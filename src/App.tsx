@@ -1,5 +1,5 @@
-import, { useState, useEffect } from 'react';
-import './App.css';
+import { useState, useEffect } from 'react'
+import './App.css'
 
 const WeatherApp = () => {
   const [city, setCity] = useState('Варна');
