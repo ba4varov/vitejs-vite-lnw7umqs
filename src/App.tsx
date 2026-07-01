@@ -1,270 +1,310 @@
-import { useState, useEffect, useRef } from 'react'
-import './App.css'
-
-const WeatherApp = () => {
-  const [city, setCity] = useState('Варна')
-  const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
-  const [searchInput, setSearchInput] = useState('')
-  const [suggestions, setSuggestions] = useState<any[]>([])
-  const [darkMode, setDarkMode] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [weather, setWeather] = useState<any>(null)
-  const [hourly, setHourly] = useState<any[]>([])
-  const [forecast, setForecast] = useState<any[]>([])
-  const searchTimer = useRef<any>(null)
-
-  const quickCities = [
-    { name: 'Варна', lat: 43.2141, lon: 27.9147 },
-    { name: 'София', lat: 42.6977, lon: 23.3219 },
-    { name: 'Пловдив', lat: 42.1522, lon: 24.7454 },
-    { name: 'Бургас', lat: 42.5048, lon: 27.4732 },
-    { name: 'Лондон', lat: 51.5074, lon: -0.1278 },
-    { name: 'Париж', lat: 48.8566, lon: 2.3522 },
-    { name: 'Ню Йорк', lat: 40.7128, lon: -74.006 },
-    { name: 'Токио', lat: 35.6762, lon: 139.6503 },
-    { name: 'Дубай', lat: 25.2048, lon: 55.2708 },
-  ]
-
-  const weekDays = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-
-  const decodeWeatherCode = (code: number) => {
-    const map: Record<number, { icon: string; desc: string }> = {
-      0: { icon: '☀️', desc: 'Ясно небе' },
-      1: { icon: '🌤️', desc: 'Предимно ясно' },
-      2: { icon: '⛅', desc: 'Частично облачно' },
-      3: { icon: '☁️', desc: 'Облачно' },
-      45: { icon: '🌫️', desc: 'Мъгла' },
-      48: { icon: '🌫️', desc: 'Замръзваща мъгла' },
-      51: { icon: '🌦️', desc: 'Лек ръмеж' },
-      53: { icon: '🌦️', desc: 'Умерен ръмеж' },
-      55: { icon: '🌧️', desc: 'Силен ръмеж' },
-      61: { icon: '🌧️', desc: 'Слаб дъжд' },
-      63: { icon: '🌧️', desc: 'Умерен дъжд' },
-      65: { icon: '🌧️', desc: 'Силен дъжд' },
-      71: { icon: '🌨️', desc: 'Слаб снеговалеж' },
-      73: { icon: '🌨️', desc: 'Умерен снеговалеж' },
-      75: { icon: '❄️', desc: 'Силен снеговалеж' },
-      80: { icon: '🌦️', desc: 'Краткотрайни превалявания' },
-      81: { icon: '🌧️', desc: 'Умерени превалявания' },
-      82: { icon: '⛈️', desc: 'Силни превалявания' },
-      95: { icon: '⛈️', desc: 'Гръмотевична буря' },
-      96: { icon: '⛈️', desc: 'Буря с градушка' },
-      99: { icon: '⛈️', desc: 'Силна буря с градушка' }
-    }
-    return map[code] || { icon: '🌡️', desc: 'Няма данни' }
-  }
-
-  const searchCities = async (query: string) => {
-    if (query.length < 2) { setSuggestions([]); return }
-    try {
-      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=bg&format=json`)
-      const data = await res.json()
-      setSuggestions(data.results || [])
-    } catch {
-      setSuggestions([])
-    }
-  }
-
-  const handleSearchInput = (val: string) => {
-    setSearchInput(val)
-    clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => searchCities(val), 300)
-  }
-
-  const selectCity = (result: any) => {
-    const name = result.name + (result.country ? `, ${result.country}` : '')
-    setCity(name)
-    setCoords({ lat: result.latitude, lon: result.longitude })
-    setSearchInput('')
-    setSuggestions([])
-  }
-
-  const fetchWeather = async (lat: number, lon: number) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-
-      const cur = decodeWeatherCode(data.current.weather_code)
-      setWeather({
-        temp: Math.round(data.current.temperature_2m),
-        humidity: data.current.relative_humidity_2m,
-        windSpeed: Math.round(data.current.wind_speed_10m),
-        description: cur.desc,
-        icon: cur.icon
-      })
-
-      const now = new Date()
-      const nowISO = now.toISOString().slice(0, 13)
-      let startIdx = data.hourly.time.findIndex((t: string) => t.slice(0, 13) === nowISO)
-      if (startIdx === -1) startIdx = 0
-      const hr = []
-      for (let i = 0; i < 24; i++) {
-        const idx = startIdx + i
-        if (idx >= data.hourly.time.length) break
-        const code = decodeWeatherCode(data.hourly.weather_code[idx])
-        hr.push({ hour: data.hourly.time[idx].slice(11, 16), temp: Math.round(data.hourly.temperature_2m[idx]), icon: code.icon })
-      }
-      setHourly(hr)
-
-      const days = []
-      for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
-        const d = new Date(data.daily.time[i])
-        const code = decodeWeatherCode(data.daily.weather_code[i])
-        days.push({ day: weekDays[d.getDay()], max: Math.round(data.daily.temperature_2m_max[i]), min: Math.round(data.daily.temperature_2m_min[i]), icon: code.icon })
-      }
-      setForecast(days)
-      setLoading(false)
-    } catch {
-      setError('Неуспешно зареждане. Моля, опитайте отново.')
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchWeather(coords.lat, coords.lon)
-    const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [coords])
-
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude })
-        setCity('Моето местоположение')
-      }, () => {}, { timeout: 5000 })
-    }
-  }, [])
-
-  const bg = darkMode ? 'weather-app dark' : 'weather-app'
-
-  return (
-    <div className={bg}>
-      <div className="header-row">
-        <h1>🌍 Прогноза на времето</h1>
-        <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
-          {darkMode ? '☀️' : '🌙'}
-        </button>
-      </div>
-
-      <div className="search-wrapper">
-        <div className="search-row">
-          <input
-            type="text"
-            placeholder="Търси град по целия свят..."
-            value={searchInput}
-            onChange={e => handleSearchInput(e.target.value)}
-            onKeyDown={e => e.key === 'Escape' && setSuggestions([])}
-            autoComplete="off"
-          />
-        </div>
-        {suggestions.length > 0 && (
-          <div className="suggestions">
-            {suggestions.map((s, i) => (
-              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
-                <span className="sug-name">{s.name}</span>
-                <span className="sug-country">{s.admin1 ? `${s.admin1}, ` : ''}{s.country}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="info-line">
-        📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин
-      </div>
-
-      <div className="city-row">
-        {quickCities.map(c => (
-          <button
-            key={c.name}
-            onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
-            className={`city-btn ${city === c.name ? 'active' : ''}`}
-          >
-            {c.name}
-          </button>
-        ))}
-      </div>
-
-      {loading && (
-        <div className="card center-text">
-          <p style={{ fontSize: '1.5rem' }}>⏳ Зареждане...</p>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="card center-text">
-          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
-          <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>Опитай отново</button>
-        </div>
-      )}
-
-      {!loading && !error && weather && (
-        <>
-          <div className="card main-card">
-            <div className="main-top">
-              <div>
-                <h2>📍 {city}</h2>
-                <p className="desc">{weather.description}</p>
-              </div>
-              <div className="big-icon">{weather.icon}</div>
-            </div>
-            <div className="big-temp">{weather.temp}°C</div>
-            <div className="stats-grid">
-              <div className="stat-box">
-                <p>💧</p>
-                <p className="label">Влажност</p>
-                <p className="value">{weather.humidity}%</p>
-              </div>
-              <div className="stat-box">
-                <p>💨</p>
-                <p className="label">Вятър</p>
-                <p className="value">{weather.windSpeed} км/ч</p>
-              </div>
-              <div className="stat-box">
-                <p>🕐</p>
-                <p className="label">Обновено</p>
-                <p className="value">{new Date().toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <h3>⏰ Следващите 24 часа</h3>
-            <div className="hourly-row">
-              {hourly.map((h, i) => (
-                <div key={i} className="hour-box">
-                  <p className="hour-time">{h.hour}</p>
-                  <p className="hour-icon">{h.icon}</p>
-                  <p className="hour-temp">{h.temp}°</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <h3>📅 Прогноза за 7 дни</h3>
-            <div className="daily-grid">
-              {forecast.map((day, i) => (
-                <div key={i} className="day-box">
-                  <p className="day-name">{day.day}</p>
-                  <p className="day-icon">{day.icon}</p>
-                  <p className="day-temp">
-                    <span className="max">{day.max}°</span><br />
-                    <span className="min">{day.min}°</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  )
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-export default WeatherApp
+.weather-app {
+  min-height: 100vh;
+  padding: 24px;
+  color: white;
+  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  font-family: 'Segoe UI', Arial, sans-serif;
+  transition: background 0.3s;
+}
+
+.weather-app.dark {
+  background: #111827;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.header-row h1 {
+  font-size: 2.2rem;
+  font-weight: bold;
+}
+
+.icon-btn {
+  font-size: 1.8rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  color: white;
+}
+
+.icon-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.search-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.search-btn {
+  background: white;
+  color: #2563eb;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.search-btn:hover {
+  background: #eff6ff;
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 100;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #1e3a5f;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:hover {
+  background: #eff6ff;
+}
+
+.sug-name {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.sug-country {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.info-line {
+  text-align: center;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-bottom: 24px;
+}
+
+.city-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.city-btn {
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+.city-btn.active {
+  background: white;
+  color: #2563eb;
+}
+
+.city-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.city-btn.active:hover {
+  background: #eff6ff;
+}
+
+.card {
+  background: rgba(255,255,255,0.2);
+  border-radius: 24px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.dark .card {
+  background: #1f2937;
+}
+
+.center-text {
+  text-align: center;
+}
+
+.card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 24px;
+}
+
+.main-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.main-top h2 {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.desc {
+  font-size: 1.1rem;
+}
+
+.big-icon {
+  font-size: 5rem;
+}
+
+.big-temp {
+  font-size: 4.5rem;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.stat-box {
+  background: rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-box .label {
+  font-size: 0.75rem;
+  margin: 8px 0 4px;
+}
+
+.stat-box .value {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.hourly-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.hour-box {
+  background: rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.hour-box:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.hour-time {
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.hour-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.hour-temp {
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.daily-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.day-box {
+  background: rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+}
+
+.day-box:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.day-name {
+  font-size: 0.9rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.day-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.day-temp .max {
+  font-weight: bold;
+}
+
+.day-temp .min {
+  opacity: 0.75;
+}
+
+@media (max-width: 600px) {
+  .header-row h1 {
+    font-size: 1.5rem;
+  }
+  .daily-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .big-temp {
+    font-size: 3rem;
+  }
+}
