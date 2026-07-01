@@ -16,6 +16,11 @@ const translations = {
     days7: '📅 Прогноза за 7 дни',
     myLocation: 'Моето местоположение',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
+    chart: '📊 Графика за 24 часа',
+    temp: 'Температура',
+    rain: 'Валежи',
+    windChart: 'Вятър',
+    mm: 'мм',
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     weather: {
       0: 'Ясно небе', 1: 'Предимно ясно', 2: 'Частично облачно', 3: 'Облачно',
@@ -51,6 +56,11 @@ const translations = {
     days7: '📅 7-Day Forecast',
     myLocation: 'My Location',
     error: 'Failed to load weather data. Please try again.',
+    chart: '📊 24-Hour Chart',
+    temp: 'Temperature',
+    rain: 'Precipitation',
+    windChart: 'Wind',
+    mm: 'mm',
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     weather: {
       0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
@@ -72,6 +82,137 @@ const translations = {
       { name: 'Dubai', lat: 25.2048, lon: 55.2708 },
     ]
   }
+}
+
+const Chart = ({ hourly, darkMode, t }) => {
+  const [activeTab, setActiveTab] = useState('temp')
+  const canvasRef = useRef(null)
+
+  const colors = {
+    temp: '#f97316',
+    rain: '#3b82f6',
+    wind: '#10b981'
+  }
+
+  useEffect(() => {
+    if (!canvasRef.current || !hourly.length) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width
+    const H = canvas.height
+    const padL = 45, padR = 20, padT = 20, padB = 40
+    const chartW = W - padL - padR
+    const chartH = H - padT - padB
+
+    ctx.clearRect(0, 0, W, H)
+
+    const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? h.rain : h.wind)
+    const labels = hourly.map(h => h.hour)
+    const minVal = Math.min(...data)
+    const maxVal = Math.max(...data)
+    const range = maxVal - minVal || 1
+
+    const xStep = chartW / (data.length - 1)
+    const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
+    const xScale = (i) => padL + i * xStep
+
+    // Grid
+    const textColor = darkMode ? '#94a3b8' : '#64748b'
+    const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
+    ctx.strokeStyle = gridColor
+    ctx.lineWidth = 1
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (chartH / 4) * i
+      ctx.beginPath()
+      ctx.moveTo(padL, y)
+      ctx.lineTo(W - padR, y)
+      ctx.stroke()
+      const val = maxVal - (range / 4) * i
+      ctx.fillStyle = textColor
+      ctx.font = '11px Arial'
+      ctx.textAlign = 'right'
+      ctx.fillText(Math.round(val), padL - 5, y + 4)
+    }
+
+    // X labels (every 3 hours)
+    ctx.fillStyle = textColor
+    ctx.font = '11px Arial'
+    ctx.textAlign = 'center'
+    data.forEach((_, i) => {
+      if (i % 3 === 0) {
+        ctx.fillText(labels[i], xScale(i), H - 10)
+      }
+    })
+
+    // Fill gradient
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
+    grad.addColorStop(0, colors[activeTab] + '55')
+    grad.addColorStop(1, colors[activeTab] + '00')
+    ctx.beginPath()
+    ctx.moveTo(xScale(0), yScale(data[0]))
+    data.forEach((val, i) => {
+      if (i === 0) return
+      const x0 = xScale(i - 1), y0 = yScale(data[i - 1])
+      const x1 = xScale(i), y1 = yScale(val)
+      const cpx = (x0 + x1) / 2
+      ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1)
+    })
+    ctx.lineTo(xScale(data.length - 1), padT + chartH)
+    ctx.lineTo(xScale(0), padT + chartH)
+    ctx.closePath()
+    ctx.fillStyle = grad
+    ctx.fill()
+
+    // Line
+    ctx.beginPath()
+    ctx.strokeStyle = colors[activeTab]
+    ctx.lineWidth = 2.5
+    data.forEach((val, i) => {
+      if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
+      const x0 = xScale(i - 1), y0 = yScale(data[i - 1])
+      const x1 = xScale(i), y1 = yScale(val)
+      const cpx = (x0 + x1) / 2
+      ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1)
+    })
+    ctx.stroke()
+
+    // Dots
+    data.forEach((val, i) => {
+      if (i % 3 === 0) {
+        ctx.beginPath()
+        ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
+        ctx.fillStyle = colors[activeTab]
+        ctx.fill()
+        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'
+        ctx.lineWidth = 2
+        ctx.stroke()
+      }
+    })
+  }, [hourly, activeTab, darkMode])
+
+  const tabs = [
+    { key: 'temp', label: t.temp, unit: '°C' },
+    { key: 'rain', label: t.rain, unit: t.mm },
+    { key: 'wind', label: t.windChart, unit: t.windUnit }
+  ]
+
+  return (
+    <div className="card">
+      <h3>{t.chart}</h3>
+      <div className="chart-tabs">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={'chart-tab' + (activeTab === tab.key ? ' active-' + tab.key : '')}
+          >
+            {tab.label} ({tab.unit})
+          </button>
+        ))}
+      </div>
+      <canvas ref={canvasRef} width={800} height={200} style={{ width: '100%', height: 'auto', display: 'block' }} />
+    </div>
+  )
 }
 
 const WeatherApp = () => {
@@ -106,9 +247,7 @@ const WeatherApp = () => {
       const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
       const data = await res.json()
       setSuggestions(data.results || [])
-    } catch (e) {
-      setSuggestions([])
-    }
+    } catch (e) { setSuggestions([]) }
   }
 
   const handleSearchInput = (val) => {
@@ -129,7 +268,7 @@ const WeatherApp = () => {
     setLoading(true)
     setError(null)
     try {
-      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'
+      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'
       const res = await fetch(url)
       if (!res.ok) throw new Error()
       const data = await res.json()
@@ -150,12 +289,19 @@ const WeatherApp = () => {
         String(now.getHours()).padStart(2, '0')
       let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === localISO)
       if (startIdx === -1) startIdx = 0
+
       const hr = []
       for (let i = 0; i < 24; i++) {
         const idx = startIdx + i
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
-        hr.push({ hour: data.hourly.time[idx].slice(11, 16), temp: Math.round(data.hourly.temperature_2m[idx]), icon: code.icon })
+        hr.push({
+          hour: data.hourly.time[idx].slice(11, 16),
+          temp: Math.round(data.hourly.temperature_2m[idx]),
+          rain: data.hourly.precipitation[idx] || 0,
+          wind: Math.round(data.hourly.wind_speed_10m[idx]),
+          icon: code.icon
+        })
       }
       setHourly(hr)
 
@@ -190,9 +336,7 @@ const WeatherApp = () => {
           const data = await res.json()
           const name = data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation
           setCity(name)
-        } catch (e) {
-          setCity(t.myLocation)
-        }
+        } catch (e) { setCity(t.myLocation) }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
@@ -213,14 +357,10 @@ const WeatherApp = () => {
 
       <div className="search-wrapper">
         <div className="search-row">
-          <input
-            type="text"
-            placeholder={t.search}
-            value={searchInput}
+          <input type="text" placeholder={t.search} value={searchInput}
             onChange={(e) => handleSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setSuggestions([])}
-            autoComplete="off"
-          />
+            autoComplete="off" />
         </div>
         {suggestions.length > 0 && (
           <div className="suggestions">
@@ -238,11 +378,9 @@ const WeatherApp = () => {
 
       <div className="city-row">
         {t.quickCities.map((c) => (
-          <button
-            key={c.name}
+          <button key={c.name}
             onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
-            className={city === c.name ? 'city-btn active' : 'city-btn'}
-          >
+            className={city === c.name ? 'city-btn active' : 'city-btn'}>
             {c.name}
           </button>
         ))}
@@ -299,6 +437,8 @@ const WeatherApp = () => {
               ))}
             </div>
           </div>
+
+          <Chart hourly={hourly} darkMode={darkMode} t={t} />
 
           <div className="card">
             <h3>{t.days7}</h3>
