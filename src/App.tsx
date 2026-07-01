@@ -58,7 +58,7 @@ const WeatherApp = () => {
   const searchCities = async (query) => {
     if (query.length < 2) { setSuggestions([]); return }
     try {
-      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=6&language=en&format=json')
+      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=bg&format=json')
       const data = await res.json()
       setSuggestions(data.results || [])
     } catch (e) {
