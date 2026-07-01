@@ -1,26 +1,32 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 const WeatherApp = () => {
-  const [city, setCity] = useState('Варна');
-  const [searchInput, setSearchInput] = useState('');
-  const [darkMode, setDarkMode] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [weather, setWeather] = useState<any>(null);
-  const [hourly, setHourly] = useState<any[]>([]);
-  const [forecast, setForecast] = useState<any[]>([]);
+  const [city, setCity] = useState('Варна')
+  const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
+  const [searchInput, setSearchInput] = useState('')
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [darkMode, setDarkMode] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [weather, setWeather] = useState<any>(null)
+  const [hourly, setHourly] = useState<any[]>([])
+  const [forecast, setForecast] = useState<any[]>([])
+  const searchTimer = useRef<any>(null)
 
-  const cities: Record<string, { lat: number; lon: number }> = {
-    'София': { lat: 42.6977, lon: 23.3219 },
-    'Варна': { lat: 43.2141, lon: 27.9147 },
-    'Пловдив': { lat: 42.1522, lon: 24.7454 },
-    'Бургас': { lat: 42.5048, lon: 27.4732 },
-    'Русе': { lat: 43.8356, lon: 25.9657 },
-    'Стара Загора': { lat: 42.4258, lon: 25.6345 }
-  };
+  const quickCities = [
+    { name: 'Варна', lat: 43.2141, lon: 27.9147 },
+    { name: 'София', lat: 42.6977, lon: 23.3219 },
+    { name: 'Пловдив', lat: 42.1522, lon: 24.7454 },
+    { name: 'Бургас', lat: 42.5048, lon: 27.4732 },
+    { name: 'Лондон', lat: 51.5074, lon: -0.1278 },
+    { name: 'Париж', lat: 48.8566, lon: 2.3522 },
+    { name: 'Ню Йорк', lat: 40.7128, lon: -74.006 },
+    { name: 'Токио', lat: 35.6762, lon: 139.6503 },
+    { name: 'Дубай', lat: 25.2048, lon: 55.2708 },
+  ]
 
-  const weekDays = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const weekDays = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
 
   const decodeWeatherCode = (code: number) => {
     const map: Record<number, { icon: string; desc: string }> = {
@@ -45,163 +51,155 @@ const WeatherApp = () => {
       95: { icon: '⛈️', desc: 'Гръмотевична буря' },
       96: { icon: '⛈️', desc: 'Буря с градушка' },
       99: { icon: '⛈️', desc: 'Силна буря с градушка' }
-    };
-    return map[code] || { icon: '🌡️', desc: 'Няма данни' };
-  };
-
-  const findNearestCity = (userLat: number, userLon: number) => {
-    let nearest = 'Варна';
-    let minDistance = Infinity;
-    Object.keys(cities).forEach(cityName => {
-      const coords = cities[cityName];
-      const distance = Math.sqrt(
-        Math.pow(userLat - coords.lat, 2) + Math.pow(userLon - coords.lon, 2)
-      );
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearest = cityName;
-      }
-    });
-    return nearest;
-  };
-
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const nearestCity = findNearestCity(position.coords.latitude, position.coords.longitude);
-          setCity(nearestCity);
-        },
-        () => {},
-        { timeout: 5000 }
-      );
     }
-  }, []);
+    return map[code] || { icon: '🌡️', desc: 'Няма данни' }
+  }
 
-  const fetchWeather = async (cityName: string) => {
-    setLoading(true);
-    setError(null);
+  const searchCities = async (query: string) => {
+    if (query.length < 2) { setSuggestions([]); return }
     try {
-      const { lat, lon } = cities[cityName];
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8`;
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=bg&format=json`)
+      const data = await res.json()
+      setSuggestions(data.results || [])
+    } catch {
+      setSuggestions([])
+    }
+  }
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Грешка при заявката');
-      const data = await response.json();
+  const handleSearchInput = (val: string) => {
+    setSearchInput(val)
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => searchCities(val), 300)
+  }
 
-      const currentCode = decodeWeatherCode(data.current.weather_code);
+  const selectCity = (result: any) => {
+    const name = result.name + (result.country ? `, ${result.country}` : '')
+    setCity(name)
+    setCoords({ lat: result.latitude, lon: result.longitude })
+    setSearchInput('')
+    setSuggestions([])
+  }
+
+  const fetchWeather = async (lat: number, lon: number) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+
+      const cur = decodeWeatherCode(data.current.weather_code)
       setWeather({
         temp: Math.round(data.current.temperature_2m),
         humidity: data.current.relative_humidity_2m,
         windSpeed: Math.round(data.current.wind_speed_10m),
-        description: currentCode.desc,
-        icon: currentCode.icon
-      });
+        description: cur.desc,
+        icon: cur.icon
+      })
 
-      const now = new Date();
-      const nowISO = now.toISOString().slice(0, 13);
-      let startIdx = data.hourly.time.findIndex((t: string) => t.slice(0, 13) === nowISO);
-      if (startIdx === -1) startIdx = 0;
-
-      const hourlyResult = [];
+      const now = new Date()
+      const nowISO = now.toISOString().slice(0, 13)
+      let startIdx = data.hourly.time.findIndex((t: string) => t.slice(0, 13) === nowISO)
+      if (startIdx === -1) startIdx = 0
+      const hr = []
       for (let i = 0; i < 24; i++) {
-        const idx = startIdx + i;
-        if (idx >= data.hourly.time.length) break;
-        const timeStr = data.hourly.time[idx];
-        const hourNum = timeStr.slice(11, 16);
-        const code = decodeWeatherCode(data.hourly.weather_code[idx]);
-        hourlyResult.push({
-          hour: hourNum,
-          temp: Math.round(data.hourly.temperature_2m[idx]),
-          icon: code.icon
-        });
+        const idx = startIdx + i
+        if (idx >= data.hourly.time.length) break
+        const code = decodeWeatherCode(data.hourly.weather_code[idx])
+        hr.push({ hour: data.hourly.time[idx].slice(11, 16), temp: Math.round(data.hourly.temperature_2m[idx]), icon: code.icon })
       }
-      setHourly(hourlyResult);
+      setHourly(hr)
 
-      const dailyResult = [];
+      const days = []
       for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
-        const dateObj = new Date(data.daily.time[i]);
-        const code = decodeWeatherCode(data.daily.weather_code[i]);
-        dailyResult.push({
-          day: weekDays[dateObj.getDay()],
-          max: Math.round(data.daily.temperature_2m_max[i]),
-          min: Math.round(data.daily.temperature_2m_min[i]),
-          icon: code.icon
-        });
+        const d = new Date(data.daily.time[i])
+        const code = decodeWeatherCode(data.daily.weather_code[i])
+        days.push({ day: weekDays[d.getDay()], max: Math.round(data.daily.temperature_2m_max[i]), min: Math.round(data.daily.temperature_2m_min[i]), icon: code.icon })
       }
-      setForecast(dailyResult);
-
-      setLoading(false);
-    } catch (err) {
-      setError('Неуспешно зареждане на реални данни. Моля, опитайте отново.');
-      setLoading(false);
+      setForecast(days)
+      setLoading(false)
+    } catch {
+      setError('Неуспешно зареждане. Моля, опитайте отново.')
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchWeather(city);
-    const interval = setInterval(() => fetchWeather(city), 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [city]);
+    fetchWeather(coords.lat, coords.lon)
+    const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [coords])
 
-  const handleSearch = () => {
-    const matched = Object.keys(cities).find(
-      c => c.toLowerCase() === searchInput.trim().toLowerCase()
-    );
-    if (matched) {
-      setCity(matched);
-      setSearchInput('');
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude })
+        setCity('Моето местоположение')
+      }, () => {}, { timeout: 5000 })
     }
-  };
+  }, [])
+
+  const bg = darkMode ? 'weather-app dark' : 'weather-app'
 
   return (
-    <div className={`weather-app ${darkMode ? 'dark' : ''}`}>
+    <div className={bg}>
       <div className="header-row">
-        <h1>Прогноза на времето</h1>
+        <h1>🌍 Прогноза на времето</h1>
         <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
           {darkMode ? '☀️' : '🌙'}
         </button>
       </div>
 
-      <div className="search-row">
-        <input
-          type="text"
-          placeholder="Търси град (София, Варна, Пловдив, Бургас, Русе, Стара Загора)..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-        />
-        <button className="search-btn" onClick={handleSearch}>Търси</button>
+      <div className="search-wrapper">
+        <div className="search-row">
+          <input
+            type="text"
+            placeholder="Търси град по целия свят..."
+            value={searchInput}
+            onChange={e => handleSearchInput(e.target.value)}
+            onKeyDown={e => e.key === 'Escape' && setSuggestions([])}
+            autoComplete="off"
+          />
+        </div>
+        {suggestions.length > 0 && (
+          <div className="suggestions">
+            {suggestions.map((s, i) => (
+              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
+                <span className="sug-name">{s.name}</span>
+                <span className="sug-country">{s.admin1 ? `${s.admin1}, ` : ''}{s.country}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="info-line">
-        📍 Реални данни от Open-Meteo · Обновява се автоматично на всеки 15 мин
+        📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин
       </div>
 
       <div className="city-row">
-        {Object.keys(cities).map(c => (
+        {quickCities.map(c => (
           <button
-            key={c}
-            onClick={() => setCity(c)}
-            className={`city-btn ${city === c ? 'active' : ''}`}
+            key={c.name}
+            onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
+            className={`city-btn ${city === c.name ? 'active' : ''}`}
           >
-            {c}
+            {c.name}
           </button>
         ))}
       </div>
 
       {loading && (
         <div className="card center-text">
-          <p style={{ fontSize: '1.5rem' }}>⏳ Зареждане на реални данни...</p>
+          <p style={{ fontSize: '1.5rem' }}>⏳ Зареждане...</p>
         </div>
       )}
 
       {error && !loading && (
         <div className="card center-text">
           <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
-          <button className="search-btn" onClick={() => fetchWeather(city)}>
-            Опитай отново
-          </button>
+          <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>Опитай отново</button>
         </div>
       )}
 
@@ -215,9 +213,7 @@ const WeatherApp = () => {
               </div>
               <div className="big-icon">{weather.icon}</div>
             </div>
-
             <div className="big-temp">{weather.temp}°C</div>
-
             <div className="stats-grid">
               <div className="stat-box">
                 <p>💧</p>
@@ -238,7 +234,7 @@ const WeatherApp = () => {
           </div>
 
           <div className="card">
-            <h3>⏰ Прогноза за следващите 24 часа</h3>
+            <h3>⏰ Следващите 24 часа</h3>
             <div className="hourly-row">
               {hourly.map((h, i) => (
                 <div key={i} className="hour-box">
@@ -258,8 +254,7 @@ const WeatherApp = () => {
                   <p className="day-name">{day.day}</p>
                   <p className="day-icon">{day.icon}</p>
                   <p className="day-temp">
-                    <span className="max">{day.max}°</span>
-                    <br />
+                    <span className="max">{day.max}°</span><br />
                     <span className="min">{day.min}°</span>
                   </p>
                 </div>
@@ -269,7 +264,7 @@ const WeatherApp = () => {
         </>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default WeatherApp;
+export default WeatherApp
