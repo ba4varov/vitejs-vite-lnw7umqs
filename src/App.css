@@ -118,8 +118,21 @@
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
-.dark .card {
-  background: #1f2937;
+.dark h1,
+.dark h2,
+.dark h3,
+.dark p,
+.dark .desc,
+.dark .label,
+.dark .value,
+.dark .hour-time,
+.dark .hour-temp,
+.dark .day-name,
+.dark .day-temp,
+.dark .max,
+.dark .min,
+.dark .info-line {
+  color: white;
 }
 
 .center-text {
