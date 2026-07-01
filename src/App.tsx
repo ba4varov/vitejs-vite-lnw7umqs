@@ -133,13 +133,21 @@ const WeatherApp = () => {
 
   useEffect(() => {
     if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude })
-        setCity('My Location')
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude
+        const lon = pos.coords.longitude
+        setCoords({ lat, lon })
+        try {
+          const res = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
+          const data = await res.json()
+          const name = data.address.city || data.address.town || data.address.village || data.address.county || 'My Location'
+          setCity(name)
+        } catch (e) {
+          setCity('My Location')
+        }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
-
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
       <div className="header-row">
