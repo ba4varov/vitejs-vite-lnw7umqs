@@ -275,5 +275,24 @@ let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === localISO)
     </div>
   )
 }
+.header-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
+.lang-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.lang-btn:hover {
+  background: rgba(255,255,255,0.35);
+}
 export default WeatherApp
