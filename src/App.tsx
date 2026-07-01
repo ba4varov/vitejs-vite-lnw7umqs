@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import './App.css'
 
 const translations = {
@@ -457,6 +458,7 @@ const WeatherApp = () => {
           </div>
         </div>
       )}
+      <SpeedInsights />
     </div>
   )
 }
