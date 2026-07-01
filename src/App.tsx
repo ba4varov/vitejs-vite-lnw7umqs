@@ -99,8 +99,11 @@ const WeatherApp = () => {
       })
 
       const now = new Date()
-      const nowISO = now.toISOString().slice(0, 13)
-      let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === nowISO)
+const localISO = now.getFullYear() + '-' +
+  String(now.getMonth() + 1).padStart(2, '0') + '-' +
+  String(now.getDate()).padStart(2, '0') + 'T' +
+  String(now.getHours()).padStart(2, '0')
+let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === localISO)
       if (startIdx === -1) startIdx = 0
       const hr = []
       for (let i = 0; i < 24; i++) {
