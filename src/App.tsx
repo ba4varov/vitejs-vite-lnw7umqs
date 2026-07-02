@@ -88,11 +88,7 @@ const Chart = ({ hourly, darkMode, t }) => {
   const [activeTab, setActiveTab] = useState('temp')
   const canvasRef = useRef(null)
 
-  const colors = {
-    temp: '#f97316',
-    rain: '#3b82f6',
-    wind: '#10b981'
-  }
+  const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981' }
 
   useEffect(() => {
     if (!canvasRef.current || !hourly.length) return
@@ -116,9 +112,9 @@ const Chart = ({ hourly, darkMode, t }) => {
     const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
     const xScale = (i) => padL + i * xStep
 
-    // Grid
     const textColor = darkMode ? '#94a3b8' : '#64748b'
     const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
+
     ctx.strokeStyle = gridColor
     ctx.lineWidth = 1
     for (let i = 0; i <= 4; i++) {
@@ -134,20 +130,17 @@ const Chart = ({ hourly, darkMode, t }) => {
       ctx.fillText(Math.round(val), padL - 5, y + 4)
     }
 
-    // X labels (every 3 hours)
     ctx.fillStyle = textColor
     ctx.font = '11px Arial'
     ctx.textAlign = 'center'
     data.forEach((_, i) => {
-      if (i % 3 === 0) {
-        ctx.fillText(labels[i], xScale(i), H - 10)
-      }
+      if (i % 3 === 0) ctx.fillText(labels[i], xScale(i), H - 10)
     })
 
-    // Fill gradient
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, colors[activeTab] + '55')
     grad.addColorStop(1, colors[activeTab] + '00')
+
     ctx.beginPath()
     ctx.moveTo(xScale(0), yScale(data[0]))
     data.forEach((val, i) => {
@@ -163,7 +156,6 @@ const Chart = ({ hourly, darkMode, t }) => {
     ctx.fillStyle = grad
     ctx.fill()
 
-    // Line
     ctx.beginPath()
     ctx.strokeStyle = colors[activeTab]
     ctx.lineWidth = 2.5
@@ -176,7 +168,6 @@ const Chart = ({ hourly, darkMode, t }) => {
     })
     ctx.stroke()
 
-    // Dots
     data.forEach((val, i) => {
       if (i % 3 === 0) {
         ctx.beginPath()
@@ -201,11 +192,8 @@ const Chart = ({ hourly, darkMode, t }) => {
       <h3>{t.chart}</h3>
       <div className="chart-tabs">
         {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={'chart-tab' + (activeTab === tab.key ? ' active-' + tab.key : '')}
-          >
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={'chart-tab' + (activeTab === tab.key ? ' active-' + tab.key : '')}>
             {tab.label} ({tab.unit})
           </button>
         ))}
