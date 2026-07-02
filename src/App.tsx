@@ -12,6 +12,12 @@ const translations = {
     wind: 'Вятър',
     windUnit: 'км/ч',
     updated: 'Обновено',
+    feelsLike: 'Усеща се като',
+    visibility: 'Видимост',
+    pressure: 'Налягане',
+    uvIndex: 'UV индекс',
+    km: 'км',
+    hpa: 'хПа',
     hours24: '⏰ Следващите 24 часа',
     days7: '📅 Прогноза за 7 дни',
     myLocation: 'Моето местоположение',
@@ -21,12 +27,6 @@ const translations = {
     rain: 'Валежи',
     windChart: 'Вятър',
     mm: 'мм',
-    feelsLike: 'Усеща се като',
-visibility: 'Видимост',
-pressure: 'Налягане',
-uvIndex: 'UV индекс',
-km: 'км',
-hpa: 'хПа',
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     weather: {
       0: 'Ясно небе', 1: 'Предимно ясно', 2: 'Частично облачно', 3: 'Облачно',
@@ -58,6 +58,12 @@ hpa: 'хПа',
     wind: 'Wind',
     windUnit: 'km/h',
     updated: 'Updated',
+    feelsLike: 'Feels Like',
+    visibility: 'Visibility',
+    pressure: 'Pressure',
+    uvIndex: 'UV Index',
+    km: 'km',
+    hpa: 'hPa',
     hours24: '⏰ Next 24 Hours',
     days7: '📅 7-Day Forecast',
     myLocation: 'My Location',
@@ -67,12 +73,6 @@ hpa: 'хПа',
     rain: 'Precipitation',
     windChart: 'Wind',
     mm: 'mm',
-    feelsLike: 'Feels Like',
-visibility: 'Visibility',
-pressure: 'Pressure',
-uvIndex: 'UV Index',
-km: 'km',
-hpa: 'hPa',
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     weather: {
       0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
@@ -99,7 +99,6 @@ hpa: 'hPa',
 const Chart = ({ hourly, darkMode, t }) => {
   const [activeTab, setActiveTab] = useState('temp')
   const canvasRef = useRef(null)
-
   const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981' }
 
   useEffect(() => {
@@ -111,22 +110,17 @@ const Chart = ({ hourly, darkMode, t }) => {
     const padL = 45, padR = 20, padT = 20, padB = 40
     const chartW = W - padL - padR
     const chartH = H - padT - padB
-
     ctx.clearRect(0, 0, W, H)
-
     const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? h.rain : h.wind)
     const labels = hourly.map(h => h.hour)
     const minVal = Math.min(...data)
     const maxVal = Math.max(...data)
     const range = maxVal - minVal || 1
-
     const xStep = chartW / (data.length - 1)
     const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
     const xScale = (i) => padL + i * xStep
-
     const textColor = darkMode ? '#94a3b8' : '#64748b'
     const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
-
     ctx.strokeStyle = gridColor
     ctx.lineWidth = 1
     for (let i = 0; i <= 4; i++) {
@@ -141,18 +135,13 @@ const Chart = ({ hourly, darkMode, t }) => {
       ctx.textAlign = 'right'
       ctx.fillText(Math.round(val), padL - 5, y + 4)
     }
-
     ctx.fillStyle = textColor
     ctx.font = '11px Arial'
     ctx.textAlign = 'center'
-    data.forEach((_, i) => {
-      if (i % 3 === 0) ctx.fillText(labels[i], xScale(i), H - 10)
-    })
-
+    data.forEach((_, i) => { if (i % 3 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, colors[activeTab] + '55')
     grad.addColorStop(1, colors[activeTab] + '00')
-
     ctx.beginPath()
     ctx.moveTo(xScale(0), yScale(data[0]))
     data.forEach((val, i) => {
@@ -167,7 +156,6 @@ const Chart = ({ hourly, darkMode, t }) => {
     ctx.closePath()
     ctx.fillStyle = grad
     ctx.fill()
-
     ctx.beginPath()
     ctx.strokeStyle = colors[activeTab]
     ctx.lineWidth = 2.5
@@ -179,7 +167,6 @@ const Chart = ({ hourly, darkMode, t }) => {
       ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1)
     })
     ctx.stroke()
-
     data.forEach((val, i) => {
       if (i % 3 === 0) {
         ctx.beginPath()
@@ -228,7 +215,6 @@ const WeatherApp = () => {
   const [hourly, setHourly] = useState([])
   const [forecast, setForecast] = useState([])
   const searchTimer = useRef(null)
-
   const t = translations[lang]
 
   const decodeWeatherCode = (code) => {
@@ -268,20 +254,22 @@ const WeatherApp = () => {
     setLoading(true)
     setError(null)
     try {
-      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'
+      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'
       const res = await fetch(url)
       if (!res.ok) throw new Error()
       const data = await res.json()
-
       const cur = decodeWeatherCode(data.current.weather_code)
       setWeather({
         temp: Math.round(data.current.temperature_2m),
         humidity: data.current.relative_humidity_2m,
         windSpeed: Math.round(data.current.wind_speed_10m),
+        feelsLike: Math.round(data.current.apparent_temperature),
+        visibility: Math.round((data.current.visibility || 0) / 1000),
+        pressure: Math.round(data.current.surface_pressure),
+        uvIndex: Math.round(data.current.uv_index),
         description: cur.desc,
         icon: cur.icon
       })
-
       const now = new Date()
       const localISO = now.getFullYear() + '-' +
         String(now.getMonth() + 1).padStart(2, '0') + '-' +
@@ -289,7 +277,6 @@ const WeatherApp = () => {
         String(now.getHours()).padStart(2, '0')
       let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === localISO)
       if (startIdx === -1) startIdx = 0
-
       const hr = []
       for (let i = 0; i < 24; i++) {
         const idx = startIdx + i
@@ -304,7 +291,6 @@ const WeatherApp = () => {
         })
       }
       setHourly(hr)
-
       const days = []
       for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
         const d = new Date(data.daily.time[i])
@@ -418,9 +404,24 @@ const WeatherApp = () => {
                 <p className="value">{weather.windSpeed} {t.windUnit}</p>
               </div>
               <div className="stat-box">
-                <p>🕐</p>
-                <p className="label">{t.updated}</p>
-                <p className="value">{new Date().toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
+                <p>🌡️</p>
+                <p className="label">{t.feelsLike}</p>
+                <p className="value">{weather.feelsLike}°C</p>
+              </div>
+              <div className="stat-box">
+                <p>👁️</p>
+                <p className="label">{t.visibility}</p>
+                <p className="value">{weather.visibility} {t.km}</p>
+              </div>
+              <div className="stat-box">
+                <p>🔵</p>
+                <p className="label">{t.pressure}</p>
+                <p className="value">{weather.pressure} {t.hpa}</p>
+              </div>
+              <div className="stat-box">
+                <p>☀️</p>
+                <p className="label">{t.uvIndex}</p>
+                <p className="value">{weather.uvIndex}</p>
               </div>
             </div>
           </div>
