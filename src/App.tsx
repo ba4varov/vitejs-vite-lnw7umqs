@@ -52,7 +52,6 @@ const translations = {
   },
   en: {
     title: '🌍 Weather PRO',
-      subtitle: 'Your meteo guide'
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
     loading: '⏳ Loading...',
