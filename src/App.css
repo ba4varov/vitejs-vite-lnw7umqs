@@ -274,3 +274,42 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+.chart-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.chart-tab {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+.chart-tab:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.active-temp {
+  background: #f97316;
+  color: white;
+}
+
+.active-rain {
+  background: #3b82f6;
+  color: white;
+}
+
+.active-wind {
+  background: #10b981;
+  color: white;
+}
+
+.dark .chart-tab {
+  color: white;
+}
