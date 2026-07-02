@@ -29,6 +29,12 @@
   font-weight: bold;
 }
 
+.header-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .icon-btn {
   font-size: 1.8rem;
   background: transparent;
@@ -43,10 +49,29 @@
   background: rgba(255,255,255,0.2);
 }
 
+.lang-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.lang-btn:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+.search-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
 .search-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 24px;
 }
 
 .search-row input {
@@ -71,6 +96,43 @@
 
 .search-btn:hover {
   background: #eff6ff;
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 100;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #1e3a5f;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:hover {
+  background: #eff6ff;
+}
+
+.sug-name {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.sug-country {
+  font-size: 0.8rem;
+  color: #666;
 }
 
 .info-line {
@@ -118,21 +180,8 @@
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
-.dark h1,
-.dark h2,
-.dark h3,
-.dark p,
-.dark .desc,
-.dark .label,
-.dark .value,
-.dark .hour-time,
-.dark .hour-temp,
-.dark .day-name,
-.dark .day-temp,
-.dark .max,
-.dark .min,
-.dark .info-line {
-  color: white;
+.dark .card {
+  background: #1f2937;
 }
 
 .center-text {
@@ -266,14 +315,6 @@
   opacity: 0.75;
 }
 
-@media (max-width: 600px) {
-  .daily-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 .chart-tabs {
   display: flex;
   gap: 8px;
@@ -312,4 +353,36 @@
 
 .dark .chart-tab {
   color: white;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark p,
+.dark .desc,
+.dark .label,
+.dark .value,
+.dark .hour-time,
+.dark .hour-temp,
+.dark .day-name,
+.dark .day-temp,
+.dark .max,
+.dark .min,
+.dark .info-line {
+  color: white;
+}
+
+@media (max-width: 600px) {
+  .header-row h1 {
+    font-size: 1.5rem;
+  }
+  .daily-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .big-temp {
+    font-size: 3rem;
+  }
 }
