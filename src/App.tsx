@@ -16,6 +16,8 @@ const translations = {
     visibility: 'Видимост',
     pressure: 'Налягане',
     uvIndex: 'UV индекс',
+    seaTemp: 'Темп. на водата',
+    noSeaData: 'няма данни',
     km: 'км',
     hpa: 'hPa',
     hours24: '⏰ Следващите 24 часа',
@@ -62,6 +64,8 @@ const translations = {
     visibility: 'Visibility',
     pressure: 'Pressure',
     uvIndex: 'UV Index',
+    seaTemp: 'Water Temp',
+    noSeaData: 'n/a',
     km: 'km',
     hpa: 'hPa',
     hours24: '⏰ Next 24 Hours',
@@ -105,16 +109,13 @@ const Chart = ({ hourly, darkMode, t }) => {
     if (!canvasRef.current || !hourly.length) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    const W = canvas.width
-    const H = canvas.height
+    const W = canvas.width, H = canvas.height
     const padL = 45, padR = 20, padT = 20, padB = 40
-    const chartW = W - padL - padR
-    const chartH = H - padT - padB
+    const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
     const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? h.rain : h.wind)
     const labels = hourly.map(h => h.hour)
-    const minVal = Math.min(...data)
-    const maxVal = Math.max(...data)
+    const minVal = Math.min(...data), maxVal = Math.max(...data)
     const range = maxVal - minVal || 1
     const xStep = chartW / (data.length - 1)
     const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
@@ -125,57 +126,34 @@ const Chart = ({ hourly, darkMode, t }) => {
     ctx.lineWidth = 1
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
-      ctx.beginPath()
-      ctx.moveTo(padL, y)
-      ctx.lineTo(W - padR, y)
-      ctx.stroke()
-      const val = maxVal - (range / 4) * i
-      ctx.fillStyle = textColor
-      ctx.font = '11px Arial'
-      ctx.textAlign = 'right'
-      ctx.fillText(Math.round(val), padL - 5, y + 4)
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
+      ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'right'
+      ctx.fillText(Math.round(maxVal - (range / 4) * i), padL - 5, y + 4)
     }
-    ctx.fillStyle = textColor
-    ctx.font = '11px Arial'
-    ctx.textAlign = 'center'
+    ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'center'
     data.forEach((_, i) => { if (i % 3 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
-    grad.addColorStop(0, colors[activeTab] + '55')
-    grad.addColorStop(1, colors[activeTab] + '00')
-    ctx.beginPath()
-    ctx.moveTo(xScale(0), yScale(data[0]))
+    grad.addColorStop(0, colors[activeTab] + '55'); grad.addColorStop(1, colors[activeTab] + '00')
+    ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
     data.forEach((val, i) => {
       if (i === 0) return
-      const x0 = xScale(i - 1), y0 = yScale(data[i - 1])
-      const x1 = xScale(i), y1 = yScale(val)
-      const cpx = (x0 + x1) / 2
-      ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1)
+      const cpx = (xScale(i - 1) + xScale(i)) / 2
+      ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
     })
-    ctx.lineTo(xScale(data.length - 1), padT + chartH)
-    ctx.lineTo(xScale(0), padT + chartH)
-    ctx.closePath()
-    ctx.fillStyle = grad
-    ctx.fill()
-    ctx.beginPath()
-    ctx.strokeStyle = colors[activeTab]
-    ctx.lineWidth = 2.5
+    ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
+    ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
+    ctx.beginPath(); ctx.strokeStyle = colors[activeTab]; ctx.lineWidth = 2.5
     data.forEach((val, i) => {
       if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
-      const x0 = xScale(i - 1), y0 = yScale(data[i - 1])
-      const x1 = xScale(i), y1 = yScale(val)
-      const cpx = (x0 + x1) / 2
-      ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1)
+      const cpx = (xScale(i - 1) + xScale(i)) / 2
+      ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
     })
     ctx.stroke()
     data.forEach((val, i) => {
       if (i % 3 === 0) {
-        ctx.beginPath()
-        ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
-        ctx.fillStyle = colors[activeTab]
-        ctx.fill()
-        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'
-        ctx.lineWidth = 2
-        ctx.stroke()
+        ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
+        ctx.fillStyle = colors[activeTab]; ctx.fill()
+        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 2; ctx.stroke()
       }
     })
   }, [hourly, activeTab, darkMode])
@@ -254,10 +232,28 @@ const WeatherApp = () => {
     setLoading(true)
     setError(null)
     try {
-      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'
-      const res = await fetch(url)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
+      const [weatherRes, marineRes] = await Promise.allSettled([
+        fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'),
+        fetch('https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto')
+      ])
+
+      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
+      const data = await weatherRes.value.json()
+
+      let seaTemp = null
+      let hourlySeaTemp = []
+      if (marineRes.status === 'fulfilled' && marineRes.value.ok) {
+        try {
+          const marineData = await marineRes.value.json()
+          if (marineData.current && marineData.current.sea_surface_temperature != null) {
+            seaTemp = Math.round(marineData.current.sea_surface_temperature)
+          }
+          if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
+            hourlySeaTemp = marineData.hourly.sea_surface_temperature
+          }
+        } catch (e) {}
+      }
+
       const cur = decodeWeatherCode(data.current.weather_code)
       setWeather({
         temp: Math.round(data.current.temperature_2m),
@@ -267,9 +263,11 @@ const WeatherApp = () => {
         visibility: Math.round((data.current.visibility || 0) / 1000),
         pressure: Math.round(data.current.surface_pressure),
         uvIndex: Math.round(data.current.uv_index),
+        seaTemp: seaTemp,
         description: cur.desc,
         icon: cur.icon
       })
+
       const now = new Date()
       const localISO = now.getFullYear() + '-' +
         String(now.getMonth() + 1).padStart(2, '0') + '-' +
@@ -277,20 +275,24 @@ const WeatherApp = () => {
         String(now.getHours()).padStart(2, '0')
       let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === localISO)
       if (startIdx === -1) startIdx = 0
+
       const hr = []
       for (let i = 0; i < 24; i++) {
         const idx = startIdx + i
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
+        const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
         hr.push({
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
           rain: data.hourly.precipitation[idx] || 0,
           wind: Math.round(data.hourly.wind_speed_10m[idx]),
+          seaTemp: sst != null ? Math.round(sst) : null,
           icon: code.icon
         })
       }
       setHourly(hr)
+
       const days = []
       for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
         const d = new Date(data.daily.time[i])
@@ -314,14 +316,12 @@ const WeatherApp = () => {
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = pos.coords.latitude
-        const lon = pos.coords.longitude
+        const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
           const res = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang)
           const data = await res.json()
-          const name = data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation
-          setCity(name)
+          setCity(data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation)
         } catch (e) { setCity(t.myLocation) }
       }, () => {}, { timeout: 5000 })
     }
@@ -393,36 +393,15 @@ const WeatherApp = () => {
             </div>
             <div className="big-temp">{weather.temp}°C</div>
             <div className="stats-grid">
-              <div className="stat-box">
-                <p>💧</p>
-                <p className="label">{t.humidity}</p>
-                <p className="value">{weather.humidity}%</p>
-              </div>
-              <div className="stat-box">
-                <p>💨</p>
-                <p className="label">{t.wind}</p>
-                <p className="value">{weather.windSpeed} {t.windUnit}</p>
-              </div>
-              <div className="stat-box">
-                <p>🌡️</p>
-                <p className="label">{t.feelsLike}</p>
-                <p className="value">{weather.feelsLike}°C</p>
-              </div>
-              <div className="stat-box">
-                <p>👁️</p>
-                <p className="label">{t.visibility}</p>
-                <p className="value">{weather.visibility} {t.km}</p>
-              </div>
-              <div className="stat-box">
-                <p>🔵</p>
-                <p className="label">{t.pressure}</p>
-                <p className="value">{weather.pressure} {t.hpa}</p>
-              </div>
-              <div className="stat-box">
-                <p>☀️</p>
-                <p className="label">{t.uvIndex}</p>
-                <p className="value">{weather.uvIndex}</p>
-              </div>
+              <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
+              <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+              <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
+              <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
+              <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
+              <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
+              {weather.seaTemp !== null && (
+                <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
+              )}
             </div>
           </div>
 
@@ -433,7 +412,9 @@ const WeatherApp = () => {
                 <div key={i} className="hour-box">
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon">{h.icon}</p>
-                  <p className="hour-temp">{h.temp}°</p>
+                  <p className="hour-temp">{h.temp}°C</p>
+                  <p className="hour-wind">💨 {h.wind} {t.windUnit}</p>
+                  {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
                 </div>
               ))}
             </div>
