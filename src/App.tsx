@@ -17,7 +17,7 @@ const translations = {
     pressure: 'Налягане',
     uvIndex: 'UV индекс',
     km: 'км',
-    hpa: 'хПа',
+    hpa: 'hPa',
     hours24: '⏰ Следващите 24 часа',
     days7: '📅 Прогноза за 7 дни',
     myLocation: 'Моето местоположение',
