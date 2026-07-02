@@ -3,7 +3,7 @@ import './App.css'
 
 const translations = {
   bg: {
-    title: '🌍 Прогноза на времето',
+    title: '🌍 Времето PRO',
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
     loading: '⏳ Зареждане...',
