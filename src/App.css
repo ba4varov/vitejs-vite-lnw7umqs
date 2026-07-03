@@ -379,6 +379,43 @@
   .daily-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+  @keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes bounce-rain {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+  60% { transform: translateY(2px); }
+}
+
+@keyframes flash {
+  0%, 90%, 100% { opacity: 1; }
+  95% { opacity: 0.2; }
+}
+
+@keyframes fall {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(5px) rotate(15deg); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(6px); }
+}
+
+.spin-slow { animation: spin-slow 8s linear infinite; }
+.float { animation: float 3s ease-in-out infinite; }
+.bounce-rain { animation: bounce-rain 1.5s ease-in-out infinite; }
+.flash { animation: flash 2s ease-in-out infinite; }
+.fall { animation: fall 2s ease-in-out infinite; }
+.drift { animation: drift 3s ease-in-out infinite; }
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
