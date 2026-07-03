@@ -52,7 +52,7 @@ const translations = {
     ]
   },
   en: {
-    title: '🌤️ Wheater PRO',
+    title: '🌤️ Времето PRO',
     subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
@@ -102,7 +102,31 @@ const translations = {
   }
 }
 
-const Chart = ({ hourly, darkMode, t }) => {
+const getTempGradient = (temp) => {
+  if (temp < 0) return 'linear-gradient(135deg, #6b21a8, #3b82f6)'
+  if (temp < 10) return 'linear-gradient(135deg, #1d4ed8, #38bdf8)'
+  if (temp < 15) return 'linear-gradient(135deg, #0891b2, #34d399)'
+  if (temp < 20) return 'linear-gradient(135deg, #059669, #84cc16)'
+  if (temp < 25) return 'linear-gradient(135deg, #ca8a04, #facc15)'
+  if (temp < 30) return 'linear-gradient(135deg, #ea580c, #fbbf24)'
+  return 'linear-gradient(135deg, #dc2626, #f97316)'
+}
+
+const getIconAnimation = (icon) => {
+  if (icon === '☀️') return 'spin-slow'
+  if (icon === '🌤️' || icon === '⛅') return 'float'
+  if (icon === '🌧️' || icon === '🌦️') return 'bounce-rain'
+  if (icon === '⛈️') return 'flash'
+  if (icon === '❄️' || icon === '🌨️') return 'fall'
+  if (icon === '🌫️') return 'drift'
+  return 'float'
+}
+
+const AnimatedIcon = ({ icon, size = '1.5rem' }) => (
+  <span className={'animated-icon ' + getIconAnimation(icon)} style={{ fontSize: size, display: 'inline-block' }}>
+    {icon}
+  </span>
+)
   const [activeTab, setActiveTab] = useState('temp')
   const canvasRef = useRef(null)
   const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981' }
@@ -387,13 +411,13 @@ const WeatherApp = () => {
 
       {!loading && !error && weather && (
         <div>
-          <div className="card main-card">
+                      <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
             <div className="main-top">
               <div>
                 <h2>📍 {city}</h2>
                 <p className="desc">{weather.description}</p>
               </div>
-              <div className="big-icon">{weather.icon}</div>
+              <div className="big-icon"><AnimatedIcon icon={weather.icon} size="5rem" /></div>
             </div>
             <div className="big-temp">{weather.temp}°C</div>
             <div className="stats-grid">
@@ -415,7 +439,7 @@ const WeatherApp = () => {
               {hourly.map((h, i) => (
                 <div key={i} className="hour-box">
                   <p className="hour-time">{h.hour}</p>
-                  <p className="hour-icon">{h.icon}</p>
+                  <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
                   <p className="hour-wind">💨 {h.wind} {t.windUnit}</p>
                   {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
@@ -432,7 +456,7 @@ const WeatherApp = () => {
               {forecast.map((day, i) => (
                 <div key={i} className="day-box">
                   <p className="day-name">{day.day}</p>
-                  <p className="day-icon">{day.icon}</p>
+                  <p className="day-icon"><AnimatedIcon icon={day.icon} size="2rem" /></p>
                   <p className="day-temp">
                     <span className="max">{day.max}°</span><br />
                     <span className="min">{day.min}°</span>
