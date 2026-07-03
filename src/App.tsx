@@ -235,7 +235,7 @@ const WeatherApp = () => {
     setError(null)
     try {
       const [weatherRes, marineRes] = await Promise.allSettled([
-        fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'),
+        fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&forecast_days=8'),
         fetch('https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto')
       ])
       if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
@@ -298,7 +298,7 @@ const WeatherApp = () => {
       for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
         const d = new Date(data.daily.time[i])
         const code = decodeWeatherCode(data.daily.weather_code[i])
-        days.push({ day: t.weekDays[d.getDay()], max: Math.round(data.daily.temperature_2m_max[i]), min: Math.round(data.daily.temperature_2m_min[i]), icon: code.icon })
+        days.push({ day: t.weekDays[d.getDay()], max: Math.round(data.daily.temperature_2m_max[i]), min: Math.round(data.daily.temperature_2m_min[i]), icon: code.icon, rain: (data.daily.precipitation_sum[i] || 0).toFixed(1), wind: Math.round(data.daily.wind_speed_10m_max[i]) })
       }
       setForecast(days)
       setLoading(false)
@@ -437,6 +437,8 @@ const WeatherApp = () => {
                     <span className="max">{day.max}°</span><br />
                     <span className="min">{day.min}°</span>
                   </p>
+                  <p className="day-rain">🌧 {day.rain}{t.mm}</p>
+                  <p className="day-wind">💨 {day.wind}{t.windUnit}</p>
                 </div>
               ))}
             </div>
