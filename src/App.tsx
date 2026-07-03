@@ -122,11 +122,16 @@ const getIconAnimation = (icon) => {
   return 'float'
 }
 
-const AnimatedIcon = ({ icon, size = '1.5rem' }) => (
-  <span className={'animated-icon ' + getIconAnimation(icon)} style={{ fontSize: size, display: 'inline-block' }}>
-    {icon}
-  </span>
-)
+const AnimatedIcon = ({ icon, size }) => {
+  const sz = size || '1.5rem'
+  return (
+    <span className={'animated-icon ' + getIconAnimation(icon)} style={{ fontSize: sz, display: 'inline-block' }}>
+      {icon}
+    </span>
+  )
+}
+
+const Chart = ({ hourly, darkMode, t }) => {
   const [activeTab, setActiveTab] = useState('temp')
   const canvasRef = useRef(null)
   const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981' }
@@ -322,7 +327,14 @@ const WeatherApp = () => {
       for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
         const d = new Date(data.daily.time[i])
         const code = decodeWeatherCode(data.daily.weather_code[i])
-        days.push({ day: t.weekDays[d.getDay()], max: Math.round(data.daily.temperature_2m_max[i]), min: Math.round(data.daily.temperature_2m_min[i]), icon: code.icon, rain: (data.daily.precipitation_sum[i] || 0).toFixed(1), wind: Math.round(data.daily.wind_speed_10m_max[i]) })
+        days.push({
+          day: t.weekDays[d.getDay()],
+          max: Math.round(data.daily.temperature_2m_max[i]),
+          min: Math.round(data.daily.temperature_2m_min[i]),
+          icon: code.icon,
+          rain: (data.daily.precipitation_sum[i] || 0).toFixed(1),
+          wind: Math.round(data.daily.wind_speed_10m_max[i])
+        })
       }
       setForecast(days)
       setLoading(false)
@@ -411,7 +423,7 @@ const WeatherApp = () => {
 
       {!loading && !error && weather && (
         <div>
-                      <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
+          <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
             <div className="main-top">
               <div>
                 <h2>📍 {city}</h2>
