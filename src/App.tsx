@@ -3,7 +3,8 @@ import './App.css'
 
 const translations = {
   bg: {
-    title: '🌍 Прогноза на времето',
+    title: '🌤️ Времето PRO',
+    subtitle: 'Твоят метео гид',
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
     loading: '⏳ Зареждане...',
@@ -51,7 +52,8 @@ const translations = {
     ]
   },
   en: {
-    title: '🌍 Weather Forecast',
+    title: '🌤️ Времето PRO',
+    subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
     loading: '⏳ Loading...',
@@ -236,7 +238,6 @@ const WeatherApp = () => {
         fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8'),
         fetch('https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto')
       ])
-
       if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
       const data = await weatherRes.value.json()
 
@@ -330,7 +331,10 @@ const WeatherApp = () => {
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
       <div className="header-row">
-        <h1>{t.title}</h1>
+        <div>
+          <h1>{t.title}</h1>
+          <p className="subtitle">{t.subtitle}</p>
+        </div>
         <div className="header-btns">
           <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
