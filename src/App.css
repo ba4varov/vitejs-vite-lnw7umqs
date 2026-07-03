@@ -386,3 +386,18 @@
     font-size: 3rem;
   }
 }
+.hour-wind {
+  font-size: 0.7rem;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.hour-sea {
+  font-size: 0.7rem;
+  color: #60d8f8;
+  margin-top: 2px;
+}
+
+.sea-temp-box {
+  border: 1px solid rgba(96, 216, 248, 0.4);
+}
