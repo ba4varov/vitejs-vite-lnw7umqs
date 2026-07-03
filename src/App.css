@@ -427,3 +427,14 @@
 .sea-temp-box {
   border: 1px solid rgba(96, 216, 248, 0.4);
 }
+.day-rain {
+  font-size: 0.65rem;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+.day-wind {
+  font-size: 0.65rem;
+  margin-top: 2px;
+  opacity: 0.9;
+}
