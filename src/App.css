@@ -448,3 +448,19 @@
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .big-temp { font-size: 3rem; }
 }
+.footer {
+  text-align: center;
+  padding: 24px 0 8px;
+  opacity: 0.7;
+  font-size: 0.85rem;
+  line-height: 1.8;
+}
+
+.footer a {
+  color: white;
+  text-decoration: underline;
+}
+
+.footer a:hover {
+  opacity: 0.8;
+}
