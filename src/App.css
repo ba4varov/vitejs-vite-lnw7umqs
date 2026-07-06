@@ -183,7 +183,15 @@
 .dark .card {
   background: #1f2937;
 }
+.card canvas {
+  background: rgba(255,255,255,0.15);
+  border-radius: 12px;
+}
 
+.dark .card canvas {
+  background: rgba(255,255,255,0.08);
+  border-radius: 12px;
+}
 .center-text {
   text-align: center;
 }
