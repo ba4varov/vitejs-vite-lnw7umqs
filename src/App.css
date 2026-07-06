@@ -464,3 +464,19 @@
 .footer a:hover {
   opacity: 0.8;
 }
+.footer {
+  text-align: center;
+  padding: 24px 0 8px;
+  opacity: 0.7;
+  font-size: 0.85rem;
+  line-height: 1.8;
+}
+
+.footer a {
+  color: white;
+  text-decoration: underline;
+}
+
+.footer a:hover {
+  opacity: 0.8;
+}
