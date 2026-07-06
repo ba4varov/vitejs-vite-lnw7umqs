@@ -162,7 +162,7 @@ const Chart = ({ hourly, darkMode, t }) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i), padL - 5, y + 4)
     }
     ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'center'
-    data.forEach((_, i) => { if (i % 3 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
+    data.forEach((_, i) => { if (i % 2 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, colors[activeTab] + '55'); grad.addColorStop(1, colors[activeTab] + '00')
     ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
@@ -181,7 +181,7 @@ const Chart = ({ hourly, darkMode, t }) => {
     })
     ctx.stroke()
     data.forEach((val, i) => {
-      if (i % 3 === 0) {
+      if (i % 2 === 0) {
         ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
         ctx.fillStyle = colors[activeTab]; ctx.fill()
         ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 2; ctx.stroke()
