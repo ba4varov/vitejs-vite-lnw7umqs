@@ -144,9 +144,10 @@ const Chart = ({ hourly, darkMode, t }) => {
     const padL = 45, padR = 20, padT = 20, padB = 40
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
-    const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? h.rain : h.wind)
+    const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? (h.rain <= 0 ? 0 : h.rain) : h.wind)
     const labels = hourly.map(h => h.hour)
-    const minVal = Math.min(...data), maxVal = Math.max(...data)
+    const minVal = activeTab === 'rain' ? 0 : Math.min(...data)
+    const maxVal = activeTab === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
     const range = maxVal - minVal || 1
     const xStep = chartW / (data.length - 1)
     const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
@@ -315,7 +316,7 @@ const WeatherApp = () => {
         hr.push({
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
-          rain: data.hourly.precipitation[idx] || 0,
+          rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
           wind: Math.round(data.hourly.wind_speed_10m[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
           icon: code.icon
@@ -332,7 +333,7 @@ const WeatherApp = () => {
           max: Math.round(data.daily.temperature_2m_max[i]),
           min: Math.round(data.daily.temperature_2m_min[i]),
           icon: code.icon,
-          rain: (data.daily.precipitation_sum[i] || 0).toFixed(1),
+          rain: Math.max(0, data.daily.precipitation_sum[i] || 0).toFixed(1),
           wind: Math.round(data.daily.wind_speed_10m_max[i])
         })
       }
