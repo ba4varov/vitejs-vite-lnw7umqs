@@ -29,6 +29,12 @@
   font-weight: bold;
 }
 
+.subtitle {
+  font-size: 0.95rem;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
 .header-btns {
   display: flex;
   gap: 8px;
@@ -182,6 +188,8 @@
 
 .dark .card {
   background: #1f2937;
+}
+
 .card canvas {
   background: rgba(255,255,255,0.9);
   border-radius: 12px;
@@ -190,7 +198,9 @@
 .dark .card canvas {
   background: rgba(255,255,255,0.9);
   border-radius: 12px;
-}.center-text {
+}
+
+.center-text {
   text-align: center;
 }
 
@@ -249,6 +259,10 @@
   font-weight: bold;
 }
 
+.sea-temp-box {
+  border: 1px solid rgba(96, 216, 248, 0.4);
+}
+
 .hourly-row {
   display: flex;
   gap: 8px;
@@ -283,6 +297,18 @@
 .hour-temp {
   font-size: 0.9rem;
   font-weight: bold;
+}
+
+.hour-wind {
+  font-size: 0.7rem;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.hour-sea {
+  font-size: 0.7rem;
+  color: #60d8f8;
+  margin-top: 2px;
 }
 
 .daily-grid {
@@ -321,6 +347,18 @@
   opacity: 0.75;
 }
 
+.day-rain {
+  font-size: 0.65rem;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+.day-wind {
+  font-size: 0.65rem;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
 .chart-tabs {
   display: flex;
   gap: 8px;
@@ -342,24 +380,11 @@
   background: rgba(255,255,255,0.3);
 }
 
-.active-temp {
-  background: #f97316;
-  color: white;
-}
+.active-temp { background: #f97316; color: white; }
+.active-rain { background: #3b82f6; color: white; }
+.active-wind { background: #10b981; color: white; }
 
-.active-rain {
-  background: #3b82f6;
-  color: white;
-}
-
-.active-wind {
-  background: #10b981;
-  color: white;
-}
-
-.dark .chart-tab {
-  color: white;
-}
+.dark .chart-tab { color: white; }
 
 .dark h1,
 .dark h2,
@@ -374,18 +399,12 @@
 .dark .day-temp,
 .dark .max,
 .dark .min,
-.dark .info-line {
+.dark .info-line,
+.dark .subtitle {
   color: white;
 }
 
-@media (max-width: 600px) {
-  .header-row h1 {
-    font-size: 1.5rem;
-  }
-  .daily-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  @keyframes spin-slow {
+@keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
@@ -422,62 +441,10 @@
 .flash { animation: flash 2s ease-in-out infinite; }
 .fall { animation: fall 2s ease-in-out infinite; }
 .drift { animation: drift 3s ease-in-out infinite; }
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .big-temp {
-    font-size: 3rem;
-  }
-}
-.hour-wind {
-  font-size: 0.7rem;
-  opacity: 0.9;
-  margin-top: 4px;
-}
 
-.hour-sea {
-  font-size: 0.7rem;
-  color: #60d8f8;
-  margin-top: 2px;
-}
-
-.sea-temp-box {
-  border: 1px solid rgba(96, 216, 248, 0.4);
-}
-.subtitle {
-  font-size: 0.95rem;
-  opacity: 0.85;
-  margin-top: 2px;
-}
-.subtitle {
-  font-size: 0.95rem;
-  opacity: 0.85;
-  margin-top: 2px;
-}
-
-.hour-wind {
-  font-size: 0.7rem;
-  opacity: 0.9;
-  margin-top: 4px;
-}
-
-.hour-sea {
-  font-size: 0.7rem;
-  color: #60d8f8;
-  margin-top: 2px;
-}
-
-.sea-temp-box {
-  border: 1px solid rgba(96, 216, 248, 0.4);
-}
-.day-rain {
-  font-size: 0.65rem;
-  margin-top: 4px;
-  opacity: 0.9;
-}
-
-.day-wind {
-  font-size: 0.65rem;
-  margin-top: 2px;
-  opacity: 0.9;
+@media (max-width: 600px) {
+  .header-row h1 { font-size: 1.5rem; }
+  .daily-grid { grid-template-columns: repeat(4, 1fr); }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .big-temp { font-size: 3rem; }
 }
