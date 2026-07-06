@@ -315,7 +315,7 @@ const WeatherApp = () => {
         hr.push({
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
-          rain: data.hourly.precipitation[idx] || 0,
+          rain: Math.max(0, data.hourly.precipitation[idx] || 0),
           wind: Math.round(data.hourly.wind_speed_10m[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
           icon: code.icon
