@@ -483,6 +483,10 @@ const WeatherApp = () => {
       )}
     </div>
   )
+  <div className="footer">
+  <p>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo API</a></p>
+  <p>© 2026 Времето PRO. Всички права запазени.</p>
+</div>
 }
 
 export default WeatherApp
