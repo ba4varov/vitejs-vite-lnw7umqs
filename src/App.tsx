@@ -146,7 +146,7 @@ const Chart = ({ hourly, darkMode, t }) => {
     ctx.clearRect(0, 0, W, H)
     const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? h.rain : h.wind)
     const labels = hourly.map(h => h.hour)
-    const minVal = Math.min(...data), maxVal = Math.max(...data)
+    const minVal = activeTab === 'rain' ? 0 : Math.min(...data), maxVal = Math.max(...data)
     const range = maxVal - minVal || 1
     const xStep = chartW / (data.length - 1)
     const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
