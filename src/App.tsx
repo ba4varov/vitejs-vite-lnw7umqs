@@ -1,4 +1,4 @@
-дimport { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 const translations = {
