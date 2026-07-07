@@ -22,7 +22,7 @@ const translations = {
     km: 'км',
     hpa: 'hPa',
     hours24: '⏰ Следващите 24 часа',
-    days7: '📅 Прогноза за 7 дни',
+    days14: '📅 Прогноза за 14 дни',
     myLocation: 'Моето местоположение',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
     chart: '📊 Графика за 24 часа',
@@ -31,7 +31,14 @@ const translations = {
     windChart: 'Вятър',
     pressureChart: 'Налягане',
     mm: 'мм',
+    cloudCover: 'Облачност',
+    dewPoint: 'Точ. оросяване',
+    detailsFor: 'Подробности за',
+    tabMain: 'Основни',
+    tabAtmosphere: 'Атмосфера',
+    tabWaterWind: 'Вода и Вятър',
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+    months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
     weather: {
       0: 'Ясно небе', 1: 'Предимно ясно', 2: 'Частично облачно', 3: 'Облачно',
       45: 'Мъгла', 48: 'Замръзваща мъгла', 51: 'Лек ръмеж', 53: 'Умерен ръмеж',
@@ -72,7 +79,7 @@ const translations = {
     km: 'km',
     hpa: 'hPa',
     hours24: '⏰ Next 24 Hours',
-    days7: '📅 7-Day Forecast',
+    days14: '📅 14-Day Forecast',
     myLocation: 'My Location',
     error: 'Failed to load weather data. Please try again.',
     chart: '📊 24-Hour Chart',
@@ -81,7 +88,14 @@ const translations = {
     windChart: 'Wind',
     pressureChart: 'Pressure',
     mm: 'mm',
+    cloudCover: 'Cloud Cover',
+    dewPoint: 'Dew Point',
+    detailsFor: 'Details for',
+    tabMain: 'Main',
+    tabAtmosphere: 'Atmosphere',
+    tabWaterWind: 'Water & Wind',
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     weather: {
       0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
       45: 'Fog', 48: 'Freezing fog', 51: 'Light drizzle', 53: 'Moderate drizzle',
@@ -170,7 +184,10 @@ const Chart = ({ hourly, darkMode, t }) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i), padL - 5, y + 4)
     }
     ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'center'
+    
+    // Показваме часовете през един, както се разбрахме (през 2 часа)
     data.forEach((_, i) => { if (i % 2 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
+    
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, colors[activeTab] + '55'); grad.addColorStop(1, colors[activeTab] + '00')
     ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
@@ -232,6 +249,8 @@ const WeatherApp = () => {
   const [weather, setWeather] = useState(null)
   const [hourly, setHourly] = useState([])
   const [forecast, setForecast] = useState([])
+  const [selectedDay, setSelectedDay] = useState(null) // State за избрания ден
+  const [detailTab, setDetailTab] = useState('main')   // State за табовете в детайлите
   const searchTimer = useRef(null)
   const t = translations[lang]
 
@@ -248,255 +267,4 @@ const WeatherApp = () => {
   const searchCities = async (query) => {
     if (query.length < 2) { setSuggestions([]); return }
     try {
-      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
-      const data = await res.json()
-      setSuggestions(data.results || [])
-    } catch (e) { setSuggestions([]) }
-  }
-
-  const handleSearchInput = (val) => {
-    setSearchInput(val)
-    clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => searchCities(val), 300)
-  }
-
-  const selectCity = (result) => {
-    const name = result.name + (result.country ? ', ' + result.country : '')
-    setCity(name)
-    setCoords({ lat: result.latitude, lon: result.longitude })
-    setSearchInput('')
-    setSuggestions([])
-  }
-
-  const fetchWeather = async (lat, lon) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [weatherRes, marineRes] = await Promise.allSettled([
-        fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&forecast_days=8'),
-        fetch('https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto')
-      ])
-      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
-      const data = await weatherRes.value.json()
-
-      let seaTemp = null
-      let hourlySeaTemp = []
-      if (marineRes.status === 'fulfilled' && marineRes.value.ok) {
-        try {
-          const marineData = await marineRes.value.json()
-          if (marineData.current && marineData.current.sea_surface_temperature != null) {
-            seaTemp = Math.round(marineData.current.sea_surface_temperature)
-          }
-          if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
-            hourlySeaTemp = marineData.hourly.sea_surface_temperature
-          }
-        } catch (e) {}
-      }
-
-      const cur = decodeWeatherCode(data.current.weather_code)
-      setWeather({
-        temp: Math.round(data.current.temperature_2m),
-        humidity: data.current.relative_humidity_2m,
-        windSpeed: Math.round(data.current.wind_speed_10m),
-        feelsLike: Math.round(data.current.apparent_temperature),
-        visibility: Math.round((data.current.visibility || 0) / 1000),
-        pressure: Math.round(data.current.surface_pressure),
-        uvIndex: Math.round(data.current.uv_index),
-        seaTemp: seaTemp,
-        description: cur.desc,
-        icon: cur.icon
-      })
-
-      const now = new Date()
-      const localISO = now.getFullYear() + '-' +
-        String(now.getMonth() + 1).padStart(2, '0') + '-' +
-        String(now.getDate()).padStart(2, '0') + 'T' +
-        String(now.getHours()).padStart(2, '0')
-      let startIdx = data.hourly.time.findIndex((t) => t.slice(0, 13) === localISO)
-      if (startIdx === -1) startIdx = 0
-
-      const hr = []
-      for (let i = 0; i < 24; i++) {
-        const idx = startIdx + i
-        if (idx >= data.hourly.time.length) break
-        const code = decodeWeatherCode(data.hourly.weather_code[idx])
-        const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
-        hr.push({
-          hour: data.hourly.time[idx].slice(11, 16),
-          temp: Math.round(data.hourly.temperature_2m[idx]),
-          rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
-          wind: Math.round(data.hourly.wind_speed_10m[idx]),
-          pressure: Math.round(data.hourly.surface_pressure[idx]),
-          seaTemp: sst != null ? Math.round(sst) : null,
-          icon: code.icon
-        })
-      }
-      setHourly(hr)
-
-      const days = []
-      for (let i = 1; i < Math.min(8, data.daily.time.length); i++) {
-        const d = new Date(data.daily.time[i])
-        const code = decodeWeatherCode(data.daily.weather_code[i])
-        days.push({
-          day: t.weekDays[d.getDay()],
-          max: Math.round(data.daily.temperature_2m_max[i]),
-          min: Math.round(data.daily.temperature_2m_min[i]),
-          icon: code.icon,
-          rain: Math.max(0, data.daily.precipitation_sum[i] || 0).toFixed(1),
-          wind: Math.round(data.daily.wind_speed_10m_max[i])
-        })
-      }
-      setForecast(days)
-      setLoading(false)
-    } catch (e) {
-      setError(t.error)
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchWeather(coords.lat, coords.lon)
-    const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [coords, lang])
-
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = pos.coords.latitude, lon = pos.coords.longitude
-        setCoords({ lat, lon })
-        try {
-          const res = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang)
-          const data = await res.json()
-          setCity(data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation)
-        } catch (e) { setCity(t.myLocation) }
-      }, () => {}, { timeout: 5000 })
-    }
-  }, [])
-
-  return (
-    <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
-      <div className="header-row">
-        <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h1>{t.title}</h1>
-          <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
-        </div>
-        <div className="header-btns">
-          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
-            {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
-          </button>
-          <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
-            {darkMode ? '☀️' : '🌙'}
-          </button>
-        </div>
-      </div>
-
-      <div className="search-wrapper">
-        <div className="search-row">
-          <input type="text" placeholder={t.search} value={searchInput}
-            onChange={(e) => handleSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setSuggestions([])}
-            autoComplete="off" />
-        </div>
-        {suggestions.length > 0 && (
-          <div className="suggestions">
-            {suggestions.map((s, i) => (
-              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
-                <span className="sug-name">{s.name}</span>
-                <span className="sug-country">{s.admin1 ? s.admin1 + ', ' : ''}{s.country}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="info-line">{t.info}</div>
-
-      <div className="city-row">
-        {t.quickCities.map((c) => (
-          <button key={c.name}
-            onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
-            className={city === c.name ? 'city-btn active' : 'city-btn'}>
-            {c.name}
-          </button>
-        ))}
-      </div>
-
-      {loading && <div className="card center-text"><p style={{ fontSize: '1.5rem' }}>{t.loading}</p></div>}
-
-      {error && !loading && (
-        <div className="card center-text">
-          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
-          <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>{t.tryAgain}</button>
-        </div>
-      )}
-
-      {!loading && !error && weather && (
-        <div>
-          <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
-            <div className="main-top">
-              <div>
-                <h2>📍 {city}</h2>
-                <p className="desc">{weather.description}</p>
-              </div>
-              <div className="big-icon"><AnimatedIcon icon={weather.icon} size="5rem" /></div>
-            </div>
-            <div className="big-temp">{weather.temp}°C</div>
-            <div className="stats-grid">
-              <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-              <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
-              <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
-              <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
-              <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
-              <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
-              {weather.seaTemp !== null && (
-                <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <h3>{t.hours24}</h3>
-            <div className="hourly-row">
-              {hourly.map((h, i) => (
-                <div key={i} className="hour-box">
-                  <p className="hour-time">{h.hour}</p>
-                  <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
-                  <p className="hour-temp">{h.temp}°C</p>
-                  <p className="hour-wind">💨 {h.wind} {t.windUnit}</p>
-                  {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Chart hourly={hourly} darkMode={darkMode} t={t} />
-
-          <div className="card">
-            <h3>{t.days7}</h3>
-            <div className="daily-grid">
-              {forecast.map((day, i) => (
-                <div key={i} className="day-box">
-                  <p className="day-name">{day.day}</p>
-                  <p className="day-icon"><AnimatedIcon icon={day.icon} size="2rem" /></p>
-                  <p className="day-temp">
-                    <span className="max">{day.max}°</span><br />
-                    <span className="min">{day.min}°</span>
-                  </p>
-                  <p className="day-rain">🌧 {day.rain}{t.mm}</p>
-                  <p className="day-wind">💨 {day.wind}{t.windUnit}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="footer" style={{ textAlign: 'center', marginTop: '2rem', padding: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
-        <p style={{ marginBottom: '0.5rem' }}>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Open-Meteo API</a></p>
-        <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
-      </div>
-    </div>
-  )
-}
-
-export default WeatherApp
+      const res = await fetch('https://geoc
