@@ -605,7 +605,7 @@ const WeatherApp = () => {
             className="card"
             style={{
               position: 'fixed',
-              top: popupPos.y + 15,
+              top: popupPos.y ,
               left: popupPos.x,
               width: '320px',
               margin: 0,
