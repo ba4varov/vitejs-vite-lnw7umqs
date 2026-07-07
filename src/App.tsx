@@ -377,9 +377,9 @@ const WeatherApp = () => {
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
       <div className="header-row">
-        <div>
+        <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
           <h1>{t.title}</h1>
-          <p className="subtitle">{t.subtitle}</p>
+          <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
           <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
@@ -491,8 +491,8 @@ const WeatherApp = () => {
           </div>
         </div>
       )}
-      <div className="footer">
-        <p>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo API</a></p>
+      <div className="footer" style={{ textAlign: 'center', marginTop: '2rem', padding: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
+        <p style={{ marginBottom: '0.5rem' }}>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Open-Meteo API</a></p>
         <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
       </div>
     </div>
