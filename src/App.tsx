@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+дimport { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 const translations = {
@@ -249,8 +249,9 @@ const WeatherApp = () => {
   const [hourly, setHourly] = useState([])
   const [forecast, setForecast] = useState([])
   
-  // Добавяме state за позицията на прозореца
+  // States за изскачащите прозорци (дни и часове)
   const [selectedDay, setSelectedDay] = useState(null)
+  const [selectedHour, setSelectedHour] = useState(null)
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
   const [detailTab, setDetailTab] = useState('main')
   
@@ -289,6 +290,7 @@ const WeatherApp = () => {
     setSearchInput('')
     setSuggestions([])
     setSelectedDay(null)
+    setSelectedHour(null)
   }
 
   const fetchWeather = async (lat, lon) => {
@@ -297,7 +299,7 @@ const WeatherApp = () => {
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
-        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover' + 
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max' + 
         '&timezone=auto&forecast_days=15';
 
@@ -354,12 +356,18 @@ const WeatherApp = () => {
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
         const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
+        
         hr.push({
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
+          feelsLike: Math.round(data.hourly.apparent_temperature[idx]),
           rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
           wind: Math.round(data.hourly.wind_speed_10m[idx]),
           pressure: Math.round(data.hourly.surface_pressure[idx]),
+          humidity: Math.round(data.hourly.relative_humidity_2m[idx]),
+          visibility: Math.round((data.hourly.visibility[idx] || 0) / 1000),
+          dewPoint: Math.round(data.hourly.dew_point_2m[idx]),
+          cloudCover: Math.round(data.hourly.cloud_cover[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
           icon: code.icon
         })
@@ -523,7 +531,34 @@ const WeatherApp = () => {
             <h3>{t.hours24}</h3>
             <div className="hourly-row">
               {hourly.map((h, i) => (
-                <div key={i} className="hour-box">
+                <div key={i} className="hour-box"
+                  onClick={(e) => { 
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const popupW = 320;
+                    const popupH = 360;
+                    
+                    let x = rect.left + (rect.width / 2) - (popupW / 2);
+                    let y = rect.top - popupH - 15;
+                    
+                    if (x < 10) x = 10;
+                    if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
+                    
+                    if (y < 10) {
+                      y = rect.bottom + 15;
+                    }
+                    
+                    setPopupPos({ x, y });
+                    setSelectedHour(h); 
+                    setDetailTab('main'); 
+                  }}
+                  style={{ 
+                    cursor: 'pointer', 
+                    boxShadow: selectedHour?.hour === h.hour ? '0 0 0 3px rgba(255,255,255,0.7)' : 'none',
+                    transform: selectedHour?.hour === h.hour ? 'scale(1.05)' : 'none',
+                    transition: 'all 0.2s',
+                    position: 'relative'
+                  }}
+                >
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
@@ -542,24 +577,16 @@ const WeatherApp = () => {
               {forecast.map((day, i) => (
                 <div key={i} className="day-box" 
                   onClick={(e) => { 
-                    // Взимаме позицията и размерите на самата кутийка, върху която сме кликнали
                     const rect = e.currentTarget.getBoundingClientRect();
-                    
-                    // Размери на прозореца (приблизителни)
                     const popupW = 320;
                     const popupH = 360;
                     
-                    // Центрираме прозореца хоризонтално спрямо кутийката
                     let x = rect.left + (rect.width / 2) - (popupW / 2);
-                    
-                    // Поставяме прозореца НАД кутийката (оставяме 15px отстояние)
                     let y = rect.top - popupH - 15;
                     
-                    // Предпазни мерки за хоризонталата (ако е извън екрана вляво или вдясно)
                     if (x < 10) x = 10;
                     if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
                     
-                    // Предпазна мярка за вертикалата (ако излиза над горния ръб, го слагаме ПОД кутийката)
                     if (y < 10) {
                       y = rect.bottom + 15;
                     }
@@ -592,7 +619,7 @@ const WeatherApp = () => {
         </div>
       )}
 
-      {/* Изскачащият прозорец (Popover) */}
+      {/* Изскачащ прозорец (Popover) за ДЕН */}
       {selectedDay && (
         <div 
           style={{ 
@@ -605,7 +632,7 @@ const WeatherApp = () => {
             className="card"
             style={{
               position: 'fixed',
-              top: popupPos.y ,
+              top: popupPos.y,
               left: popupPos.x,
               width: '320px',
               margin: 0,
@@ -648,6 +675,71 @@ const WeatherApp = () => {
                 <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌧️</p><p className="label" style={{color: 'white'}}>{t.rain}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.rain} {t.mm}</p></div>
                 {selectedDay.seaTemp !== null ? (
                   <div className="stat-box sea-temp-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌊</p><p className="label" style={{color: 'white'}}>{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.seaTemp}°C</p></div>
+                ) : (
+                  <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌊</p><p className="label" style={{color: 'white'}}>{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{t.noSeaData}</p></div>
+                )}
+              </>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Изскачащ прозорец (Popover) за ЧАС */}
+      {selectedHour && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            zIndex: 9998, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)' 
+          }} 
+          onClick={() => setSelectedHour(null)}
+        >
+          <div 
+            className="card"
+            style={{
+              position: 'fixed',
+              top: popupPos.y,
+              left: popupPos.x,
+              width: '320px',
+              margin: 0,
+              padding: '24px',
+              background: darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(37, 99, 235, 0.95)',
+              color: 'white',
+              boxShadow: '0 15px 50px rgba(0,0,0,0.6)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              zIndex: 9999,
+              cursor: 'default'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
+              <button className="icon-btn" style={{ fontSize: '1rem', padding: '4px 8px', background: 'rgba(255,255,255,0.2)' }} onClick={() => setSelectedHour(null)}>❌</button>
+            </div>
+            
+            <div className="chart-tabs" style={{ marginBottom: '20px' }}>
+              <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
+              <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
+              <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
+            </div>
+            
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              {detailTab === 'main' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌡️</p><p className="label" style={{color: 'white'}}>{t.temp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.temp}°C</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🤔</p><p className="label" style={{color: 'white'}}>{t.feelsLike}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.feelsLike}°C</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>💧</p><p className="label" style={{color: 'white'}}>{t.humidity}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.humidity}%</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>☁️</p><p className="label" style={{color: 'white'}}>Време</p><p className="value" style={{ fontSize: '1.1rem' }}><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
+              </>}
+              {detailTab === 'atmosphere' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🔵</p><p className="label" style={{color: 'white'}}>{t.pressure}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.pressure} {t.hpa}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>👁️</p><p className="label" style={{color: 'white'}}>{t.visibility}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.visibility} {t.km}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>☁️</p><p className="label" style={{color: 'white'}}>{t.cloudCover}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.cloudCover}%</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌿</p><p className="label" style={{color: 'white'}}>{t.dewPoint}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.dewPoint}°C</p></div>
+              </>}
+              {detailTab === 'water' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>💨</p><p className="label" style={{color: 'white'}}>{t.wind}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.wind} {t.windUnit}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌧️</p><p className="label" style={{color: 'white'}}>{t.rain}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.rain} {t.mm}</p></div>
+                {selectedHour.seaTemp !== null ? (
+                  <div className="stat-box sea-temp-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌊</p><p className="label" style={{color: 'white'}}>{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.seaTemp}°C</p></div>
                 ) : (
                   <div className="stat-box" style={{ padding: '12px', background: 'rgba(255,255,255,0.1)' }}><p>🌊</p><p className="label" style={{color: 'white'}}>{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{t.noSeaData}</p></div>
                 )}
