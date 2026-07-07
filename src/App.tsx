@@ -170,7 +170,7 @@ const Chart = ({ hourly, darkMode, t }) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i), padL - 5, y + 4)
     }
     ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'center'
-    data.forEach((_, i) => { if (i % 1 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
+    data.forEach((_, i) => { if (i % 2 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, colors[activeTab] + '55'); grad.addColorStop(1, colors[activeTab] + '00')
     ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
