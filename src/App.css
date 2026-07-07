@@ -28,7 +28,10 @@
   font-size: 2.2rem;
   font-weight: bold;
 }
-
+.active-pressure {
+  background: #a855f7;
+  color: white;
+}
 .subtitle {
   font-size: 0.95rem;
   opacity: 0.85;
