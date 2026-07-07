@@ -267,4 +267,18 @@ const WeatherApp = () => {
   const searchCities = async (query) => {
     if (query.length < 2) { setSuggestions([]); return }
     try {
-      const res = await fetch('https://geoc
+      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
+        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover' + 
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max' + 
+        '&timezone=auto&forecast_days=15';
+
+      const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
+        '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15';
+
+      const [weatherRes, marineRes] = await Promise.allSettled([
+        fetch(weatherUrl),
+        fetch(marineUrl)
+      ]);
+      
+      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error();
