@@ -542,19 +542,27 @@ const WeatherApp = () => {
               {forecast.map((day, i) => (
                 <div key={i} className="day-box" 
                   onClick={(e) => { 
-                    // Взимаме координатите на мишката
-                    let x = e.clientX;
-                    let y = e.clientY;
+                    // Взимаме позицията и размерите на самата кутийка, върху която сме кликнали
+                    const rect = e.currentTarget.getBoundingClientRect();
                     
                     // Размери на прозореца (приблизителни)
-                    const popupW = 340;
+                    const popupW = 320;
                     const popupH = 360;
                     
-                    // Предпазваме от излизане извън екрана
-                    if (x + popupW > window.innerWidth) x = window.innerWidth - popupW - 20;
-                    if (y + popupH > window.innerHeight) y = window.innerHeight - popupH - 20;
+                    // Центрираме прозореца хоризонтално спрямо кутийката
+                    let x = rect.left + (rect.width / 2) - (popupW / 2);
+                    
+                    // Поставяме прозореца НАД кутийката (оставяме 15px отстояние)
+                    let y = rect.top - popupH - 15;
+                    
+                    // Предпазни мерки за хоризонталата (ако е извън екрана вляво или вдясно)
                     if (x < 10) x = 10;
-                    if (y < 10) y = 10;
+                    if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
+                    
+                    // Предпазна мярка за вертикалата (ако излиза над горния ръб, го слагаме ПОД кутийката)
+                    if (y < 10) {
+                      y = rect.bottom + 15;
+                    }
                     
                     setPopupPos({ x, y });
                     setSelectedDay(day); 
