@@ -29,6 +29,7 @@ const translations = {
     temp: 'Температура',
     rain: 'Валежи',
     windChart: 'Вятър',
+    pressureChart: 'Налягане',
     mm: 'мм',
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     weather: {
@@ -78,6 +79,7 @@ const translations = {
     temp: 'Temperature',
     rain: 'Precipitation',
     windChart: 'Wind',
+    pressureChart: 'Pressure',
     mm: 'mm',
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     weather: {
@@ -134,17 +136,22 @@ const AnimatedIcon = ({ icon, size }) => {
 const Chart = ({ hourly, darkMode, t }) => {
   const [activeTab, setActiveTab] = useState('temp')
   const canvasRef = useRef(null)
-  const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981' }
+  const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981', pressure: '#a855f7' }
 
   useEffect(() => {
     if (!canvasRef.current || !hourly.length) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const W = canvas.width, H = canvas.height
-    const padL = 45, padR = 20, padT = 20, padB = 40
+    const padL = 55, padR = 20, padT = 20, padB = 40
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
-    const data = hourly.map(h => activeTab === 'temp' ? h.temp : activeTab === 'rain' ? (h.rain <= 0 ? 0 : h.rain) : h.wind)
+    const data = hourly.map(h =>
+      activeTab === 'temp' ? h.temp :
+      activeTab === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
+      activeTab === 'pressure' ? h.pressure :
+      h.wind
+    )
     const labels = hourly.map(h => h.hour)
     const minVal = activeTab === 'rain' ? 0 : Math.min(...data)
     const maxVal = activeTab === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
@@ -193,7 +200,8 @@ const Chart = ({ hourly, darkMode, t }) => {
   const tabs = [
     { key: 'temp', label: t.temp, unit: '°C' },
     { key: 'rain', label: t.rain, unit: t.mm },
-    { key: 'wind', label: t.windChart, unit: t.windUnit }
+    { key: 'wind', label: t.windChart, unit: t.windUnit },
+    { key: 'pressure', label: t.pressureChart, unit: t.hpa }
   ]
 
   return (
@@ -318,6 +326,7 @@ const WeatherApp = () => {
           temp: Math.round(data.hourly.temperature_2m[idx]),
           rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
           wind: Math.round(data.hourly.wind_speed_10m[idx]),
+          pressure: Math.round(data.hourly.surface_pressure[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
           icon: code.icon
         })
@@ -484,7 +493,7 @@ const WeatherApp = () => {
       )}
       <div className="footer">
         <p>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo API</a></p>
-        <p>© 2026 Времето PRO. Всички права запазени.</p>
+        <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
       </div>
     </div>
   )
