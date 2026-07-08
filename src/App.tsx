@@ -119,10 +119,12 @@ const translations = {
 }
 
 const getTempGradient = (temp: number) => {
-  if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
-  if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
-  if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
-  return 'linear-gradient(135deg, #fee2e2, #fecaca)'
+  if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)' // Студено (Синьо)
+  if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)' // Хладно (Ментово зелено)
+  if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)' // Топло (Златисто жълто)
+  
+  // Горещо: Истински нюанси на червено (без розово)
+  return 'linear-gradient(135deg, #ffc2c2, #ff6b6b)' 
 }
 
 const getIconAnimation = (icon: string) => {
