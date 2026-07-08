@@ -6,7 +6,7 @@
 }
 
 html, body {
-  overflow-x: hidden; /* Убива хоризонталния скрол глобално */
+  overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -109,7 +109,7 @@ html, body {
 /* --- ХОРИЗОНТАЛНИ СПИСЪЦИ --- */
 .hourly-row { 
   display: flex; overflow-x: auto; gap: 16px; padding-bottom: 16px; 
-  -webkit-overflow-scrolling: touch; /* Плавен скрол на телефон */
+  -webkit-overflow-scrolling: touch;
 }
 .hourly-row::-webkit-scrollbar { height: 6px; }
 .hourly-row::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
@@ -136,16 +136,44 @@ html, body {
 .day-temp .max { font-weight: bold; }
 .day-temp .min { opacity: 0.6; font-size: 0.9rem; margin-top: 4px; display: block; }
 
-/* --- ГРАФИКА ЗА 24 ЧАСА (FIX ЗА МОБИЛНИ) --- */
+/* --- ГРАФИКА ЗА 24 ЧАСА --- */
 .chart-container {
   width: 100%;
-  overflow: hidden; /* Спира графиката да разпъва екрана */
+  overflow: hidden;
 }
 canvas {
   max-width: 100%;
   height: auto !important;
   display: block;
 }
+
+/* ========================================= */
+/* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (ВИНАГИ ЦЕНТРИРАНИ ЗА ВСИЧКИ УСТРОЙСТВА) --- */
+/* ========================================= */
+.popup-card {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 90% !important; 
+  max-width: 360px !important;
+  padding: 24px !important;
+  border-radius: 24px !important;
+  margin: 0 !important;
+}
+.popup-card .chart-tabs { margin-bottom: 16px !important; gap: 8px; display: flex; flex-wrap: wrap; justify-content: center; }
+.popup-card .chart-tab { padding: 8px 12px; font-size: 0.85rem; border-radius: 16px; }
+
+.popup-grid { gap: 12px !important; }
+.popup-grid .stat-box {
+  padding: 12px !important; border-radius: 16px !important;
+  background: #f1f5f9 !important; box-shadow: none !important;
+}
+.popup-grid .sea-temp-box { background: #ade3ff !important; border: 2px solid white !important; }
+.popup-grid .stat-box .label { margin: 4px 0 2px !important; font-size: 0.8rem !important; }
+.popup-grid .stat-box .value { font-size: 1.1rem !important; }
+
+/* --- ГРАФИКА ТАБОВЕ --- */
 .chart-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
 .chart-tab {
   padding: 8px 16px; border-radius: 20px; border: none; background: #f1f5f9;
@@ -156,28 +184,10 @@ canvas {
 .chart-tab.active-wind { background: #10b981; color: white; }
 .chart-tab.active-pressure { background: #a855f7; color: white; }
 
-/* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (COMPACT POPOVER) --- */
-.popup-card {
-  width: 300px !important; 
-  padding: 16px !important;
-  border-radius: 20px !important;
-}
-.popup-card .chart-tabs { margin-bottom: 12px !important; gap: 6px; }
-.popup-card .chart-tab { padding: 6px 10px; font-size: 0.8rem; border-radius: 16px; }
-
-.popup-grid { gap: 10px !important; }
-.popup-grid .stat-box {
-  padding: 8px 12px !important; border-radius: 16px !important;
-  background: #f1f5f9 !important; box-shadow: none !important;
-}
-.popup-grid .sea-temp-box { background: #ade3ff !important; border: 2px solid white !important; }
-.popup-grid .stat-box .label { margin: 4px 0 2px !important; font-size: 0.75rem !important; }
-.popup-grid .stat-box .value { font-size: 1rem !important; }
-
 .center-text { text-align: center; }
 .footer { text-align: center; margin-top: 40px; opacity: 0.5; font-size: 0.9rem; }
 
-/* --- DARK MODE (ПОПЪП И КУТИИ) --- */
+/* --- DARK MODE --- */
 .weather-app.dark { background: #0f172a; color: #f8fafc; }
 .weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
 .weather-app.dark .popup-grid .stat-box { background: rgba(255,255,255,0.05) !important; }
@@ -192,9 +202,7 @@ canvas {
 @keyframes bounce-rain { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
 .bounce-rain { animation: bounce-rain 1.5s ease-in-out infinite; }
 
-/* ========================================= */
-/* --- ПЪЛНА МОБИЛНА ОПТИМИЗАЦИЯ (TELEFON) --- */
-/* ========================================= */
+/* --- МОБИЛНА ОПТИМИЗАЦИЯ --- */
 @media (max-width: 650px) {
   .weather-app { padding: 12px; }
   
@@ -215,19 +223,8 @@ canvas {
   .main-top h2 { font-size: 2rem; }
   .big-temp { font-size: 4rem; text-align: center; margin-bottom: 24px; }
   
-  /* Оправяме счупените кутии да се подреждат идеално 2 по 2 */
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .daily-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   
   .stat-box, .day-box, .hour-box { padding: 12px; border-radius: 16px; }
-  
-  /* ЗАДАВАМЕ ПОПЪПА ВИНАГИ В ЦЕНТЪРА */
-  .popup-card {
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    width: 90% !important;
-    max-width: 340px !important;
-    padding: 20px !important;
-  }
 }
