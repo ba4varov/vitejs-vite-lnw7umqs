@@ -8,7 +8,7 @@
   min-height: 100vh;
   padding: 24px;
   color: white;
-  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  background: linear-gradient(135deg, #475569, #1e293b); /* Графитено сиво-синьо */
   font-family: 'Segoe UI', Arial, sans-serif;
   transition: background 0.3s;
 }
