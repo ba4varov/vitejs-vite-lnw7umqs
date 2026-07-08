@@ -25,7 +25,7 @@ const translations = {
     days14: '📅 Прогноза за 14 дни',
     myLocation: 'Моето местоположение',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
-    chart: '📊 Графика за 24 часа',
+    chart: '📊 Графики за 24 часа',
     temp: 'Температура',
     rain: 'Валежи',
     windChart: 'Вятър',
@@ -82,7 +82,7 @@ const translations = {
     days14: '📅 14-Day Forecast',
     myLocation: 'My Location',
     error: 'Failed to load weather data. Please try again.',
-    chart: '📊 24-Hour Chart',
+    chart: '📊 24-Hour Charts',
     temp: 'Temperature',
     rain: 'Precipitation',
     windChart: 'Wind',
@@ -119,12 +119,10 @@ const translations = {
 }
 
 const getTempGradient = (temp: number) => {
-  if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)' // Студено (Синьо)
-  if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)' // Хладно (Ментово зелено)
-  if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)' // Топло (Златисто жълто)
-  
-  // Горещо: Истински нюанси на червено (без розово)
-  return 'linear-gradient(135deg, #ffc2c2, #ff6b6b)' 
+  if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
+  if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
+  if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
+  return 'linear-gradient(135deg, #ffc2c2, #ff6b6b)'
 }
 
 const getIconAnimation = (icon: string) => {
@@ -146,10 +144,8 @@ const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
   )
 }
 
-const Chart = ({ hourly, darkMode, t }: any) => {
-  const [activeTab, setActiveTab] = useState('temp')
+const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981', pressure: '#a855f7' }
 
   useEffect(() => {
     if (!canvasRef.current || !hourly.length) return
@@ -157,38 +153,47 @@ const Chart = ({ hourly, darkMode, t }: any) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    const padL = 55, padR = 20, padT = 20, padB = 40
+    const padL = 40, padR = 15, padT = 20, padB = 30
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
+
     const data = hourly.map((h: any) =>
-      activeTab === 'temp' ? h.temp :
-      activeTab === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
-      activeTab === 'pressure' ? h.pressure :
+      type === 'temp' ? h.temp :
+      type === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
+      type === 'pressure' ? h.pressure :
       h.wind
     )
     const labels = hourly.map((h: any) => h.hour)
-    const minVal = activeTab === 'rain' ? 0 : Math.min(...data)
-    const maxVal = activeTab === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
-    const range = maxVal - minVal || 1
+
+    let minVal = type === 'rain' ? 0 : Math.min(...data)
+    let maxVal = type === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
+    if (minVal === maxVal) { maxVal += 1; minVal -= 1; }
+    const range = maxVal - minVal
+
     const xStep = chartW / (data.length - 1)
     const yScale = (val: number) => padT + chartH - ((val - minVal) / range) * chartH
     const xScale = (i: number) => padL + i * xStep
+
     const textColor = darkMode ? '#94a3b8' : '#64748b'
     const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
+
     ctx.strokeStyle = gridColor
     ctx.lineWidth = 1
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
-      ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'right'
-      ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 5, y + 4)
+      ctx.fillStyle = textColor; ctx.font = '12px Arial'; ctx.textAlign = 'right'
+      ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
-    ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'center'
     
-    data.forEach((_: any, i: number) => { if (i % 2 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
-    
+    ctx.fillStyle = textColor; ctx.font = '12px Arial'; ctx.textAlign = 'center'
+    data.forEach((_: any, i: number) => { 
+      if (i % 4 === 0 || i === data.length - 1) ctx.fillText(labels[i], xScale(i), H - 5) 
+    })
+
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
-    grad.addColorStop(0, colors[activeTab as keyof typeof colors] + '55'); grad.addColorStop(1, colors[activeTab as keyof typeof colors] + '00')
+    grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00')
+    
     ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
     data.forEach((val: number, i: number) => {
       if (i === 0) return
@@ -197,41 +202,50 @@ const Chart = ({ hourly, darkMode, t }: any) => {
     })
     ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
     ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
-    ctx.beginPath(); ctx.strokeStyle = colors[activeTab as keyof typeof colors]; ctx.lineWidth = 2.5
+    
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5
     data.forEach((val: number, i: number) => {
       if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
       const cpx = (xScale(i - 1) + xScale(i)) / 2
       ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
     })
     ctx.stroke()
+    
     data.forEach((val: number, i: number) => {
-      if (i % 2 === 0) {
+      if (i % 4 === 0 || i === data.length - 1) {
         ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
-        ctx.fillStyle = colors[activeTab as keyof typeof colors]; ctx.fill()
+        ctx.fillStyle = color; ctx.fill()
         ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 2; ctx.stroke()
       }
     })
-  }, [hourly, activeTab, darkMode])
+  }, [hourly, type, darkMode, color])
 
-  const tabs = [
-    { key: 'temp', label: t.temp, unit: '°C' },
-    { key: 'rain', label: t.rain, unit: t.mm },
-    { key: 'wind', label: t.windChart, unit: t.windUnit },
-    { key: 'pressure', label: t.pressureChart, unit: t.hpa }
+  return (
+    <div className="mini-chart">
+      <h4 style={{ color: color, marginBottom: '16px', textAlign: 'center', fontSize: '1.1rem' }}>
+        {label} <span style={{ opacity: 0.7, fontSize: '0.8em' }}>({unit})</span>
+      </h4>
+      <canvas ref={canvasRef} width={600} height={250} style={{ width: '100%', height: 'auto', display: 'block' }} />
+    </div>
+  )
+}
+
+const Chart = ({ hourly, darkMode, t }: any) => {
+  const chartsData = [
+    { key: 'temp', label: t.temp, unit: '°C', color: '#f97316' },
+    { key: 'rain', label: t.rain, unit: t.mm, color: '#3b82f6' },
+    { key: 'wind', label: t.windChart, unit: t.windUnit, color: '#10b981' },
+    { key: 'pressure', label: t.pressureChart, unit: t.hpa, color: '#a855f7' }
   ]
 
   return (
-    <div className="card chart-container">
+    <div className="card">
       <h3>{t.chart}</h3>
-      <div className="chart-tabs">
-        {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={'chart-tab' + (activeTab === tab.key ? ' active-' + tab.key : '')}>
-            {tab.label} ({tab.unit})
-          </button>
+      <div className="charts-grid">
+        {chartsData.map(c => (
+          <SingleChart key={c.key} hourly={hourly} darkMode={darkMode} type={c.key} label={c.label} unit={c.unit} color={c.color} />
         ))}
       </div>
-      <canvas ref={canvasRef} width={800} height={200} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   )
 }
