@@ -532,16 +532,11 @@ const WeatherApp = () => {
                 <div key={i} className="hour-box"
                   onClick={(e) => { 
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const popupW = 320;
-                    const popupH = 360;
-                    
-                    let x = rect.left + (rect.width / 2) - (popupW / 2);
-                    let y = rect.top - popupH - 15;
-                    
+                    let x = rect.left + (rect.width / 2) - 150;
+                    let y = rect.top - 320;
                     if (x < 10) x = 10;
-                    if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
+                    if (x + 300 > window.innerWidth - 10) x = window.innerWidth - 310;
                     if (y < 10) y = rect.bottom + 15;
-                    
                     setPopupPos({ x, y });
                     setSelectedHour(h); 
                     setDetailTab('main'); 
@@ -573,16 +568,11 @@ const WeatherApp = () => {
                 <div key={i} className="day-box" 
                   onClick={(e) => { 
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const popupW = 320;
-                    const popupH = 360;
-                    
-                    let x = rect.left + (rect.width / 2) - (popupW / 2);
-                    let y = rect.top - popupH - 15;
-                    
+                    let x = rect.left + (rect.width / 2) - 150;
+                    let y = rect.top - 320;
                     if (x < 10) x = 10;
-                    if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
+                    if (x + 300 > window.innerWidth - 10) x = window.innerWidth - 310;
                     if (y < 10) y = rect.bottom + 15;
-                    
                     setPopupPos({ x, y });
                     setSelectedDay(day); 
                     setDetailTab('main'); 
@@ -614,61 +604,50 @@ const WeatherApp = () => {
       {/* Изскачащ прозорец (Popover) за ДЕН */}
       {selectedDay && (
         <div 
-          style={{ 
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-            zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' 
-          }} 
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} 
           onClick={() => setSelectedDay(null)}
         >
           <div 
-            className="card"
+            className="card popup-card"
             style={{
-              position: 'fixed',
-              top: popupPos.y,
-              left: popupPos.x,
-              width: '320px',
-              margin: 0,
-              padding: '24px',
-              background: darkMode ? '#1e293b' : '#ffffff',
-              color: darkMode ? '#ffffff' : '#1e293b',
-              boxShadow: '0 15px 50px rgba(0,0,0,0.15)',
-              border: '1px solid rgba(0,0,0,0.05)',
-              zIndex: 9999,
-              cursor: 'default'
+              position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0,
+              background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b',
+              boxShadow: '0 15px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)',
+              zIndex: 9999, cursor: 'default'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
-              <button className="icon-btn" style={{ fontSize: '1rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedDay(null)}>❌</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
+              <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedDay(null)}>❌</button>
             </div>
             
-            <div className="chart-tabs" style={{ marginBottom: '20px' }}>
+            <div className="chart-tabs">
               <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
               <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
               <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
             </div>
             
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <div className="stats-grid popup-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               {detailTab === 'main' && <>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌡️</p><p className="label">{t.temp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.min}° / {selectedDay.max}°</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value" style={{ fontSize: '1.1rem' }}>до {selectedDay.feelsLikeMax}°</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💧</p><p className="label">{t.humidity}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.humidity}%</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.uv}</p></div>
+                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedDay.min}° / {selectedDay.max}°</p></div>
+                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">до {selectedDay.feelsLikeMax}°</p></div>
+                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedDay.humidity}%</p></div>
+                <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{selectedDay.uv}</p></div>
               </>}
               {detailTab === 'atmosphere' && <>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🔵</p><p className="label">{t.pressure}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.pressure} {t.hpa}</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>👁️</p><p className="label">{t.visibility}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.visibility} {t.km}</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.cloudCover}%</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.dewPoint}°C</p></div>
+                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedDay.pressure} {t.hpa}</p></div>
+                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{selectedDay.visibility} {t.km}</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{selectedDay.cloudCover}%</p></div>
+                <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedDay.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💨</p><p className="label">{t.wind}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.wind} {t.windUnit}</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌧️</p><p className="label">{t.rain}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.rain} {t.mm}</p></div>
+                <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedDay.rain} {t.mm}</p></div>
                 {selectedDay.seaTemp !== null ? (
-                  <div className="stat-box sea-temp-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.seaTemp}°C</p></div>
+                  <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedDay.seaTemp}°C</p></div>
                 ) : (
-                  <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{t.noSeaData}</p></div>
+                  <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
                 )}
               </>}
             </div>
@@ -679,61 +658,50 @@ const WeatherApp = () => {
       {/* Изскачащ прозорец (Popover) за ЧАС */}
       {selectedHour && (
         <div 
-          style={{ 
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-            zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' 
-          }} 
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} 
           onClick={() => setSelectedHour(null)}
         >
           <div 
-            className="card"
+            className="card popup-card"
             style={{
-              position: 'fixed',
-              top: popupPos.y,
-              left: popupPos.x,
-              width: '320px',
-              margin: 0,
-              padding: '24px',
-              background: darkMode ? '#1e293b' : '#ffffff',
-              color: darkMode ? '#ffffff' : '#1e293b',
-              boxShadow: '0 15px 50px rgba(0,0,0,0.15)',
-              border: '1px solid rgba(0,0,0,0.05)',
-              zIndex: 9999,
-              cursor: 'default'
+              position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0,
+              background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b',
+              boxShadow: '0 15px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)',
+              zIndex: 9999, cursor: 'default'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
-              <button className="icon-btn" style={{ fontSize: '1rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedHour(null)}>❌</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
+              <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedHour(null)}>❌</button>
             </div>
             
-            <div className="chart-tabs" style={{ marginBottom: '20px' }}>
+            <div className="chart-tabs">
               <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
               <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
               <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
             </div>
             
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <div className="stats-grid popup-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               {detailTab === 'main' && <>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌡️</p><p className="label">{t.temp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.temp}°C</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.feelsLike}°C</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💧</p><p className="label">{t.humidity}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.humidity}%</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☁️</p><p className="label">Време</p><p className="value" style={{ fontSize: '1.1rem' }}><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
+                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp}°C</p></div>
+                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike}°C</p></div>
+                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity}%</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">Време</p><p className="value" style={{ marginTop: '4px' }}><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
               </>}
               {detailTab === 'atmosphere' && <>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🔵</p><p className="label">{t.pressure}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.pressure} {t.hpa}</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>👁️</p><p className="label">{t.visibility}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.visibility} {t.km}</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.cloudCover}%</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.dewPoint}°C</p></div>
+                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedHour.pressure} {t.hpa}</p></div>
+                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{selectedHour.visibility} {t.km}</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{selectedHour.cloudCover}%</p></div>
+                <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedHour.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💨</p><p className="label">{t.wind}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.wind} {t.windUnit}</p></div>
-                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌧️</p><p className="label">{t.rain}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.rain} {t.mm}</p></div>
+                <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain} {t.mm}</p></div>
                 {selectedHour.seaTemp !== null ? (
-                  <div className="stat-box sea-temp-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.seaTemp}°C</p></div>
+                  <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
                 ) : (
-                  <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{t.noSeaData}</p></div>
+                  <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
                 )}
               </>}
             </div>
