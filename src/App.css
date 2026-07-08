@@ -16,7 +16,7 @@ html, body {
 }
 
 .weather-app {
-  max-width: 1200px; /* <--- Ето тук разширихме изгледа от 900px на 1200px */
+  max-width: 1200px;
   width: 100%;
   margin: 0 auto;
   padding: 24px;
@@ -178,4 +178,52 @@ canvas {
   padding: 8px 16px; border-radius: 20px; border: none; background: #f1f5f9;
   color: #64748b; cursor: pointer; font-weight: 600; transition: 0.2s;
 }
-.chart-tab.active-temp
+.chart-tab.active-temp { background: #f97316; color: white; }
+.chart-tab.active-rain { background: #3b82f6; color: white; }
+.chart-tab.active-wind { background: #10b981; color: white; }
+.chart-tab.active-pressure { background: #a855f7; color: white; }
+
+.center-text { text-align: center; }
+.footer { text-align: center; margin-top: 40px; opacity: 0.5; font-size: 0.9rem; }
+
+/* --- DARK MODE --- */
+.weather-app.dark { background: #0f172a; color: #f8fafc; }
+.weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
+.weather-app.dark .popup-grid .stat-box { background: rgba(255,255,255,0.05) !important; }
+.weather-app.dark .popup-grid .sea-temp-box { background: rgba(56, 189, 248, 0.2) !important;}
+.weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
+
+/* --- АНИМАЦИИ --- */
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.float { animation: float 3s ease-in-out infinite; }
+@keyframes spin-slow { 100% { transform: rotate(360deg); } }
+.spin-slow { animation: spin-slow 12s linear infinite; }
+@keyframes bounce-rain { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+.bounce-rain { animation: bounce-rain 1.5s ease-in-out infinite; }
+
+/* --- МОБИЛНА ОПТИМИЗАЦИЯ --- */
+@media (max-width: 650px) {
+  .weather-app { padding: 12px; }
+  
+  .header-row { 
+    flex-direction: column; gap: 16px; text-align: center; 
+    padding: 16px; margin-bottom: 20px;
+  }
+  .header-title-wrapper h1 { font-size: 1.6rem; }
+  
+  .search-row input { padding: 14px 20px; font-size: 1rem; }
+  .city-btn { padding: 8px 16px; font-size: 0.85rem; }
+  
+  .card { padding: 20px; border-radius: 24px; margin-bottom: 16px; }
+  .card h3 { font-size: 1.2rem; }
+  
+  .main-top { flex-direction: column; align-items: center; text-align: center; }
+  .main-top div:first-child { text-align: center; margin-bottom: 12px; }
+  .main-top h2 { font-size: 2rem; }
+  .big-temp { font-size: 4rem; text-align: center; margin-bottom: 24px; }
+  
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .daily-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  
+  .stat-box, .day-box, .hour-box { padding: 12px; border-radius: 16px; }
+}
