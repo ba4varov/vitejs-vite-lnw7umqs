@@ -16,7 +16,7 @@ html, body {
 }
 
 .weather-app {
-  max-width: 1200px;
+  max-width: 1500px; /* <--- Увеличено на 1500px за максимална широчина */
   width: 100%;
   margin: 0 auto;
   padding: 24px;
