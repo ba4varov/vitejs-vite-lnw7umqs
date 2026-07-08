@@ -121,10 +121,8 @@ const translations = {
 const getTempGradient = (temp: number) => {
   if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
   if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
-  if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
-  
-  // Истинско червено, премахнато е розовото
-  return 'linear-gradient(135deg, #ffb3b3, #ff4d4d)'
+  if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)' // Слънчево жълто-оранжево до 29°C
+  return 'linear-gradient(135deg, #ff9270, #ea4335)' // Червено от 30°C нагоре
 }
 
 const getIconAnimation = (icon: string) => {
@@ -176,7 +174,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const yScale = (val: number) => padT + chartH - ((val - minVal) / range) * chartH
     const xScale = (i: number) => padL + i * xStep
 
-    const textColor = darkMode ? '#94a3b8' : '#64748b'
+    const textColor = darkMode ? '#e2e8f0' : '#1e293b'
     const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
 
     ctx.strokeStyle = gridColor
@@ -184,11 +182,12 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
-      ctx.fillStyle = textColor; ctx.font = '12px Arial'; ctx.textAlign = 'right'
+      
+      ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'right'
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    ctx.fillStyle = textColor; ctx.font = '12px Arial'; ctx.textAlign = 'center'
+    ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'
     data.forEach((_: any, i: number) => { 
       if (i % 4 === 0 || i === data.length - 1) ctx.fillText(labels[i], xScale(i), H - 5) 
     })
