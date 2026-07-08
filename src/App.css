@@ -9,28 +9,39 @@
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.6);
+  background: white;
   border-radius: 24px;
-  padding: 32px;
-  margin-bottom: 32px;
+  padding: 24px;
+  margin-bottom: 24px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
-.icon-btn, .lang-btn {
-  color: #1e293b;
-  background: rgba(0,0,0,0.05);
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: none;
+.hourly-row, .daily-grid {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 10px 0;
+}
+
+.hour-box, .day-box {
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 12px;
   cursor: pointer;
+  min-width: 80px;
+  text-align: center;
 }
 
 .popup {
   position: fixed;
-  width: 300px;
-  background: white;
+  width: 250px;
+  background: #fff;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
   z-index: 1000;
+  border: 1px solid #e2e8f0;
 }
+
+.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.lang-btn { padding: 8px 16px; border-radius: 20px; border: none; background: #e2e8f0; cursor: pointer; }
