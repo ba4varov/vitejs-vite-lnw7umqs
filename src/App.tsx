@@ -362,3 +362,391 @@ const WeatherApp = () => {
           rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
           wind: Math.round(data.hourly.wind_speed_10m[idx]),
           pressure: Math.round(data.hourly.surface_pressure[idx]),
+          humidity: Math.round(data.hourly.relative_humidity_2m[idx]),
+          visibility: Math.round((data.hourly.visibility[idx] || 0) / 1000),
+          dewPoint: Math.round(data.hourly.dew_point_2m[idx]),
+          cloudCover: Math.round(data.hourly.cloud_cover[idx]),
+          seaTemp: sst != null ? Math.round(sst) : null,
+          icon: code.icon
+        })
+      }
+      setHourly(hr)
+
+      const days: any[] = []
+      for (let i = 1; i < Math.min(15, data.daily.time.length); i++) {
+        const d = new Date(data.daily.time[i])
+        const code = decodeWeatherCode(data.daily.weather_code[i])
+        
+        let sumHum = 0, sumPress = 0, sumVis = 0, sumDew = 0, sumCloud = 0, sumSea = 0;
+        let count = 0, seaCount = 0;
+        const startH = i * 24;
+        
+        for(let h = startH; h < startH + 24; h++) {
+          if (data.hourly && h < data.hourly.time.length) {
+            sumHum += data.hourly.relative_humidity_2m[h] || 0;
+            sumPress += data.hourly.surface_pressure[h] || 0;
+            sumVis += data.hourly.visibility[h] || 0;
+            sumDew += data.hourly.dew_point_2m[h] || 0;
+            sumCloud += data.hourly.cloud_cover[h] || 0;
+            count++;
+            
+            if (hourlySeaTemp.length > h && hourlySeaTemp[h] !== null) {
+               sumSea += hourlySeaTemp[h];
+               seaCount++;
+            }
+          }
+        }
+
+        days.push({
+          dateStr: data.daily.time[i],
+          dayName: (t.weekDays as any)[d.getDay()],
+          dateFormatted: `${d.getDate()} ${(t.months as any)[d.getMonth()]}`,
+          max: Math.round(data.daily.temperature_2m_max[i]),
+          min: Math.round(data.daily.temperature_2m_min[i]),
+          feelsLikeMax: Math.round(data.daily.apparent_temperature_max[i] || data.daily.temperature_2m_max[i]),
+          icon: code.icon,
+          rain: Math.max(0, data.daily.precipitation_sum[i] || 0).toFixed(1),
+          wind: Math.round(data.daily.wind_speed_10m_max[i] || 0),
+          uv: Math.round(data.daily.uv_index_max[i] || 0),
+          humidity: count > 0 ? Math.round(sumHum / count) : 0,
+          pressure: count > 0 ? Math.round(sumPress / count) : 0,
+          visibility: count > 0 ? Math.round((sumVis / count) / 1000) : 0,
+          dewPoint: count > 0 ? Math.round(sumDew / count) : 0,
+          cloudCover: count > 0 ? Math.round(sumCloud / count) : 0,
+          seaTemp: seaCount > 0 ? Math.round(sumSea / seaCount) : null
+        })
+      }
+      setForecast(days)
+      setLoading(false)
+    } catch (e) {
+      setError(t.error)
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchWeather(coords.lat, coords.lon)
+    const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [coords, lang])
+
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude, lon = pos.coords.longitude
+        setCoords({ lat, lon })
+        try {
+          const res = await fetch('[https://nominatim.openstreetmap.org/reverse?lat=](https://nominatim.openstreetmap.org/reverse?lat=)' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang)
+          const data = await res.json()
+          setCity(data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation)
+        } catch (e) { setCity(t.myLocation) }
+      }, () => {}, { timeout: 5000 })
+    }
+  }, [])
+
+  return (
+    <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
+      <div className="header-row">
+        <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
+          <h1>{t.title}</h1>
+          <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
+        </div>
+        <div className="header-btns">
+          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
+            {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
+          </button>
+          <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+        </div>
+      </div>
+
+      <div className="search-wrapper">
+        <div className="search-row">
+          <input type="text" placeholder={t.search} value={searchInput}
+            onChange={(e) => handleSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setSuggestions([])}
+            autoComplete="off" />
+        </div>
+        {suggestions.length > 0 && (
+          <div className="suggestions">
+            {suggestions.map((s, i) => (
+              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
+                <span className="sug-name">{s.name}</span>
+                <span className="sug-country">{s.admin1 ? s.admin1 + ', ' : ''}{s.country}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="info-line">{t.info}</div>
+
+      <div className="city-row">
+        {t.quickCities.map((c: any) => (
+          <button key={c.name}
+            onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
+            className={city === c.name ? 'city-btn active' : 'city-btn'}>
+            {c.name}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="card center-text"><p style={{ fontSize: '1.5rem' }}>{t.loading}</p></div>}
+
+      {error && !loading && (
+        <div className="card center-text">
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
+          <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>{t.tryAgain}</button>
+        </div>
+      )}
+
+      {!loading && !error && weather && (
+        <div>
+          <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
+            <div className="main-top">
+              <div>
+                <h2>📍 {city}</h2>
+                <p className="desc">{weather.description}</p>
+              </div>
+              <div className="big-icon"><AnimatedIcon icon={weather.icon} size="5rem" /></div>
+            </div>
+            <div className="big-temp">{weather.temp}°C</div>
+            <div className="stats-grid">
+              <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
+              <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+              <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
+              <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
+              <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
+              <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
+              {weather.seaTemp !== null && (
+                <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>{t.hours24}</h3>
+            <div className="hourly-row">
+              {hourly.map((h, i) => (
+                <div key={i} className="hour-box"
+                  onClick={(e) => { 
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const popupW = 320;
+                    const popupH = 360;
+                    
+                    let x = rect.left + (rect.width / 2) - (popupW / 2);
+                    let y = rect.top - popupH - 15;
+                    
+                    if (x < 10) x = 10;
+                    if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
+                    if (y < 10) y = rect.bottom + 15;
+                    
+                    setPopupPos({ x, y });
+                    setSelectedHour(h); 
+                    setDetailTab('main'); 
+                  }}
+                  style={{ 
+                    cursor: 'pointer', 
+                    boxShadow: selectedHour?.hour === h.hour ? '0 0 0 3px rgba(30,41,55,0.2)' : 'none',
+                    transform: selectedHour?.hour === h.hour ? 'scale(1.05)' : 'none',
+                    transition: 'all 0.2s',
+                    position: 'relative'
+                  }}
+                >
+                  <p className="hour-time">{h.hour}</p>
+                  <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
+                  <p className="hour-temp">{h.temp}°C</p>
+                  <p className="hour-wind">💨 {h.wind} {t.windUnit}</p>
+                  {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Chart hourly={hourly} darkMode={darkMode} t={t} />
+
+          <div className="card">
+            <h3>{t.days14}</h3>
+            <div className="daily-grid" style={{ rowGap: '16px' }}>
+              {forecast.map((day, i) => (
+                <div key={i} className="day-box" 
+                  onClick={(e) => { 
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const popupW = 320;
+                    const popupH = 360;
+                    
+                    let x = rect.left + (rect.width / 2) - (popupW / 2);
+                    let y = rect.top - popupH - 15;
+                    
+                    if (x < 10) x = 10;
+                    if (x + popupW > window.innerWidth - 10) x = window.innerWidth - popupW - 10;
+                    if (y < 10) y = rect.bottom + 15;
+                    
+                    setPopupPos({ x, y });
+                    setSelectedDay(day); 
+                    setDetailTab('main'); 
+                  }}
+                  style={{ 
+                    cursor: 'pointer', 
+                    boxShadow: selectedDay?.dateStr === day.dateStr ? '0 0 0 3px rgba(30,41,55,0.2)' : 'none',
+                    transform: selectedDay?.dateStr === day.dateStr ? 'scale(1.05)' : 'none',
+                    transition: 'all 0.2s',
+                    position: 'relative'
+                  }}
+                >
+                  <p className="day-name" style={{ marginBottom: '2px' }}>{day.dayName}</p>
+                  <p style={{ fontSize: '0.7rem', opacity: 0.8, marginBottom: '8px', fontWeight: 'normal' }}>{day.dateFormatted}</p>
+                  <p className="day-icon"><AnimatedIcon icon={day.icon} size="2rem" /></p>
+                  <p className="day-temp">
+                    <span className="max">{day.max}°</span><br />
+                    <span className="min">{day.min}°</span>
+                  </p>
+                  <p className="day-rain">🌧 {day.rain}{t.mm}</p>
+                  <p className="day-wind">💨 {day.wind}{t.windUnit}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Изскачащ прозорец (Popover) за ДЕН */}
+      {selectedDay && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' 
+          }} 
+          onClick={() => setSelectedDay(null)}
+        >
+          <div 
+            className="card"
+            style={{
+              position: 'fixed',
+              top: popupPos.y,
+              left: popupPos.x,
+              width: '320px',
+              margin: 0,
+              padding: '24px',
+              background: darkMode ? '#1e293b' : '#ffffff',
+              color: darkMode ? '#ffffff' : '#1e293b',
+              boxShadow: '0 15px 50px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(0,0,0,0.05)',
+              zIndex: 9999,
+              cursor: 'default'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
+              <button className="icon-btn" style={{ fontSize: '1rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedDay(null)}>❌</button>
+            </div>
+            
+            <div className="chart-tabs" style={{ marginBottom: '20px' }}>
+              <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
+              <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
+              <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
+            </div>
+            
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              {detailTab === 'main' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌡️</p><p className="label">{t.temp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.min}° / {selectedDay.max}°</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value" style={{ fontSize: '1.1rem' }}>до {selectedDay.feelsLikeMax}°</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💧</p><p className="label">{t.humidity}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.humidity}%</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.uv}</p></div>
+              </>}
+              {detailTab === 'atmosphere' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🔵</p><p className="label">{t.pressure}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.pressure} {t.hpa}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>👁️</p><p className="label">{t.visibility}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.visibility} {t.km}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.cloudCover}%</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.dewPoint}°C</p></div>
+              </>}
+              {detailTab === 'water' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💨</p><p className="label">{t.wind}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.wind} {t.windUnit}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌧️</p><p className="label">{t.rain}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.rain} {t.mm}</p></div>
+                {selectedDay.seaTemp !== null ? (
+                  <div className="stat-box sea-temp-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedDay.seaTemp}°C</p></div>
+                ) : (
+                  <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{t.noSeaData}</p></div>
+                )}
+              </>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Изскачащ прозорец (Popover) за ЧАС */}
+      {selectedHour && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' 
+          }} 
+          onClick={() => setSelectedHour(null)}
+        >
+          <div 
+            className="card"
+            style={{
+              position: 'fixed',
+              top: popupPos.y,
+              left: popupPos.x,
+              width: '320px',
+              margin: 0,
+              padding: '24px',
+              background: darkMode ? '#1e293b' : '#ffffff',
+              color: darkMode ? '#ffffff' : '#1e293b',
+              boxShadow: '0 15px 50px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(0,0,0,0.05)',
+              zIndex: 9999,
+              cursor: 'default'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
+              <button className="icon-btn" style={{ fontSize: '1rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedHour(null)}>❌</button>
+            </div>
+            
+            <div className="chart-tabs" style={{ marginBottom: '20px' }}>
+              <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
+              <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
+              <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
+            </div>
+            
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              {detailTab === 'main' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌡️</p><p className="label">{t.temp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.temp}°C</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.feelsLike}°C</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💧</p><p className="label">{t.humidity}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.humidity}%</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☁️</p><p className="label">Време</p><p className="value" style={{ fontSize: '1.1rem' }}><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
+              </>}
+              {detailTab === 'atmosphere' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🔵</p><p className="label">{t.pressure}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.pressure} {t.hpa}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>👁️</p><p className="label">{t.visibility}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.visibility} {t.km}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.cloudCover}%</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.dewPoint}°C</p></div>
+              </>}
+              {detailTab === 'water' && <>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>💨</p><p className="label">{t.wind}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.wind} {t.windUnit}</p></div>
+                <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌧️</p><p className="label">{t.rain}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.rain} {t.mm}</p></div>
+                {selectedHour.seaTemp !== null ? (
+                  <div className="stat-box sea-temp-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{selectedHour.seaTemp}°C</p></div>
+                ) : (
+                  <div className="stat-box" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)' }}><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value" style={{ fontSize: '1.1rem' }}>{t.noSeaData}</p></div>
+                )}
+              </>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="footer" style={{ textAlign: 'center', marginTop: '2rem', padding: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
+        <p style={{ marginBottom: '0.5rem' }}>Данните за времето се предоставят от <a href="[https://open-meteo.com](https://open-meteo.com)" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Open-Meteo API</a></p>
+        <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
+      </div>
+    </div>
+  )
+}
+
+export default WeatherApp
