@@ -5,7 +5,6 @@
   padding: 0;
 }
 
-/* ДОБАВЕН #root ТУК, ЗА ДА ПРЕМАХНЕМ СКРИТОТО ОГРАНИЧЕНИЕ НА REACT */
 html, body, #root {
   overflow-x: hidden;
   width: 100%;
@@ -19,7 +18,7 @@ html, body, #root {
 }
 
 .weather-app {
-  max-width: 1500px; /* Сега вече наистина ще се разпъне до 1500px */
+  max-width: 1500px; 
   width: 100%;
   margin: 0 auto;
   padding: 24px;
@@ -138,10 +137,16 @@ html, body, #root {
 .day-temp .max { font-weight: bold; }
 .day-temp .min { opacity: 0.6; font-size: 0.9rem; margin-top: 4px; display: block; }
 
-/* --- ГРАФИКА ЗА 24 ЧАСА --- */
-.chart-container {
-  width: 100%;
-  overflow: hidden;
+/* --- ГРАФИКИ ЗА 24 ЧАСА (ТВЪРДО 4 В ЕДИН РЕД) --- */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* <-- ЗАДЪЛЖАВА ГИ ДА СА 4 НА РЕД */
+  gap: 16px;
+}
+.mini-chart {
+  background: rgba(0,0,0,0.02);
+  padding: 16px;
+  border-radius: 20px;
 }
 canvas {
   max-width: 100%;
@@ -192,6 +197,7 @@ canvas {
 /* --- DARK MODE --- */
 .weather-app.dark { background: #0f172a; color: #f8fafc; }
 .weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
+.weather-app.dark .mini-chart { background: rgba(255,255,255,0.05); }
 .weather-app.dark .popup-grid .stat-box { background: rgba(255,255,255,0.05) !important; }
 .weather-app.dark .popup-grid .sea-temp-box { background: rgba(56, 189, 248, 0.2) !important;}
 .weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
@@ -205,6 +211,22 @@ canvas {
 .bounce-rain { animation: bounce-rain 1.5s ease-in-out infinite; }
 
 /* --- МОБИЛНА ОПТИМИЗАЦИЯ --- */
+@media (max-width: 850px) {
+  /* Графиките стават скролващи на мобилен */
+  .charts-grid {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .charts-grid::-webkit-scrollbar { height: 6px; }
+  .charts-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+  .mini-chart {
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+}
+
 @media (max-width: 650px) {
   .weather-app { padding: 12px; }
   
