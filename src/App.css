@@ -1,47 +1,160 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #eef6ff; /* Твоят светъл фон */
+  color: #1e293b;     /* Тъмен и четим текст */
+  -webkit-font-smoothing: antialiased;
+}
 
 .weather-app {
-  min-height: 100vh;
+  max-width: 900px;
+  margin: 0 auto;
   padding: 24px;
-  color: #1e293b;
-  background: #eef6ff;
-  font-family: 'Segoe UI', Arial, sans-serif;
 }
 
-.card {
-  background: white;
-  border-radius: 24px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-}
-
-.hourly-row, .daily-grid {
+/* --- HEADER --- */
+.header-row {
   display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 10px 0;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 16px 24px;
+  border-radius: 24px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.02);
 }
+.header-title-wrapper h1 { font-size: 1.8rem; margin: 0; }
+.header-title-wrapper p { margin: 4px 0 0; opacity: 0.7; }
+.header-btns { display: flex; gap: 12px; }
+.header-btns button {
+  background: white; border: none; padding: 10px 18px; border-radius: 20px;
+  cursor: pointer; font-weight: bold; color: #1e293b;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
+}
+.header-btns button:hover { transform: scale(1.05); }
 
-.hour-box, .day-box {
-  background: #f8fafc;
-  padding: 15px;
-  border-radius: 12px;
-  cursor: pointer;
-  min-width: 80px;
+/* --- ТЪРСАЧКА И ГРАДОВЕ --- */
+.search-wrapper { margin-bottom: 24px; position: relative; }
+.search-row input {
+  width: 100%; padding: 18px 24px; border-radius: 24px; border: none;
+  background: white; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  outline: none; color: #1e293b;
+}
+.suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; background: white;
+  border-radius: 16px; margin-top: 8px; overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100;
+}
+.suggestion-item { padding: 12px 24px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.suggestion-item:hover { background: #f8fafc; }
+.info-line { text-align: center; font-size: 0.85rem; opacity: 0.6; margin-bottom: 24px; }
+
+.city-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px; }
+.city-btn {
+  padding: 10px 20px; border-radius: 20px; border: none; background: white;
+  color: #1e293b; cursor: pointer; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+}
+.city-btn.active { background: #3b82f6; color: white; }
+
+/* --- ОСНОВНИ КАРТИ --- */
+.card {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 32px;
+  padding: 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.04);
+}
+.card h3 { margin-bottom: 20px; font-size: 1.4rem; opacity: 0.9; }
+
+/* --- ГЛАВНА КАРТА С ВРЕМЕТО (където беше мазалото) --- */
+.main-card { border: 1px solid rgba(255,255,255,0.4); }
+.main-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.main-top div:first-child { text-align: left; }
+.main-top h2 { font-size: 2.5rem; margin-bottom: 8px; }
+.main-top .desc { font-size: 1.2rem; opacity: 0.8; text-transform: capitalize; }
+.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-bottom: 32px; text-align: left; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+}
+.stat-box {
+  background: rgba(255,255,255, 0.6);
+  padding: 16px;
+  border-radius: 20px;
   text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
 }
+.stat-box p { margin: 0; }
+.stat-box .label { font-size: 0.85rem; opacity: 0.7; margin: 8px 0 4px; }
+.stat-box .value { font-weight: bold; font-size: 1.2rem; }
+.sea-temp-box { background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); }
 
+/* --- ХОРИЗОНТАЛНИ СПИСЪЦИ --- */
+.hourly-row { display: flex; overflow-x: auto; gap: 16px; padding-bottom: 16px; }
+.hourly-row::-webkit-scrollbar { height: 8px; }
+.hourly-row::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+.hour-box {
+  background: white; min-width: 100px; padding: 16px; border-radius: 20px;
+  text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+.hour-time { font-weight: bold; color: #64748b; }
+.hour-temp { font-size: 1.3rem; font-weight: bold; }
+
+.daily-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px; }
+.day-box {
+  background: white; padding: 16px; border-radius: 20px; text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  transition: transform 0.2s;
+}
+.day-box:hover { transform: translateY(-3px); }
+.day-name { font-weight: bold; font-size: 1.1rem; }
+.day-temp { font-size: 1.2rem; }
+.day-temp .max { font-weight: bold; }
+.day-temp .min { opacity: 0.5; font-size: 0.9rem; margin-top: 4px; display: block; }
+
+/* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (POPOVER) --- */
 .popup {
-  position: fixed;
-  width: 250px;
-  background: #fff;
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-  z-index: 1000;
-  border: 1px solid #e2e8f0;
+  position: fixed; width: 360px; background: white; padding: 24px;
+  border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); z-index: 1000;
 }
+.chart-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
+.chart-tab {
+  padding: 8px 16px; border-radius: 20px; border: none; background: #f1f5f9;
+  color: #64748b; cursor: pointer; font-weight: 600; transition: 0.2s;
+}
+.chart-tab.active-temp { background: #f97316; color: white; }
+.chart-tab.active-rain { background: #3b82f6; color: white; }
+.chart-tab.active-wind { background: #10b981; color: white; }
+.chart-tab.active-pressure { background: #a855f7; color: white; }
 
-.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.lang-btn { padding: 8px 16px; border-radius: 20px; border: none; background: #e2e8f0; cursor: pointer; }
+.center-text { text-align: center; }
+.footer { text-align: center; margin-top: 40px; opacity: 0.5; font-size: 0.9rem; }
+
+/* --- АНИМАЦИИ НА ИКОНИТЕ --- */
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.float { animation: float 3s ease-in-out infinite; }
+@keyframes spin-slow { 100% { transform: rotate(360deg); } }
+.spin-slow { animation: spin-slow 12s linear infinite; }
+@keyframes bounce-rain { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+.bounce-rain { animation: bounce-rain 1.5s ease-in-out infinite; }
+
+/* --- МОБИЛЕН ИЗГЛЕД --- */
+@media (max-width: 600px) {
+  .header-row { flex-direction: column; gap: 16px; text-align: center; }
+  .main-top { flex-direction: column; align-items: center; text-align: center; }
+  .main-top div:first-child { text-align: center; margin-bottom: 16px; }
+  .big-temp { text-align: center; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .daily-grid { grid-template-columns: repeat(3, 1fr); }
+}
