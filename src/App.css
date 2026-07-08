@@ -1,14 +1,17 @@
-/* --- ОСНОВЕН РЕСЕТ И ПРЕДПАЗВАНЕ ОТ ХОРИЗОНТАЛЕН СКРОЛ --- */
+/* --- ОСНОВЕН РЕСЕТ И ОТКЛЮЧВАНЕ НА ШИРИНАТА --- */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+/* ДОБАВЕН #root ТУК, ЗА ДА ПРЕМАХНЕМ СКРИТОТО ОГРАНИЧЕНИЕ НА REACT */
+html, body, #root {
   overflow-x: hidden;
   width: 100%;
-  max-width: 100vw;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background: #eef6ff;
   color: #1e293b;
@@ -16,7 +19,7 @@ html, body {
 }
 
 .weather-app {
-  max-width: 1500px; /* <--- Увеличено на 1500px за максимална широчина */
+  max-width: 1500px; /* Сега вече наистина ще се разпъне до 1500px */
   width: 100%;
   margin: 0 auto;
   padding: 24px;
