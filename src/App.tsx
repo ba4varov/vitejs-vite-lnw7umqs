@@ -25,7 +25,7 @@ const translations = {
     days14: '📅 Прогноза за 14 дни',
     myLocation: 'Моето местоположение',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
-    chart: '📊 Графика за 24 часа',
+    chart: '📊 Графики за 24 часа',
     temp: 'Температура',
     rain: 'Валежи',
     windChart: 'Вятър',
@@ -122,7 +122,9 @@ const getTempGradient = (temp: number) => {
   if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
   if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
   if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
-  return 'linear-gradient(135deg, #ffc2c2, #ff6b6b)'
+  
+  // Истинско червено, премахнато е розовото
+  return 'linear-gradient(135deg, #ffb3b3, #ff4d4d)'
 }
 
 const getIconAnimation = (icon: string) => {
@@ -174,8 +176,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const yScale = (val: number) => padT + chartH - ((val - minVal) / range) * chartH
     const xScale = (i: number) => padL + i * xStep
 
-    // Променени цветове и шрифтове за кристална четимост
-    const textColor = darkMode ? '#e2e8f0' : '#1e293b' // Тъмно графитено за бял фон
+    const textColor = darkMode ? '#94a3b8' : '#64748b'
     const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
 
     ctx.strokeStyle = gridColor
@@ -183,14 +184,11 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
-      
-      // Удебелен (bold) и по-голям шрифт за стойностите по Y оста
-      ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'right'
+      ctx.fillStyle = textColor; ctx.font = '12px Arial'; ctx.textAlign = 'right'
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    // Удебелен (bold) и по-голям шрифт за часовете по X оста
-    ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'
+    ctx.fillStyle = textColor; ctx.font = '12px Arial'; ctx.textAlign = 'center'
     data.forEach((_: any, i: number) => { 
       if (i % 4 === 0 || i === data.length - 1) ctx.fillText(labels[i], xScale(i), H - 5) 
     })
