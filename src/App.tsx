@@ -252,7 +252,6 @@ const WeatherApp = () => {
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
   const [detailTab, setDetailTab] = useState('main')
   
-  // Коригирано тук, за да избегнем NodeJS грешката
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
 
@@ -269,7 +268,7 @@ const WeatherApp = () => {
   const searchCities = async (query: string) => {
     if (query.length < 2) { setSuggestions([]); return }
     try {
-      const res = await fetch('[https://geocoding-api.open-meteo.com/v1/search?name=](https://geocoding-api.open-meteo.com/v1/search?name=)' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
+      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
       const data = await res.json()
       setSuggestions(data.results || [])
     } catch (e) { setSuggestions([]) }
@@ -295,13 +294,13 @@ const WeatherApp = () => {
     setLoading(true)
     setError(null)
     try {
-      const weatherUrl = '[https://api.open-meteo.com/v1/forecast?latitude=](https://api.open-meteo.com/v1/forecast?latitude=)' + lat + '&longitude=' + lon + 
+      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
         '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max' + 
         '&timezone=auto&forecast_days=15';
 
-      const marineUrl = '[https://marine-api.open-meteo.com/v1/marine?latitude=](https://marine-api.open-meteo.com/v1/marine?latitude=)' + lat + '&longitude=' + lon + 
+      const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
         '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15';
 
       const [weatherRes, marineRes] = await Promise.allSettled([
@@ -309,7 +308,7 @@ const WeatherApp = () => {
         fetch(marineUrl)
       ])
       
-      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
+      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error('Моля проверете връзката си с интернет.')
       const data = await weatherRes.value.json()
 
       let seaTemp = null
@@ -418,7 +417,8 @@ const WeatherApp = () => {
       }
       setForecast(days)
       setLoading(false)
-    } catch (e) {
+    } catch (e: any) {
+      console.error(e);
       setError(t.error)
       setLoading(false)
     }
@@ -436,7 +436,7 @@ const WeatherApp = () => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
-          const res = await fetch('[https://nominatim.openstreetmap.org/reverse?lat=](https://nominatim.openstreetmap.org/reverse?lat=)' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang)
+          const res = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang)
           const data = await res.json()
           setCity(data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation)
         } catch (e) { setCity(t.myLocation) }
@@ -742,7 +742,7 @@ const WeatherApp = () => {
       )}
 
       <div className="footer" style={{ textAlign: 'center', marginTop: '2rem', padding: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
-        <p style={{ marginBottom: '0.5rem' }}>Данните за времето се предоставят от <a href="[https://open-meteo.com](https://open-meteo.com)" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Open-Meteo API</a></p>
+        <p style={{ marginBottom: '0.5rem' }}>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>Open-Meteo API</a></p>
         <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
       </div>
     </div>
