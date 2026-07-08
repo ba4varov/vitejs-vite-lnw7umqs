@@ -6,8 +6,8 @@
 
 body {
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #eef6ff; /* Твоят светъл фон */
-  color: #1e293b;     /* Тъмен и четим текст */
+  background: #eef6ff; /* Светлият фон на страницата */
+  color: #1e293b;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -52,7 +52,7 @@ body {
   box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100;
 }
 .suggestion-item { padding: 12px 24px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); }
-.suggestion-item:hover { background: #f8fafc; }
+.suggestion-item:hover { background: #ade3ff; } /* При маркиране в търсачката - също твоят цвят */
 .info-line { text-align: center; font-size: 0.85rem; opacity: 0.6; margin-bottom: 24px; }
 
 .city-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px; }
@@ -63,7 +63,7 @@ body {
 }
 .city-btn.active { background: #3b82f6; color: white; }
 
-/* --- ОСНОВНИ КАРТИ --- */
+/* --- ОСНОВНИ КАРТИ (Големите бели рамки) --- */
 .card {
   background: rgba(255, 255, 255, 0.7);
   border-radius: 32px;
@@ -73,7 +73,7 @@ body {
 }
 .card h3 { margin-bottom: 20px; font-size: 1.4rem; opacity: 0.9; }
 
-/* --- ГЛАВНА КАРТА С ВРЕМЕТО (където беше мазалото) --- */
+/* --- ГЛАВНА КАРТА С ВРЕМЕТО --- */
 .main-card { border: 1px solid rgba(255,255,255,0.4); }
 .main-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
 .main-top div:first-child { text-align: left; }
@@ -87,7 +87,7 @@ body {
   gap: 16px;
 }
 .stat-box {
-  background: rgba(255,255,255, 0.6);
+  background: #ade3ff; /* ТВОЯТ НОВ СВЕТЛОСИН ЦВЯТ */
   padding: 16px;
   border-radius: 20px;
   text-align: center;
@@ -96,23 +96,30 @@ body {
 .stat-box p { margin: 0; }
 .stat-box .label { font-size: 0.85rem; opacity: 0.7; margin: 8px 0 4px; }
 .stat-box .value { font-weight: bold; font-size: 1.2rem; }
-.sea-temp-box { background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); }
+
+/* КУТИЯТА ЗА ТЕМПЕРАТУРА НА ВОДАТА */
+.sea-temp-box {
+  background: #ade3ff;
+  border: 3px solid white; /* БЯЛАТА РАМКА ЗА ИЗПЪКВАНЕ */
+}
 
 /* --- ХОРИЗОНТАЛНИ СПИСЪЦИ --- */
 .hourly-row { display: flex; overflow-x: auto; gap: 16px; padding-bottom: 16px; }
 .hourly-row::-webkit-scrollbar { height: 8px; }
 .hourly-row::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
 .hour-box {
-  background: white; min-width: 100px; padding: 16px; border-radius: 20px;
+  background: #ade3ff; /* ТВОЯТ НОВ СВЕТЛОСИН ЦВЯТ */
+  min-width: 100px; padding: 16px; border-radius: 20px;
   text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
   display: flex; flex-direction: column; gap: 8px; align-items: center;
 }
-.hour-time { font-weight: bold; color: #64748b; }
+.hour-time { font-weight: bold; color: #1e293b; }
 .hour-temp { font-size: 1.3rem; font-weight: bold; }
 
 .daily-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px; }
 .day-box {
-  background: white; padding: 16px; border-radius: 20px; text-align: center;
+  background: #ade3ff; /* ТВОЯТ НОВ СВЕТЛОСИН ЦВЯТ */
+  padding: 16px; border-radius: 20px; text-align: center;
   box-shadow: 0 4px 10px rgba(0,0,0,0.03);
   display: flex; flex-direction: column; gap: 8px; align-items: center;
   transition: transform 0.2s;
@@ -121,7 +128,7 @@ body {
 .day-name { font-weight: bold; font-size: 1.1rem; }
 .day-temp { font-size: 1.2rem; }
 .day-temp .max { font-weight: bold; }
-.day-temp .min { opacity: 0.5; font-size: 0.9rem; margin-top: 4px; display: block; }
+.day-temp .min { opacity: 0.6; font-size: 0.9rem; margin-top: 4px; display: block; }
 
 /* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (POPOVER) --- */
 .popup {
