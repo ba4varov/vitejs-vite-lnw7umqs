@@ -104,7 +104,6 @@ html, body {
 .stat-box p { margin: 0; }
 .stat-box .label { font-size: 0.85rem; opacity: 0.7; margin: 8px 0 4px; }
 .stat-box .value { font-weight: bold; font-size: 1.2rem; }
-.sea-temp-box { border: 3px solid white; }
 
 /* --- ХОРИЗОНТАЛНИ СПИСЪЦИ --- */
 .hourly-row { 
@@ -169,7 +168,9 @@ canvas {
   padding: 12px !important; border-radius: 16px !important;
   background: #f1f5f9 !important; box-shadow: none !important;
 }
-.popup-grid .sea-temp-box { background: #ade3ff !important; border: 2px solid white !important; }
+
+.popup-grid .sea-temp-box { background: #ade3ff !important; } /* Без рамка */
+
 .popup-grid .stat-box .label { margin: 4px 0 2px !important; font-size: 0.8rem !important; }
 .popup-grid .stat-box .value { font-size: 1.1rem !important; }
 
@@ -191,7 +192,7 @@ canvas {
 .weather-app.dark { background: #0f172a; color: #f8fafc; }
 .weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
 .weather-app.dark .popup-grid .stat-box { background: rgba(255,255,255,0.05) !important; }
-.weather-app.dark .popup-grid .sea-temp-box { border-color: rgba(255,255,255,0.2) !important; background: rgba(56, 189, 248, 0.2) !important;}
+.weather-app.dark .popup-grid .sea-temp-box { background: rgba(56, 189, 248, 0.2) !important;}
 .weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
 
 /* --- АНИМАЦИИ --- */
