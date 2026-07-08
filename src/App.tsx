@@ -1,361 +1,364 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+import { useState, useEffect, useRef } from 'react'
+import './App.css'
+
+const translations = {
+  bg: {
+    title: '🌤️ Доброто време с Боби',
+    subtitle: 'Твоят метео гид',
+    search: 'Търси град по целия свят...',
+    info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
+    loading: '⏳ Зареждане...',
+    tryAgain: 'Опитай отново',
+    humidity: 'Влажност',
+    wind: 'Вятър',
+    windUnit: 'км/ч',
+    updated: 'Обновено',
+    feelsLike: 'Усеща се като',
+    visibility: 'Видимост',
+    pressure: 'Налягане',
+    uvIndex: 'UV индекс',
+    seaTemp: 'Темп. на водата',
+    noSeaData: 'няма данни',
+    km: 'км',
+    hpa: 'hPa',
+    hours24: '⏰ Следващите 24 часа',
+    days14: '📅 Прогноза за 14 дни',
+    myLocation: 'Моето местоположение',
+    error: 'Неуспешно зареждане. Моля, опитайте отново.',
+    chart: '📊 Графика за 24 часа',
+    temp: 'Температура',
+    rain: 'Валежи',
+    windChart: 'Вятър',
+    pressureChart: 'Налягане',
+    mm: 'мм',
+    cloudCover: 'Облачност',
+    dewPoint: 'Точ. оросяване',
+    detailsFor: 'Подробности за',
+    tabMain: 'Основни',
+    tabAtmosphere: 'Атмосфера',
+    tabWaterWind: 'Вода и Вятър',
+    weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+    months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
+    weather: {
+      0: 'Ясно небе', 1: 'Предимно ясно', 2: 'Частично облачно', 3: 'Облачно',
+      45: 'Мъгла', 48: 'Замръзваща мъгла', 51: 'Лек ръмеж', 53: 'Умерен ръмеж',
+      55: 'Силен ръмеж', 61: 'Слаб дъжд', 63: 'Умерен дъжд', 65: 'Силен дъжд',
+      71: 'Слаб снеговалеж', 73: 'Умерен снеговалеж', 75: 'Силен снеговалеж',
+      80: 'Превалявания', 81: 'Умерени превалявания', 82: 'Силни превалявания',
+      95: 'Гръмотевична буря', 96: 'Буря с градушка', 99: 'Силна буря'
+    },
+    quickCities: [
+      { name: 'Варна', lat: 43.2141, lon: 27.9147 },
+      { name: 'София', lat: 42.6977, lon: 23.3219 },
+      { name: 'Пловдив', lat: 42.1522, lon: 24.7454 },
+      { name: 'Бургас', lat: 42.5048, lon: 27.4732 },
+      { name: 'Лондон', lat: 51.5074, lon: -0.1278 },
+      { name: 'Париж', lat: 48.8566, lon: 2.3522 },
+      { name: 'Ню Йорк', lat: 40.7128, lon: -74.006 },
+      { name: 'Токио', lat: 35.6762, lon: 139.6503 },
+      { name: 'Дубай', lat: 25.2048, lon: 55.2708 },
+    ]
+  },
+  en: {
+    title: '🌤️ Great Weather with Bobby',
+    subtitle: 'Your meteo guide',
+    search: 'Search any city in the world...',
+    info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
+    loading: '⏳ Loading...',
+    tryAgain: 'Try Again',
+    humidity: 'Humidity',
+    wind: 'Wind',
+    windUnit: 'km/h',
+    updated: 'Updated',
+    feelsLike: 'Feels Like',
+    visibility: 'Visibility',
+    pressure: 'Pressure',
+    uvIndex: 'UV Index',
+    seaTemp: 'Water Temp',
+    noSeaData: 'n/a',
+    km: 'km',
+    hpa: 'hPa',
+    hours24: '⏰ Next 24 Hours',
+    days14: '📅 14-Day Forecast',
+    myLocation: 'My Location',
+    error: 'Failed to load weather data. Please try again.',
+    chart: '📊 24-Hour Chart',
+    temp: 'Temperature',
+    rain: 'Precipitation',
+    windChart: 'Wind',
+    pressureChart: 'Pressure',
+    mm: 'mm',
+    cloudCover: 'Cloud Cover',
+    dewPoint: 'Dew Point',
+    detailsFor: 'Details for',
+    tabMain: 'Main',
+    tabAtmosphere: 'Atmosphere',
+    tabWaterWind: 'Water & Wind',
+    weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    weather: {
+      0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+      45: 'Fog', 48: 'Freezing fog', 51: 'Light drizzle', 53: 'Moderate drizzle',
+      55: 'Heavy drizzle', 61: 'Light rain', 63: 'Moderate rain', 65: 'Heavy rain',
+      71: 'Light snow', 73: 'Moderate snow', 75: 'Heavy snow',
+      80: 'Rain showers', 81: 'Moderate showers', 82: 'Violent showers',
+      95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Heavy thunderstorm'
+    },
+    quickCities: [
+      { name: 'Varna', lat: 43.2141, lon: 27.9147 },
+      { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
+      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
+      { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
+      { name: 'London', lat: 51.5074, lon: -0.1278 },
+      { name: 'Paris', lat: 48.8566, lon: 2.3522 },
+      { name: 'New York', lat: 40.7128, lon: -74.006 },
+      { name: 'Tokyo', lat: 35.6762, lon: 139.6503 },
+      { name: 'Dubai', lat: 25.2048, lon: 55.2708 },
+    ]
+  }
 }
 
-body {
-  margin: 0;
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+const getTempGradient = (temp: number) => {
+  if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
+  if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
+  if (temp < 25) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
+  return 'linear-gradient(135deg, #fee2e2, #fecaca)'
 }
 
-.weather-app {
-  min-height: 100vh;
-  padding: 24px;
-  background: #eef6ff;
-  color: #1e293b;
-  transition: background 0.3s, color 0.3s;
+const getIconAnimation = (icon: string) => {
+  if (icon === '☀️') return 'spin-slow'
+  if (icon === '🌤️' || icon === '⛅') return 'float'
+  if (icon === '🌧️' || icon === '🌦️') return 'bounce-rain'
+  if (icon === '⛈️') return 'flash'
+  if (icon === '❄️' || icon === '🌨️') return 'fall'
+  if (icon === '🌫️') return 'drift'
+  return 'float'
 }
 
-.weather-app.dark {
-  background: #0f172a;
-  color: #f8fafc;
+const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
+  const sz = size || '1.5rem'
+  return (
+    <span className={'animated-icon ' + getIconAnimation(icon)} style={{ fontSize: sz, display: 'inline-block' }}>
+      {icon}
+    </span>
+  )
 }
 
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 800px;
-  margin: 0 auto 32px;
+const Chart = ({ hourly, darkMode, t }: any) => {
+  const [activeTab, setActiveTab] = useState('temp')
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const colors = { temp: '#f97316', rain: '#3b82f6', wind: '#10b981', pressure: '#a855f7' }
+
+  useEffect(() => {
+    if (!canvasRef.current || !hourly.length) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const W = canvas.width, H = canvas.height
+    const padL = 55, padR = 20, padT = 20, padB = 40
+    const chartW = W - padL - padR, chartH = H - padT - padB
+    ctx.clearRect(0, 0, W, H)
+    const data = hourly.map((h: any) =>
+      activeTab === 'temp' ? h.temp :
+      activeTab === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
+      activeTab === 'pressure' ? h.pressure :
+      h.wind
+    )
+    const labels = hourly.map((h: any) => h.hour)
+    const minVal = activeTab === 'rain' ? 0 : Math.min(...data)
+    const maxVal = activeTab === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
+    const range = maxVal - minVal || 1
+    const xStep = chartW / (data.length - 1)
+    const yScale = (val: number) => padT + chartH - ((val - minVal) / range) * chartH
+    const xScale = (i: number) => padL + i * xStep
+    const textColor = darkMode ? '#94a3b8' : '#64748b'
+    const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
+    ctx.strokeStyle = gridColor
+    ctx.lineWidth = 1
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (chartH / 4) * i
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
+      ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'right'
+      ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 5, y + 4)
+    }
+    ctx.fillStyle = textColor; ctx.font = '11px Arial'; ctx.textAlign = 'center'
+    
+    data.forEach((_: any, i: number) => { if (i % 2 === 0) ctx.fillText(labels[i], xScale(i), H - 10) })
+    
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
+    grad.addColorStop(0, colors[activeTab as keyof typeof colors] + '55'); grad.addColorStop(1, colors[activeTab as keyof typeof colors] + '00')
+    ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
+    data.forEach((val: number, i: number) => {
+      if (i === 0) return
+      const cpx = (xScale(i - 1) + xScale(i)) / 2
+      ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
+    })
+    ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
+    ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
+    ctx.beginPath(); ctx.strokeStyle = colors[activeTab as keyof typeof colors]; ctx.lineWidth = 2.5
+    data.forEach((val: number, i: number) => {
+      if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
+      const cpx = (xScale(i - 1) + xScale(i)) / 2
+      ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
+    })
+    ctx.stroke()
+    data.forEach((val: number, i: number) => {
+      if (i % 2 === 0) {
+        ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
+        ctx.fillStyle = colors[activeTab as keyof typeof colors]; ctx.fill()
+        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 2; ctx.stroke()
+      }
+    })
+  }, [hourly, activeTab, darkMode])
+
+  const tabs = [
+    { key: 'temp', label: t.temp, unit: '°C' },
+    { key: 'rain', label: t.rain, unit: t.mm },
+    { key: 'wind', label: t.windChart, unit: t.windUnit },
+    { key: 'pressure', label: t.pressureChart, unit: t.hpa }
+  ]
+
+  return (
+    <div className="card chart-container">
+      <h3>{t.chart}</h3>
+      <div className="chart-tabs">
+        {tabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={'chart-tab' + (activeTab === tab.key ? ' active-' + tab.key : '')}>
+            {tab.label} ({tab.unit})
+          </button>
+        ))}
+      </div>
+      <canvas ref={canvasRef} width={800} height={200} style={{ width: '100%', height: 'auto', display: 'block' }} />
+    </div>
+  )
 }
 
-.header-title-wrapper h1 {
-  font-size: 2rem;
-  margin: 0;
-}
+const WeatherApp = () => {
+  const [lang, setLang] = useState('bg')
+  const [city, setCity] = useState('Варна')
+  const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
+  const [searchInput, setSearchInput] = useState('')
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [darkMode, setDarkMode] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [weather, setWeather] = useState<any>(null)
+  const [hourly, setHourly] = useState<any[]>([])
+  const [forecast, setForecast] = useState<any[]>([])
+  
+  const [selectedDay, setSelectedDay] = useState<any>(null)
+  const [selectedHour, setSelectedHour] = useState<any>(null)
+  const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
+  const [detailTab, setDetailTab] = useState('main')
+  
+  // Коригирано тук, за да избегнем NodeJS грешката
+  const searchTimer = useRef<any>(null)
+  const t = translations[lang as keyof typeof translations]
 
-.header-btns {
-  display: flex;
-  gap: 12px;
-}
+  const decodeWeatherCode = (code: number) => {
+    const icons: Record<number, string> = {
+      0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
+      51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
+      71: '🌨️', 73: '🌨️', 75: '❄️', 80: '🌦️', 81: '🌧️', 82: '⛈️',
+      95: '⛈️', 96: '⛈️', 99: '⛈️'
+    }
+    return { icon: icons[code] || '🌡️', desc: (t.weather as any)[code] || 'Unknown' }
+  }
 
-.lang-btn, .icon-btn {
-  background: rgba(0,0,0,0.05);
-  color: inherit;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
+  const searchCities = async (query: string) => {
+    if (query.length < 2) { setSuggestions([]); return }
+    try {
+      const res = await fetch('[https://geocoding-api.open-meteo.com/v1/search?name=](https://geocoding-api.open-meteo.com/v1/search?name=)' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
+      const data = await res.json()
+      setSuggestions(data.results || [])
+    } catch (e) { setSuggestions([]) }
+  }
 
-.weather-app.dark .lang-btn,
-.weather-app.dark .icon-btn {
-  background: rgba(255,255,255,0.1);
-}
+  const handleSearchInput = (val: string) => {
+    setSearchInput(val)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => searchCities(val), 300)
+  }
 
-.lang-btn:hover, .icon-btn:hover {
-  transform: scale(1.05);
-}
+  const selectCity = (result: any) => {
+    const name = result.name + (result.country ? ', ' + result.country : '')
+    setCity(name)
+    setCoords({ lat: result.latitude, lon: result.longitude })
+    setSearchInput('')
+    setSuggestions([])
+    setSelectedDay(null)
+    setSelectedHour(null)
+  }
 
-.search-wrapper {
-  max-width: 800px;
-  margin: 0 auto 16px;
-  position: relative;
-}
+  const fetchWeather = async (lat: number, lon: number) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const weatherUrl = '[https://api.open-meteo.com/v1/forecast?latitude=](https://api.open-meteo.com/v1/forecast?latitude=)' + lat + '&longitude=' + lon + 
+        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max' + 
+        '&timezone=auto&forecast_days=15';
 
-.search-row input {
-  width: 100%;
-  padding: 16px 24px;
-  border-radius: 24px;
-  border: 1px solid rgba(0,0,0,0.1);
-  background: rgba(255,255,255,0.7);
-  font-size: 1.1rem;
-  outline: none;
-  color: #1e293b;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-}
+      const marineUrl = '[https://marine-api.open-meteo.com/v1/marine?latitude=](https://marine-api.open-meteo.com/v1/marine?latitude=)' + lat + '&longitude=' + lon + 
+        '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15';
 
-.weather-app.dark .search-row input {
-  background: rgba(30,41,55,0.8);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: white;
-}
+      const [weatherRes, marineRes] = await Promise.allSettled([
+        fetch(weatherUrl),
+        fetch(marineUrl)
+      ])
+      
+      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
+      const data = await weatherRes.value.json()
 
-.suggestions {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border-radius: 16px;
-  margin-top: 8px;
-  overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-  z-index: 100;
-}
+      let seaTemp = null
+      let hourlySeaTemp: any[] = []
+      if (marineRes.status === 'fulfilled' && marineRes.value.ok) {
+        try {
+          const marineData = await marineRes.value.json()
+          if (marineData.current && marineData.current.sea_surface_temperature != null) {
+            seaTemp = Math.round(marineData.current.sea_surface_temperature)
+          }
+          if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
+            hourlySeaTemp = marineData.hourly.sea_surface_temperature
+          }
+        } catch (e) {}
+      }
 
-.weather-app.dark .suggestions {
-  background: #1e293b;
-}
+      const cur = decodeWeatherCode(data.current.weather_code)
+      setWeather({
+        temp: Math.round(data.current.temperature_2m),
+        humidity: data.current.relative_humidity_2m,
+        windSpeed: Math.round(data.current.wind_speed_10m),
+        feelsLike: Math.round(data.current.apparent_temperature),
+        visibility: Math.round((data.current.visibility || 0) / 1000),
+        pressure: Math.round(data.current.surface_pressure),
+        uvIndex: Math.round(data.current.uv_index),
+        seaTemp: seaTemp,
+        description: cur.desc,
+        icon: cur.icon
+      })
 
-.suggestion-item {
-  padding: 12px 24px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-}
+      const now = new Date()
+      const localISO = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0') + 'T' +
+        String(now.getHours()).padStart(2, '0')
+      let startIdx = data.hourly.time.findIndex((time: string) => time.slice(0, 13) === localISO)
+      if (startIdx === -1) startIdx = 0
 
-.suggestion-item:hover {
-  background: rgba(0,0,0,0.03);
-}
-
-.weather-app.dark .suggestion-item {
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.weather-app.dark .suggestion-item:hover {
-  background: rgba(255,255,255,0.05);
-}
-
-.sug-country {
-  opacity: 0.6;
-  font-size: 0.9rem;
-}
-
-.info-line {
-  text-align: center;
-  opacity: 0.7;
-  font-size: 0.85rem;
-  margin-bottom: 24px;
-}
-
-.city-row {
-  max-width: 800px;
-  margin: 0 auto 32px;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.city-btn {
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: none;
-  background: rgba(0,0,0,0.05);
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: all 0.2s;
-}
-
-.weather-app.dark .city-btn {
-  background: rgba(255,255,255,0.1);
-}
-
-.city-btn.active {
-  background: #2563eb;
-  color: white;
-  font-weight: bold;
-}
-
-.card {
-  max-width: 800px;
-  margin: 0 auto 24px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-}
-
-.weather-app.dark .card {
-  background: rgba(30,41,55,0.5);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-.main-card {
-  color: #1e293b;
-  border: 1px solid rgba(255,255,255,0.2);
-}
-
-.weather-app.dark .main-card {
-  color: white;
-}
-
-.main-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.main-top h2 {
-  font-size: 1.8rem;
-  margin-bottom: 8px;
-}
-
-.main-top .desc {
-  font-size: 1.2rem;
-  opacity: 0.9;
-  text-transform: capitalize;
-}
-
-.big-temp {
-  font-size: 5rem;
-  font-weight: 800;
-  margin-bottom: 32px;
-  line-height: 1;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 16px;
-}
-
-.stat-box {
-  background: rgba(0,0,0,0.03);
-  padding: 16px;
-  border-radius: 16px;
-  text-align: center;
-}
-
-.weather-app.dark .stat-box {
-  background: rgba(255,255,255,0.1);
-}
-
-.stat-box p { margin: 0; }
-.stat-box .label { font-size: 0.85rem; opacity: 0.8; margin: 8px 0 4px; }
-.stat-box .value { font-weight: bold; font-size: 1.1rem; }
-
-.sea-temp-box {
-  background: rgba(14, 165, 233, 0.1);
-}
-
-.weather-app.dark .sea-temp-box {
-  background: rgba(56, 189, 248, 0.2);
-}
-
-h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 1.3rem;
-  opacity: 0.9;
-}
-
-.hourly-row {
-  display: flex;
-  overflow-x: auto;
-  gap: 12px;
-  padding-bottom: 16px;
-}
-
-.hourly-row::-webkit-scrollbar { height: 6px; }
-.hourly-row::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
-.weather-app.dark .hourly-row::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
-
-.hour-box {
-  background: rgba(0,0,0,0.03);
-  min-width: 80px;
-  padding: 16px 8px;
-  border-radius: 16px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.weather-app.dark .hour-box { background: rgba(255,255,255,0.05); }
-
-.hour-time { font-weight: bold; font-size: 0.9rem; }
-.hour-temp { font-size: 1.2rem; font-weight: bold; }
-.hour-wind, .hour-sea { font-size: 0.75rem; opacity: 0.8; }
-
-.chart-container { overflow-x: auto; }
-.chart-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
-.chart-tab {
-  padding: 6px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.1);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s;
-}
-.weather-app.dark .chart-tab { border-color: rgba(255,255,255,0.2); }
-
-.chart-tab.active-temp { background: #f97316; color: white; border-color: #f97316; }
-.chart-tab.active-rain { background: #3b82f6; color: white; border-color: #3b82f6; }
-.chart-tab.active-wind { background: #10b981; color: white; border-color: #10b981; }
-.chart-tab.active-pressure { background: #a855f7; color: white; border-color: #a855f7; }
-
-.daily-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-}
-
-.day-box {
-  background: rgba(0,0,0,0.03);
-  padding: 16px 8px;
-  border-radius: 16px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.weather-app.dark .day-box { background: rgba(255,255,255,0.05); }
-
-.day-name { font-weight: bold; font-size: 1rem; }
-.day-temp { font-size: 1.1rem; }
-.day-temp .max { font-weight: bold; }
-.day-temp .min { opacity: 0.7; font-size: 0.9rem; }
-.day-rain, .day-wind { font-size: 0.75rem; opacity: 0.8; }
-
-.center-text { text-align: center; }
-.search-btn {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 20px;
-  font-size: 1rem;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-/* Animations */
-@keyframes spin-slow { 100% { transform: rotate(360deg); } }
-.spin-slow { animation: spin-slow 12s linear infinite; }
-
-@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-.float { animation: float 3s ease-in-out infinite; }
-
-@keyframes bounce-rain { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
-.bounce-rain { animation: bounce-rain 1.5s ease-in-out infinite; }
-
-@keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.flash { animation: flash 2s ease-in-out infinite; }
-
-@keyframes fall { 0% { transform: translateY(-2px); } 100% { transform: translateY(2px); } }
-.fall { animation: fall 2s linear infinite alternate; }
-
-@keyframes drift { 0% { transform: translateX(-2px); } 100% { transform: translateX(2px); } }
-.drift { animation: drift 3s ease-in-out infinite alternate; }
-
-@media (max-width: 600px) {
-  .header-row { flex-direction: column; gap: 16px; align-items: stretch; text-align: center; }
-  .header-btns { justify-content: center; }
-  .big-temp { font-size: 4rem; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .daily-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
-}
+      const hr: any[] = []
+      for (let i = 0; i < 24; i++) {
+        const idx = startIdx + i
+        if (idx >= data.hourly.time.length) break
+        const code = decodeWeatherCode(data.hourly.weather_code[idx])
+        const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
+        
+        hr.push({
+          hour: data.hourly.time[idx].slice(11, 16),
+          temp: Math.round(data.hourly.temperature_2m[idx]),
+          feelsLike: Math.round(data.hourly.apparent_temperature[idx]),
+          rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
+          wind: Math.round(data.hourly.wind_speed_10m[idx]),
+          pressure: Math.round(data.hourly.surface_pressure[idx]),
