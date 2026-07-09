@@ -266,6 +266,7 @@ const WeatherApp = () => {
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
   const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null) // НОВ ЩАТ ЗА ВРЕМЕТО НА ОБНОВЯВАНЕ
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
@@ -458,6 +459,7 @@ const WeatherApp = () => {
       }
       setForecast(days)
       setLoading(false)
+      setLastUpdated(new Date()) // ЗАПИСВА ТОЧНИЯ ЧАС НА УСПЕШНОТО ИЗТЕГЛЯНЕ
     } catch (e: any) {
       console.error(e);
       setError(t.error)
@@ -524,7 +526,6 @@ const WeatherApp = () => {
       <div className="info-line">{t.info}</div>
 
       <div className="city-row">
-        {/* Бутонът за любимия град излиза винаги първи */}
         {favoriteCity && (
           <button 
             onClick={() => { setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }) }}
@@ -535,7 +536,6 @@ const WeatherApp = () => {
         )}
         
         {t.quickCities.map((c: any) => {
-          // За да не показваме един град два пъти (и като любим, и като бърз бутон)
           if (favoriteCity && favoriteCity.name === c.name) return null;
           return (
             <button key={c.name}
@@ -567,7 +567,13 @@ const WeatherApp = () => {
                     {favoriteCity?.name === city ? '⭐' : '☆'}
                   </button>
                 </h2>
-                <p className="desc">{weather.description}</p>
+                <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
+                {/* ПОКАЗВАНЕ НА ЧАСА НА ОБНОВЯВАНЕ ТУК */}
+                {lastUpdated && (
+                  <p style={{ fontSize: '0.85rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
               <div className="big-icon"><AnimatedIcon icon={weather.icon} size="5rem" /></div>
             </div>
