@@ -618,7 +618,7 @@ const WeatherApp = () => {
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
-                  <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
+                  <p className="hour-wind">〰️ {h.wind} {t.windUnit}</p>
                   {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
                 </div>
               ))}
@@ -659,7 +659,7 @@ const WeatherApp = () => {
                     <span className="min">{day.min}°</span>
                   </p>
                   <p className="day-rain">🌧 {day.rain}{t.mm}</p>
-                  <p className="day-wind">💨 {day.wind}{t.windUnit}</p>
+                  <p className="day-wind">〰️ {day.wind}{t.windUnit}</p>
                 </div>
               ))}
             </div>
@@ -708,7 +708,7 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedDay.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
+                <div className="stat-box"><p>〰️</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedDay.rain} {t.mm}</p></div>
                 {selectedDay.seaTemp !== null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedDay.seaTemp}°C</p></div>
@@ -762,7 +762,7 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedHour.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
+                <div className="stat-box"><p>〰️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain} {t.mm}</p></div>
                 {selectedHour.seaTemp !== null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
