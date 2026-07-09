@@ -580,7 +580,7 @@ const WeatherApp = () => {
             <div className="big-temp">{weather.temp}°C</div>
             <div className="stats-grid">
               <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-              <div className="stat-box"><p>💨</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+              <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
               <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
               <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
               <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
@@ -618,7 +618,7 @@ const WeatherApp = () => {
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
-                  <p className="hour-wind">💨 {h.wind} {t.windUnit}</p>
+                  <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
                   {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
                 </div>
               ))}
