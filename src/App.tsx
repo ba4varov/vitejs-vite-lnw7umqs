@@ -124,7 +124,7 @@ const getTempGradient = (temp: number) => {
   if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
   if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
   if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)'
-  return 'linear-gradient(135deg, #ffb3b3, #ff4d4d)' // Истинско червено, премахнато е розовото
+  return 'linear-gradient(135deg, #ff9270, #ea4335)'
 }
 
 const getIconAnimation = (icon: string) => {
@@ -155,7 +155,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    // Увеличихме padB на 50, за да има място за завъртяните часове
     const padL = 40, padR = 15, padT = 20, padB = 50 
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
@@ -192,17 +191,20 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    // Часове (завъртяни на 45 градуса, показващи всеки час)
+    // Часове (завъртяни на 45 градуса, показващи всеки 4-ти час за да не се мажат)
     ctx.fillStyle = textColor; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'right'
     data.forEach((_: any, i: number) => { 
-      const x = xScale(i);
-      const y = H - 8; // Леко отместване нагоре за по-добро изравняване
-      
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(-Math.PI / 4); // -45 градуса
-      ctx.fillText(labels[i], 0, 0);
-      ctx.restore();
+      // Изписваме само през 4 часа (0, 4, 8, 12, 16, 20) + последния час
+      if (i % 4 === 0 || i === data.length - 1) {
+        const x = xScale(i);
+        const y = H - 8; 
+        
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillText(labels[i], 0, 0);
+        ctx.restore();
+      }
     })
 
     // Преливка
@@ -227,11 +229,13 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     })
     ctx.stroke()
     
-    // Точки за всеки един час, за да съответстват на етикетите
+    // Точки само за часовете, които сме изписали (за по-изчистен вид)
     data.forEach((val: number, i: number) => {
-      ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2) // Малко по-малки точки (3)
-      ctx.fillStyle = color; ctx.fill()
-      ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
+      if (i % 4 === 0 || i === data.length - 1) {
+        ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
+        ctx.fillStyle = color; ctx.fill()
+        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
+      }
     })
   }, [hourly, type, darkMode, color])
 
