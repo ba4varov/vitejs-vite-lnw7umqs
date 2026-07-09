@@ -150,7 +150,7 @@ html, body, #root {
 }
 .mini-chart {
   background: rgba(0,0,0,0.02);
-  padding: 16px;
+  padding: 20px;
   border-radius: 20px;
 }
 canvas {
