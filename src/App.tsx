@@ -124,7 +124,7 @@ const getTempGradient = (temp: number) => {
   if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
   if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
   if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)'
-  return 'linear-gradient(135deg, #ff9270, #ea4335)'
+  return 'linear-gradient(135deg, #ffb3b3, #ff4d4d)'
 }
 
 const getIconAnimation = (icon: string) => {
@@ -191,13 +191,17 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    // Часове (завъртяни на 45 градуса, показващи всеки 4-ти час за да не се мажат)
-    ctx.fillStyle = textColor; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'right'
+    // Часове (завъртяни на 45 градуса)
+    ctx.fillStyle = textColor; 
+    ctx.font = 'bold 11px Arial'; 
+    ctx.textAlign = 'right'; 
+    ctx.textBaseline = 'middle'; // Важно: центрира текста спрямо координатите
+
     data.forEach((_: any, i: number) => { 
-      // Изписваме само през 4 часа (0, 4, 8, 12, 16, 20) + последния час
       if (i % 4 === 0 || i === data.length - 1) {
         const x = xScale(i);
-        const y = H - 8; 
+        // Изчисляваме Y да е точно под края на графиката (padT + chartH + 15px отстояние)
+        const y = padT + chartH + 15; 
         
         ctx.save();
         ctx.translate(x, y);
