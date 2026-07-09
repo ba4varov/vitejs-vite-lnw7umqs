@@ -146,12 +146,12 @@ html, body, #root {
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 26px;
 }
 .mini-chart {
   background: rgba(0,0,0,0.02);
   padding: 16px;
-  border-radius: 30px;
+  border-radius: 20px;
 }
 canvas {
   max-width: 100%;
