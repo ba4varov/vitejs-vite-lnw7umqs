@@ -133,7 +133,7 @@ const getIconAnimation = (icon: string) => {
   if (icon === '🌧️' || icon === '🌦️') return 'bounce-rain'
   if (icon === '⛈️') return 'flash'
   if (icon === '❄️' || icon === '🌨️') return 'fall'
-  if (icon === '🌫️') return 'drift'
+  if (icon === '〰️') return 'drift'
   return 'float'
 }
 
@@ -580,7 +580,7 @@ const WeatherApp = () => {
             <div className="big-temp">{weather.temp}°C</div>
             <div className="stats-grid">
               <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-              <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+              <div className="stat-box"><p>〰️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
               <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
               <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
               <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
