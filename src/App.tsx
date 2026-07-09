@@ -9,6 +9,7 @@ const translations = {
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
     loading: '⏳ Зареждане...',
     tryAgain: 'Опитай отново',
+    favorite: 'Любим град',
     humidity: 'Влажност',
     wind: 'Вятър',
     windUnit: 'км/ч',
@@ -66,6 +67,7 @@ const translations = {
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
     loading: '⏳ Loading...',
     tryAgain: 'Try Again',
+    favorite: 'Favorite City',
     humidity: 'Humidity',
     wind: 'Wind',
     windUnit: 'km/h',
@@ -121,8 +123,8 @@ const translations = {
 const getTempGradient = (temp: number) => {
   if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
   if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
-  if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)' // Слънчево жълто-оранжево до 29°C
-  return 'linear-gradient(135deg, #ff9270, #ea4335)' // Червено от 30°C нагоре
+  if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)'
+  return 'linear-gradient(135deg, #ff9270, #ea4335)'
 }
 
 const getIconAnimation = (icon: string) => {
@@ -263,6 +265,7 @@ const WeatherApp = () => {
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
+  const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
@@ -271,6 +274,27 @@ const WeatherApp = () => {
   
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
+
+  // Зареждане на любимия град от паметта на браузъра
+  useEffect(() => {
+    const savedFav = localStorage.getItem('bobbyWeatherFav')
+    if (savedFav) {
+      try {
+        setFavoriteCity(JSON.parse(savedFav))
+      } catch (e) {}
+    }
+  }, [])
+
+  const toggleFavorite = () => {
+    if (favoriteCity && favoriteCity.name === city) {
+      setFavoriteCity(null)
+      localStorage.removeItem('bobbyWeatherFav')
+    } else {
+      const newFav = { name: city, lat: coords.lat, lon: coords.lon }
+      setFavoriteCity(newFav)
+      localStorage.setItem('bobbyWeatherFav', JSON.stringify(newFav))
+    }
+  }
 
   const decodeWeatherCode = (code: number) => {
     const icons: Record<number, string> = {
@@ -500,13 +524,27 @@ const WeatherApp = () => {
       <div className="info-line">{t.info}</div>
 
       <div className="city-row">
-        {t.quickCities.map((c: any) => (
-          <button key={c.name}
-            onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
-            className={city === c.name ? 'city-btn active' : 'city-btn'}>
-            {c.name}
+        {/* Бутонът за любимия град излиза винаги първи */}
+        {favoriteCity && (
+          <button 
+            onClick={() => { setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }) }}
+            className={city === favoriteCity.name ? 'city-btn fav-btn active' : 'city-btn fav-btn'}
+          >
+            ⭐ {favoriteCity.name}
           </button>
-        ))}
+        )}
+        
+        {t.quickCities.map((c: any) => {
+          // За да не показваме един град два пъти (и като любим, и като бърз бутон)
+          if (favoriteCity && favoriteCity.name === c.name) return null;
+          return (
+            <button key={c.name}
+              onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }) }}
+              className={city === c.name ? 'city-btn active' : 'city-btn'}>
+              {c.name}
+            </button>
+          )
+        })}
       </div>
 
       {loading && <div className="card center-text"><p style={{ fontSize: '1.5rem' }}>{t.loading}</p></div>}
@@ -523,7 +561,12 @@ const WeatherApp = () => {
           <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
             <div className="main-top">
               <div>
-                <h2>📍 {city}</h2>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  📍 {city} 
+                  <button onClick={toggleFavorite} className="star-btn" title={t.favorite}>
+                    {favoriteCity?.name === city ? '⭐' : '☆'}
+                  </button>
+                </h2>
                 <p className="desc">{weather.description}</p>
               </div>
               <div className="big-icon"><AnimatedIcon icon={weather.icon} size="5rem" /></div>
