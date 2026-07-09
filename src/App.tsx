@@ -124,7 +124,7 @@ const getTempGradient = (temp: number) => {
   if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
   if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
   if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)'
-  return 'linear-gradient(135deg, #ff9270, #ea4335)'
+  return 'linear-gradient(135deg, #ffb3b3, #ff4d4d)' // Истинско червено, премахнато е розовото
 }
 
 const getIconAnimation = (icon: string) => {
@@ -133,7 +133,7 @@ const getIconAnimation = (icon: string) => {
   if (icon === '🌧️' || icon === '🌦️') return 'bounce-rain'
   if (icon === '⛈️') return 'flash'
   if (icon === '❄️' || icon === '🌨️') return 'fall'
-  if (icon === '〰️') return 'drift'
+  if (icon === '🌫️') return 'drift'
   return 'float'
 }
 
@@ -155,7 +155,8 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    const padL = 40, padR = 15, padT = 20, padB = 30
+    // Увеличихме padB на 50, за да има място за завъртяните часове
+    const padL = 40, padR = 15, padT = 20, padB = 50 
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
 
@@ -181,6 +182,8 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
 
     ctx.strokeStyle = gridColor
     ctx.lineWidth = 1
+    
+    // Хоризонтални линии и стойности
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
@@ -189,11 +192,20 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'
+    // Часове (завъртяни на 45 градуса, показващи всеки час)
+    ctx.fillStyle = textColor; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'right'
     data.forEach((_: any, i: number) => { 
-      if (i % 4 === 0 || i === data.length - 1) ctx.fillText(labels[i], xScale(i), H - 5) 
+      const x = xScale(i);
+      const y = H - 8; // Леко отместване нагоре за по-добро изравняване
+      
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-Math.PI / 4); // -45 градуса
+      ctx.fillText(labels[i], 0, 0);
+      ctx.restore();
     })
 
+    // Преливка
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00')
     
@@ -206,6 +218,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
     ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
     
+    // Основна линия
     ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5
     data.forEach((val: number, i: number) => {
       if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
@@ -214,12 +227,11 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     })
     ctx.stroke()
     
+    // Точки за всеки един час, за да съответстват на етикетите
     data.forEach((val: number, i: number) => {
-      if (i % 4 === 0 || i === data.length - 1) {
-        ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 4, 0, Math.PI * 2)
-        ctx.fillStyle = color; ctx.fill()
-        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 2; ctx.stroke()
-      }
+      ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2) // Малко по-малки точки (3)
+      ctx.fillStyle = color; ctx.fill()
+      ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
     })
   }, [hourly, type, darkMode, color])
 
@@ -266,7 +278,7 @@ const WeatherApp = () => {
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
   const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null) // НОВ ЩАТ ЗА ВРЕМЕТО НА ОБНОВЯВАНЕ
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
@@ -276,7 +288,6 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
 
-  // Зареждане на любимия град от паметта на браузъра
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
     if (savedFav) {
@@ -459,7 +470,7 @@ const WeatherApp = () => {
       }
       setForecast(days)
       setLoading(false)
-      setLastUpdated(new Date()) // ЗАПИСВА ТОЧНИЯ ЧАС НА УСПЕШНОТО ИЗТЕГЛЯНЕ
+      setLastUpdated(new Date())
     } catch (e: any) {
       console.error(e);
       setError(t.error)
@@ -568,7 +579,6 @@ const WeatherApp = () => {
                   </button>
                 </h2>
                 <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
-                {/* ПОКАЗВАНЕ НА ЧАСА НА ОБНОВЯВАНЕ ТУК */}
                 {lastUpdated && (
                   <p style={{ fontSize: '0.85rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: '5px' }}>
                     🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
@@ -580,7 +590,7 @@ const WeatherApp = () => {
             <div className="big-temp">{weather.temp}°C</div>
             <div className="stats-grid">
               <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-              <div className="stat-box"><p>〰️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+              <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
               <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
               <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
               <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
@@ -618,7 +628,7 @@ const WeatherApp = () => {
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
-                  <p className="hour-wind">〰️ {h.wind} {t.windUnit}</p>
+                  <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
                   {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
                 </div>
               ))}
@@ -659,7 +669,7 @@ const WeatherApp = () => {
                     <span className="min">{day.min}°</span>
                   </p>
                   <p className="day-rain">🌧 {day.rain}{t.mm}</p>
-                  <p className="day-wind">〰️ {day.wind}{t.windUnit}</p>
+                  <p className="day-wind">🌬️ {day.wind}{t.windUnit}</p>
                 </div>
               ))}
             </div>
@@ -708,7 +718,7 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedDay.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>〰️</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
+                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedDay.rain} {t.mm}</p></div>
                 {selectedDay.seaTemp !== null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedDay.seaTemp}°C</p></div>
@@ -762,7 +772,7 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedHour.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>〰️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
+                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain} {t.mm}</p></div>
                 {selectedHour.seaTemp !== null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
