@@ -107,13 +107,17 @@ html, body, #root {
 .stat-box .label { font-size: 0.85rem; opacity: 0.7; margin: 8px 0 4px; }
 .stat-box .value { font-weight: bold; font-size: 1.2rem; }
 
-/* --- ХОРИЗОНТАЛНИ СПИСЪЦИ --- */
-.hourly-row { 
-  display: flex; overflow-x: auto; gap: 16px; padding-bottom: 16px; 
+/* --- ХОРИЗОНТАЛНИ СПИСЪЦИ (ЧАСОВЕ И ДНИ) --- */
+.hourly-row, .daily-grid { 
+  display: flex; 
+  overflow-x: auto; 
+  gap: 16px; 
+  padding-bottom: 16px; 
   -webkit-overflow-scrolling: touch;
 }
-.hourly-row::-webkit-scrollbar { height: 6px; }
-.hourly-row::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+.hourly-row::-webkit-scrollbar, .daily-grid::-webkit-scrollbar { height: 6px; }
+.hourly-row::-webkit-scrollbar-thumb, .daily-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+
 .hour-box {
   background: #ade3ff; 
   min-width: 100px; padding: 16px; border-radius: 20px;
@@ -123,13 +127,14 @@ html, body, #root {
 .hour-time { font-weight: bold; color: #1e293b; }
 .hour-temp { font-size: 1.3rem; font-weight: bold; }
 
-.daily-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 16px; }
 .day-box {
   background: #ade3ff; 
+  min-width: 120px; /* Фиксирана минимална ширина за дните */
   padding: 16px; border-radius: 20px; text-align: center;
   box-shadow: 0 4px 10px rgba(0,0,0,0.03);
   display: flex; flex-direction: column; gap: 8px; align-items: center;
   transition: transform 0.2s;
+  flex-shrink: 0; /* Предотвратява свиването им, когато са в flex-ред */
 }
 .day-box:hover { transform: translateY(-3px); }
 .day-name { font-weight: bold; font-size: 1.1rem; }
@@ -247,7 +252,8 @@ canvas {
   .big-temp { font-size: 4rem; text-align: center; margin-bottom: 24px; }
   
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .daily-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  
+  /* .daily-grid вече е flex контейнер и не се нуждае от пренареждане тук */
   
   .stat-box, .day-box, .hour-box { padding: 12px; border-radius: 16px; }
 }
