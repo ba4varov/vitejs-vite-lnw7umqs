@@ -155,7 +155,8 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    const padL = 40, padR = 15, padT = 20, padB = 50 
+    // Увеличено padB на 60 за по-големия диагонален шрифт
+    const padL = 40, padR = 15, padT = 20, padB = 60 
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
 
@@ -191,24 +192,21 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    // Часове (завъртяни на 45 градуса)
+    // Часове (завъртяни на 45 градуса, за ВСЕКИ час, по-голям шрифт)
     ctx.fillStyle = textColor; 
-    ctx.font = 'bold 11px Arial'; 
+    ctx.font = 'bold 12px Arial'; 
     ctx.textAlign = 'right'; 
-    ctx.textBaseline = 'middle'; // Важно: центрира текста спрямо координатите
+    ctx.textBaseline = 'middle'; 
 
     data.forEach((_: any, i: number) => { 
-      if (i % 4 === 0 || i === data.length - 1) {
-        const x = xScale(i);
-        // Изчисляваме Y да е точно под края на графиката (padT + chartH + 15px отстояние)
-        const y = padT + chartH + 15; 
-        
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(-Math.PI / 4);
-        ctx.fillText(labels[i], 0, 0);
-        ctx.restore();
-      }
+      const x = xScale(i);
+      const y = padT + chartH + 18; // Отстояние от графиката
+      
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillText(labels[i], 0, 0);
+      ctx.restore();
     })
 
     // Преливка
@@ -233,13 +231,11 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     })
     ctx.stroke()
     
-    // Точки само за часовете, които сме изписали (за по-изчистен вид)
+    // Точки за всеки един час
     data.forEach((val: number, i: number) => {
-      if (i % 4 === 0 || i === data.length - 1) {
-        ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
-        ctx.fillStyle = color; ctx.fill()
-        ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
-      }
+      ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
+      ctx.fillStyle = color; ctx.fill()
+      ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
     })
   }, [hourly, type, darkMode, color])
 
