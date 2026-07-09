@@ -150,8 +150,8 @@ html, body, #root {
 }
 .mini-chart {
   background: rgba(0,0,0,0.02);
-  padding: 20px;
-  border-radius: 20px;
+  padding: 16px;
+  border-radius: 30px;
 }
 canvas {
   max-width: 100%;
