@@ -606,7 +606,7 @@ const WeatherApp = () => {
 
           <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
             <div className="main-top">
-              <div>
+              <div className="main-info-left">
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   📍 {city} 
                   <button onClick={toggleFavorite} className="star-btn" title={t.favorite}>
@@ -619,10 +619,13 @@ const WeatherApp = () => {
                     🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
+                {/* ТЕМПЕРАТУРАТА ВЕЧЕ Е ЧАСТ ОТ ЛЕВИЯ БЛОК */}
+                <div className="big-temp">{weather.temp}°C</div>
               </div>
-              <div className="big-icon"><AnimatedIcon icon={weather.icon} size="5rem" /></div>
+              {/* ИКОНАТА ОСТАВА ВДЯСНО, НО ЦЕНТРИРАНА И ПО-ГОЛЯМА */}
+              <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
             </div>
-            <div className="big-temp">{weather.temp}°C</div>
+            
             <div className="stats-grid">
               <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
               <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
@@ -712,10 +715,9 @@ const WeatherApp = () => {
         </div>
       )}
 
-      {/* Popups... (остават същите) */}
       {selectedDay && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
-          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
               <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedDay(null)}>❌</button>
@@ -754,7 +756,7 @@ const WeatherApp = () => {
 
       {selectedHour && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedHour(null)}>
-          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
               <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedHour(null)}>❌</button>
