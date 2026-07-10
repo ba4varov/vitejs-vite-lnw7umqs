@@ -40,6 +40,13 @@ const translations = {
     tabWaterWind: 'Вода и Вятър',
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
+    highTemp: 'Опасно високи температури! (Над 35°C)',
+    lowTemp: 'Опасно ниски температури! Опасност от измръзване.',
+    highWind: 'Предупреждение за силен ураганен вятър!',
+    highUv: 'Екстремен UV индекс! Пазете се от слънцето.',
+    storm: 'Опасност: Приближава гръмотевична буря!',
+    heavySnow: 'Предупреждение за обилен снеговалеж!',
+    heavyRain: 'Опасност от проливни дъждове и наводнения!',
     weather: {
       0: 'Ясно небе', 1: 'Предимно ясно', 2: 'Частично облачно', 3: 'Облачно',
       45: 'Мъгла', 48: 'Замръзваща мъгла', 51: 'Лек ръмеж', 53: 'Умерен ръмеж',
@@ -98,6 +105,13 @@ const translations = {
     tabWaterWind: 'Water & Wind',
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    highTemp: 'Extreme high temperatures! (Above 35°C)',
+    lowTemp: 'Extreme low temperatures! Frost warning.',
+    highWind: 'Severe gale/hurricane wind warning!',
+    highUv: 'Extreme UV index! Avoid sun exposure.',
+    storm: 'Danger: Thunderstorm approaching!',
+    heavySnow: 'Heavy snowfall warning!',
+    heavyRain: 'Heavy rainfall and flooding risk!',
     weather: {
       0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
       45: 'Fog', 48: 'Freezing fog', 51: 'Light drizzle', 53: 'Moderate drizzle',
@@ -155,7 +169,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    // Увеличено padB на 60 за по-големия диагонален шрифт
     const padL = 40, padR = 15, padT = 20, padB = 60 
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
@@ -192,7 +205,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    // Часове (завъртяни на 45 градуса, за ВСЕКИ час, по-голям шрифт)
+    // Часове (завъртяни на 45 градуса, за ВСЕКИ час)
     ctx.fillStyle = textColor; 
     ctx.font = 'bold 12px Arial'; 
     ctx.textAlign = 'right'; 
@@ -200,7 +213,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
 
     data.forEach((_: any, i: number) => { 
       const x = xScale(i);
-      const y = padT + chartH + 18; // Отстояние от графиката
+      const y = padT + chartH + 18; 
       
       ctx.save();
       ctx.translate(x, y);
@@ -231,7 +244,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     })
     ctx.stroke()
     
-    // Точки за всеки един час
+    // Точки
     data.forEach((val: number, i: number) => {
       ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
       ctx.fillStyle = color; ctx.fill()
@@ -391,6 +404,7 @@ const WeatherApp = () => {
         visibility: Math.round((data.current.visibility || 0) / 1000),
         pressure: Math.round(data.current.surface_pressure),
         uvIndex: Math.round(data.current.uv_index),
+        code: data.current.weather_code, // Запазваме кода за алармите
         seaTemp: seaTemp,
         description: cur.desc,
         icon: cur.icon
@@ -502,6 +516,18 @@ const WeatherApp = () => {
     }
   }, [])
 
+  // Генериране на предупреждения за екстремни условия
+  const activeAlerts = [];
+  if (weather) {
+    if (weather.temp >= 35) activeAlerts.push({ icon: '🔥', text: (t as any).highTemp });
+    if (weather.temp <= -5) activeAlerts.push({ icon: '❄️', text: (t as any).lowTemp });
+    if (weather.windSpeed >= 65) activeAlerts.push({ icon: '⚠️', text: (t as any).highWind });
+    if (weather.uvIndex >= 8) activeAlerts.push({ icon: '☀️', text: (t as any).highUv });
+    if ([95, 96, 99].includes(weather.code)) activeAlerts.push({ icon: '⚡', text: (t as any).storm });
+    if (weather.code === 75) activeAlerts.push({ icon: '🌨️', text: (t as any).heavySnow });
+    if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
+  }
+
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
       <div className="header-row">
@@ -573,6 +599,18 @@ const WeatherApp = () => {
 
       {!loading && !error && weather && (
         <div>
+          {/* СЕКЦИЯ ЗА ПРЕДУПРЕЖДЕНИЯ (АЛАРМИ) */}
+          {activeAlerts.length > 0 && (
+            <div className="alerts-container">
+              {activeAlerts.map((alert, idx) => (
+                <div key={idx} className="alert-item">
+                  <span style={{fontSize: '1.8rem'}}>{alert.icon}</span>
+                  <span>{alert.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
             <div className="main-top">
               <div>
