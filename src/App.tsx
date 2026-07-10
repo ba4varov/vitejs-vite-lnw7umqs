@@ -169,7 +169,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    const padL = 40, padR = 15, padT = 20, padB = 60 
+    const padL = 40, padR = 15, padT = 30, padB = 60 
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
 
@@ -196,7 +196,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     ctx.strokeStyle = gridColor
     ctx.lineWidth = 1
     
-    // Хоризонтални линии и стойности
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
@@ -205,7 +204,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
     
-    // Часове (завъртяни на 45 градуса, за ВСЕКИ час)
     ctx.fillStyle = textColor; 
     ctx.font = 'bold 12px Arial'; 
     ctx.textAlign = 'right'; 
@@ -222,7 +220,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       ctx.restore();
     })
 
-    // Преливка
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00')
     
@@ -235,7 +232,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
     ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
     
-    // Основна линия
     ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5
     data.forEach((val: number, i: number) => {
       if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
@@ -244,7 +240,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
     })
     ctx.stroke()
     
-    // Точки
     data.forEach((val: number, i: number) => {
       ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
       ctx.fillStyle = color; ctx.fill()
@@ -257,7 +252,6 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       <h4 style={{ color: color, marginBottom: '16px', textAlign: 'center', fontSize: '1.1rem' }}>
         {label} <span style={{ opacity: 0.7, fontSize: '0.8em' }}>({unit})</span>
       </h4>
-      {/* УВЕЛИЧАВАМЕ ПРОПОРЦИИТЕ НА ГРАФИКАТА ТУК (от 600x250 на 800x400) */}
       <canvas ref={canvasRef} width={800} height={400} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   )
@@ -718,33 +712,19 @@ const WeatherApp = () => {
         </div>
       )}
 
-      {/* Изскачащ прозорец (Popover) за ДЕН */}
+      {/* Popups... (остават същите) */}
       {selectedDay && (
-        <div 
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} 
-          onClick={() => setSelectedDay(null)}
-        >
-          <div 
-            className="card popup-card"
-            style={{
-              position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0,
-              background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b',
-              boxShadow: '0 15px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)',
-              zIndex: 9999, cursor: 'default'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
+          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
               <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedDay(null)}>❌</button>
             </div>
-            
             <div className="chart-tabs">
               <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
               <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
               <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
             </div>
-            
             <div className="stats-grid popup-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               {detailTab === 'main' && <>
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedDay.min}° / {selectedDay.max}°</p></div>
@@ -772,33 +752,18 @@ const WeatherApp = () => {
         </div>
       )}
 
-      {/* Изскачащ прозорец (Popover) за ЧАС */}
       {selectedHour && (
-        <div 
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} 
-          onClick={() => setSelectedHour(null)}
-        >
-          <div 
-            className="card popup-card"
-            style={{
-              position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0,
-              background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b',
-              boxShadow: '0 15px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)',
-              zIndex: 9999, cursor: 'default'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedHour(null)}>
+          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
               <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px', background: 'rgba(0,0,0,0.05)' }} onClick={() => setSelectedHour(null)}>❌</button>
             </div>
-            
             <div className="chart-tabs">
               <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
               <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
               <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
             </div>
-            
             <div className="stats-grid popup-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               {detailTab === 'main' && <>
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp}°C</p></div>
