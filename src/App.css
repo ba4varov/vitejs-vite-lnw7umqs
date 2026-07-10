@@ -17,9 +17,8 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-/* РАЗШИРЯВАМЕ КОНТЕЙНЕРА НА 1800px ЗА ОЩЕ ПО-ШИРОКИ ГРАФИКИ */
 .weather-app {
-  max-width: 1800px; 
+  max-width: 1500px; 
   width: 100%;
   margin: 0 auto;
   padding: 24px;
@@ -193,11 +192,11 @@ html, body, #root {
 .day-temp .max { font-weight: bold; }
 .day-temp .min { opacity: 0.6; font-size: 0.9rem; margin-top: 4px; display: block; }
 
-/* --- ГРАФИКИ ЗА 24 ЧАСА --- */
+/* --- ГРАФИКИ ЗА 24 ЧАСА (GRID 2x2) --- */
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, 1fr); /* 2 колони */
+  gap: 24px;
 }
 .mini-chart {
   background: rgba(0,0,0,0.02);
@@ -299,15 +298,11 @@ canvas {
 @media (max-width: 850px) {
   .charts-grid {
     display: flex;
-    overflow-x: auto;
-    padding-bottom: 16px;
-    -webkit-overflow-scrolling: touch;
+    flex-direction: column; /* На телефон всяка графика ще е на нов ред */
+    gap: 16px;
   }
-  .charts-grid::-webkit-scrollbar { height: 6px; }
-  .charts-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
   .mini-chart {
-    min-width: 260px;
-    flex-shrink: 0;
+    min-width: 100%;
   }
 }
 
