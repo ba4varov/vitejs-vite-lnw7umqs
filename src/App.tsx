@@ -257,7 +257,8 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       <h4 style={{ color: color, marginBottom: '16px', textAlign: 'center', fontSize: '1.1rem' }}>
         {label} <span style={{ opacity: 0.7, fontSize: '0.8em' }}>({unit})</span>
       </h4>
-      <canvas ref={canvasRef} width={600} height={250} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      {/* УВЕЛИЧАВАМЕ ПРОПОРЦИИТЕ НА ГРАФИКАТА ТУК (от 600x250 на 800x400) */}
+      <canvas ref={canvasRef} width={800} height={400} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   )
 }
@@ -404,7 +405,7 @@ const WeatherApp = () => {
         visibility: Math.round((data.current.visibility || 0) / 1000),
         pressure: Math.round(data.current.surface_pressure),
         uvIndex: Math.round(data.current.uv_index),
-        code: data.current.weather_code, // Запазваме кода за алармите
+        code: data.current.weather_code,
         seaTemp: seaTemp,
         description: cur.desc,
         icon: cur.icon
@@ -516,7 +517,6 @@ const WeatherApp = () => {
     }
   }, [])
 
-  // Генериране на предупреждения за екстремни условия
   const activeAlerts = [];
   if (weather) {
     if (weather.temp >= 35) activeAlerts.push({ icon: '🔥', text: (t as any).highTemp });
@@ -599,7 +599,6 @@ const WeatherApp = () => {
 
       {!loading && !error && weather && (
         <div>
-          {/* СЕКЦИЯ ЗА ПРЕДУПРЕЖДЕНИЯ (АЛАРМИ) */}
           {activeAlerts.length > 0 && (
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
