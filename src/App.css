@@ -135,11 +135,12 @@ html, body, #root {
 
 /* --- ГЛАВНА КАРТА С ВРЕМЕТО --- */
 .main-card { border: 1px solid rgba(255,255,255,0.4); }
-.main-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-.main-top div:first-child { text-align: left; }
-.main-top h2 { font-size: 2.5rem; margin-bottom: 8px; }
-.main-top .desc { font-size: 1.2rem; opacity: 0.8; text-transform: capitalize; }
-.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-bottom: 32px; text-align: left; }
+.main-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+.main-info-left { text-align: left; }
+.main-info-left h2 { font-size: 2.5rem; margin-bottom: 8px; }
+.main-info-left .desc { font-size: 1.2rem; opacity: 0.8; text-transform: capitalize; }
+.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-top: 16px; text-align: left; }
+.big-icon { margin-right: 8%; }
 
 .stats-grid {
   display: grid;
@@ -195,7 +196,7 @@ html, body, #root {
 /* --- ГРАФИКИ ЗА 24 ЧАСА (GRID 2x2) --- */
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 2 колони */
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
 }
 .mini-chart {
@@ -298,11 +299,14 @@ canvas {
 @media (max-width: 850px) {
   .charts-grid {
     display: flex;
-    flex-direction: column; /* На телефон всяка графика ще е на нов ред */
+    flex-direction: column;
     gap: 16px;
   }
   .mini-chart {
     min-width: 100%;
+  }
+  .main-top {
+    flex-direction: row; 
   }
 }
 
@@ -321,10 +325,11 @@ canvas {
   .card { padding: 20px; border-radius: 24px; margin-bottom: 16px; }
   .card h3 { font-size: 1.2rem; }
   
-  .main-top { flex-direction: column; align-items: center; text-align: center; }
-  .main-top div:first-child { text-align: center; margin-bottom: 12px; }
-  .main-top h2 { font-size: 2rem; justify-content: center; }
+  .main-top { flex-direction: column; text-align: center; }
+  .main-info-left { text-align: center; width: 100%; }
+  .main-info-left h2 { font-size: 2rem; justify-content: center; }
   .big-temp { font-size: 4rem; text-align: center; margin-bottom: 24px; }
+  .big-icon { margin-right: 0; margin-top: 16px; }
   
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   
