@@ -19,6 +19,8 @@ const translations = {
     pressure: 'Налягане',
     uvIndex: 'UV индекс',
     seaTemp: 'Темп. на водата',
+    sunrise: 'Изгрев',
+    sunset: 'Залез',
     noSeaData: 'няма данни',
     km: 'км',
     hpa: 'hPa',
@@ -84,6 +86,8 @@ const translations = {
     pressure: 'Pressure',
     uvIndex: 'UV Index',
     seaTemp: 'Water Temp',
+    sunrise: 'Sunrise',
+    sunset: 'Sunset',
     noSeaData: 'n/a',
     km: 'km',
     hpa: 'hPa',
@@ -123,7 +127,7 @@ const translations = {
     quickCities: [
       { name: 'Varna', lat: 43.2141, lon: 27.9147 },
       { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
-      { name: 'Pловдив', lat: 42.1522, lon: 24.7454 },
+      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
       { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
       { name: 'London', lat: 51.5074, lon: -0.1278 },
       { name: 'Paris', lat: 48.8566, lon: 2.3522 },
@@ -357,14 +361,21 @@ const WeatherApp = () => {
     setExactLocation(null) 
   }
 
+  const formatTime = (isoString: string) => {
+    if (!isoString) return '--:--';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+
   const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
     setError(null)
     try {
+      // Добавено извличане на sunrise и sunset
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
         '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
-        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max' + 
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
 
       const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
@@ -401,6 +412,8 @@ const WeatherApp = () => {
         visibility: Math.round((data.current.visibility || 0) / 1000),
         pressure: Math.round(data.current.surface_pressure),
         uvIndex: Math.round(data.current.uv_index),
+        sunrise: data.daily.sunrise && data.daily.sunrise[0] ? formatTime(data.daily.sunrise[0]) : '--:--',
+        sunset: data.daily.sunset && data.daily.sunset[0] ? formatTime(data.daily.sunset[0]) : '--:--',
         code: data.current.weather_code,
         seaTemp: seaTemp,
         description: cur.desc,
@@ -475,6 +488,8 @@ const WeatherApp = () => {
           rain: Math.max(0, data.daily.precipitation_sum[i] || 0).toFixed(1),
           wind: Math.round(data.daily.wind_speed_10m_max[i] || 0),
           uv: Math.round(data.daily.uv_index_max[i] || 0),
+          sunrise: data.daily.sunrise && data.daily.sunrise[i] ? formatTime(data.daily.sunrise[i]) : '--:--',
+          sunset: data.daily.sunset && data.daily.sunset[i] ? formatTime(data.daily.sunset[i]) : '--:--',
           humidity: count > 0 ? Math.round(sumHum / count) : 0,
           pressure: count > 0 ? Math.round(sumPress / count) : 0,
           visibility: count > 0 ? Math.round((sumVis / count) / 1000) : 0,
@@ -512,7 +527,6 @@ const WeatherApp = () => {
           const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
           setCity(mainCity);
 
-          // По-агресивно търсене на точен адрес (улица + номер)
           const exactDetails = [];
           const street = address.road || address.pedestrian || address.street;
           
@@ -523,7 +537,6 @@ const WeatherApp = () => {
             exactDetails.push(address.house_number);
           }
           
-          // Ако не открие улица и номер, търси квартал
           if (exactDetails.length === 0) {
             const neighborhood = address.suburb || address.neighbourhood || address.city_district;
             if (neighborhood) exactDetails.push(neighborhood);
@@ -637,7 +650,6 @@ const WeatherApp = () => {
             <div className="main-top">
               <div className="main-info-left">
                 
-                {/* ПРОМЕНЕНА ПОДРЕДБА: Град, точна локация и звезда на един ред */}
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
                   <span>📍 {city}</span>
                   
@@ -670,6 +682,8 @@ const WeatherApp = () => {
               <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
               <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
               <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
+              <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{weather.sunrise}</p></div>
+              <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{weather.sunset}</p></div>
               {weather.seaTemp !== null && (
                 <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
               )}
@@ -768,6 +782,8 @@ const WeatherApp = () => {
               {detailTab === 'main' && <>
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedDay.min}° / {selectedDay.max}°</p></div>
                 <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">до {selectedDay.feelsLikeMax}°</p></div>
+                <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{selectedDay.sunrise}</p></div>
+                <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{selectedDay.sunset}</p></div>
                 <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedDay.humidity}%</p></div>
                 <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{selectedDay.uv}</p></div>
               </>}
