@@ -123,7 +123,7 @@ const translations = {
     quickCities: [
       { name: 'Varna', lat: 43.2141, lon: 27.9147 },
       { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
-      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
+      { name: 'Pловдив', lat: 42.1522, lon: 24.7454 },
       { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
       { name: 'London', lat: 51.5074, lon: -0.1278 },
       { name: 'Paris', lat: 48.8566, lon: 2.3522 },
@@ -281,7 +281,7 @@ const WeatherApp = () => {
   const [lang, setLang] = useState('bg')
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
-  const [exactLocation, setExactLocation] = useState<string | null>(null) // НОВО: Точна локация
+  const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [darkMode, setDarkMode] = useState(false)
@@ -354,7 +354,7 @@ const WeatherApp = () => {
     setSuggestions([])
     setSelectedDay(null)
     setSelectedHour(null)
-    setExactLocation(null) // Скриваме точната локация при ръчно търсене
+    setExactLocation(null) 
   }
 
   const fetchWeather = async (lat: number, lon: number) => {
@@ -505,19 +505,29 @@ const WeatherApp = () => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
-          const res = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang)
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=18`)
           const data = await res.json()
           
-          // Извличане на града
-          const mainCity = data.address.city || data.address.town || data.address.village || data.address.county || t.myLocation;
+          const address = data.address;
+          const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
           setCity(mainCity);
 
-          // Извличане на точния адрес (улица, номер, квартал)
+          // По-агресивно търсене на точен адрес (улица + номер)
           const exactDetails = [];
-          if (data.address.road) exactDetails.push(data.address.road);
-          if (data.address.house_number) exactDetails.push(data.address.house_number);
-          if (!data.address.road && data.address.suburb) exactDetails.push(data.address.suburb);
-          if (!data.address.road && !data.address.suburb && data.address.neighbourhood) exactDetails.push(data.address.neighbourhood);
+          const street = address.road || address.pedestrian || address.street;
+          
+          if (street) {
+            exactDetails.push(street);
+          }
+          if (address.house_number) {
+            exactDetails.push(address.house_number);
+          }
+          
+          // Ако не открие улица и номер, търси квартал
+          if (exactDetails.length === 0) {
+            const neighborhood = address.suburb || address.neighbourhood || address.city_district;
+            if (neighborhood) exactDetails.push(neighborhood);
+          }
           
           if (exactDetails.length > 0) {
             setExactLocation(exactDetails.join(' '));
@@ -626,19 +636,21 @@ const WeatherApp = () => {
           <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
             <div className="main-top">
               <div className="main-info-left">
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: exactLocation ? '4px' : '8px' }}>
-                  📍 {city} 
-                  <button onClick={toggleFavorite} className="star-btn" title={t.favorite}>
+                
+                {/* ПРОМЕНЕНА ПОДРЕДБА: Град, точна локация и звезда на един ред */}
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <span>📍 {city}</span>
+                  
+                  {exactLocation && (
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
+                    </span>
+                  )}
+                  
+                  <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
                     {favoriteCity?.name === city ? '⭐' : '☆'}
                   </button>
                 </h2>
-                
-                {/* ПОКАЗВАНЕ НА ТОЧНАТА ЛОКАЦИЯ (АКО Е НАЛИЧНА) */}
-                {exactLocation && (
-                  <p style={{ fontSize: '1.1rem', opacity: 0.9, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
-                    🎯 {exactLocation}
-                  </p>
-                )}
 
                 <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
                 {lastUpdated && (
