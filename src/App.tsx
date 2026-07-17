@@ -138,11 +138,23 @@ const translations = {
   }
 }
 
-const getTempGradient = (temp: number) => {
-  if (temp < 0) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
-  if (temp < 15) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
-  if (temp < 30) return 'linear-gradient(135deg, #fcd34d, #f59e0b)'
-  return 'linear-gradient(135deg, #ffb3b3, #ff4d4d)'
+// НОВА логика: връща RGBA градиент, за да работи като полупрозрачен филтър върху снимката
+const getTempGradient = (temp: number, darkMode: boolean) => {
+  if (darkMode) {
+    let c1, c2;
+    if (temp < 0) { c1 = '30, 58, 138'; c2 = '23, 37, 84'; } 
+    else if (temp < 15) { c1 = '6, 78, 59'; c2 = '2, 44, 34'; } 
+    else if (temp < 30) { c1 = '120, 53, 15'; c2 = '69, 26, 3'; } 
+    else { c1 = '127, 29, 29'; c2 = '69, 10, 10'; } 
+    return `linear-gradient(135deg, rgba(${c1}, 0.85), rgba(${c2}, 0.85))`
+  } else {
+    let c1, c2;
+    if (temp < 0) { c1 = '219, 234, 254'; c2 = '191, 219, 254'; } 
+    else if (temp < 15) { c1 = '209, 250, 229'; c2 = '167, 243, 208'; } 
+    else if (temp < 30) { c1 = '252, 211, 77'; c2 = '245, 158, 11'; } 
+    else { c1 = '255, 179, 179'; c2 = '255, 77, 77'; } 
+    return `linear-gradient(135deg, rgba(${c1}, 0.85), rgba(${c2}, 0.85))`
+  }
 }
 
 const getIconAnimation = (icon: string) => {
@@ -296,6 +308,7 @@ const WeatherApp = () => {
   const [forecast, setForecast] = useState<any[]>([])
   const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
+  const [bgImageUrl, setBgImageUrl] = useState<string>('') // НОВО: Стейт за снимката на града
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
@@ -371,7 +384,6 @@ const WeatherApp = () => {
     setLoading(true)
     setError(null)
     try {
-      // Добавено извличане на sunrise и sunset
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
         '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
@@ -501,6 +513,11 @@ const WeatherApp = () => {
       setForecast(days)
       setLoading(false)
       setLastUpdated(new Date())
+
+      // НОВО: Зареждане на снимката на града (използваме само първата дума от стринга за града за по-точни резултати)
+      const cityNameForImage = city.split(',')[0].trim();
+      setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},landmark/all?lock=${new Date().getTime()}`);
+
     } catch (e: any) {
       console.error(e);
       setError(t.error)
@@ -646,7 +663,10 @@ const WeatherApp = () => {
             </div>
           )}
 
-          <div className="card main-card" style={{ background: getTempGradient(weather.temp) }}>
+          {/* НОВО: Добавена е фоновата снимка заедно с температурния градиент като overlay */}
+          <div className="card main-card" style={{ 
+            background: `${getTempGradient(weather.temp, darkMode)}, url('${bgImageUrl}') center/cover no-repeat` 
+          }}>
             <div className="main-top">
               <div className="main-info-left">
                 
