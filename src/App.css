@@ -1,312 +1,41 @@
-/* --- ОСНОВЕН РЕСЕТ И ОТКЛЮЧВАНЕ НА ШИРИНАТА --- */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body, #root {
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #eef6ff;
-  color: #1e293b;
-  -webkit-font-smoothing: antialiased;
-}
-
-.weather-app {
-  max-width: 1500px; 
-  width: 100%;
-  margin: 0 auto;
-  padding: 24px;
-  overflow-x: hidden;
-}
-
-/* --- HEADER --- */
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-  background: rgba(255, 255, 255, 0.6);
-  padding: 16px 24px;
-  border-radius: 24px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-}
-.header-title-wrapper h1 { font-size: 1.8rem; margin: 0; }
-.header-title-wrapper p { margin: 4px 0 0; opacity: 0.7; }
-.header-btns { display: flex; gap: 12px; }
-.header-btns button {
-  background: white; border: none; padding: 10px 18px; border-radius: 20px;
-  cursor: pointer; font-weight: bold; color: #1e293b;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  transition: transform 0.2s;
-}
-.header-btns button:hover { transform: scale(1.05); }
-
-/* --- ТЪРСАЧКА И ГРАДОВЕ --- */
-.search-wrapper { margin-bottom: 24px; position: relative; width: 100%; }
-.search-row input {
-  width: 100%; padding: 18px 24px; border-radius: 24px; border: none;
-  background: white; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-  outline: none; color: #1e293b;
-}
-.suggestions {
-  position: absolute; top: 100%; left: 0; right: 0; background: white;
-  border-radius: 16px; margin-top: 8px; overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100;
-}
-.suggestion-item { padding: 12px 24px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); }
-.suggestion-item:hover { background: #ade3ff; }
-.info-line { text-align: center; font-size: 0.85rem; opacity: 0.6; margin-bottom: 24px; }
-
-.city-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px; }
-.city-btn {
-  padding: 10px 20px; border-radius: 20px; border: none; background: white;
-  color: #1e293b; cursor: pointer; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  transition: all 0.2s;
-}
-.city-btn.active { background: #3b82f6; color: white; }
-
-.star-btn {
-  background: none;
-  border: none;
-  font-size: 1.8rem;
-  cursor: pointer;
-  transition: transform 0.2s;
-  padding: 0;
-  line-height: 1;
-  color: #fde047; 
-}
-.star-btn:hover { transform: scale(1.2); }
-
-.fav-btn {
-  background: #fef08a !important; 
-  color: #1e293b !important;
-  border: 1px solid #f59e0b !important;
-}
-.weather-app.dark .fav-btn {
-  background: rgba(252, 211, 77, 0.2) !important;
-  color: #fde047 !important;
-  border-color: rgba(252, 211, 77, 0.4) !important;
-}
-
-/* --- СИСТЕМА ЗА ПРЕДУПРЕЖДЕНИЯ (АЛАРМИ) --- */
-.alerts-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-  width: 100%;
-}
-.alert-item {
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
-  border-left: 6px solid #ef4444;
-  color: #b91c1c;
-  padding: 16px 20px;
-  border-radius: 16px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.15);
-  animation: pulse-border 2s infinite;
-}
-@keyframes pulse-border {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-/* --- ОСНОВНИ КАРТИ --- */
-.card {
-  width: 100%;
-  max-width: 100%;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 32px;
-  padding: 32px;
-  margin-bottom: 24px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.04);
-}
-.card h3 { margin-bottom: 20px; font-size: 1.4rem; opacity: 0.9; }
-
-/* --- ГЛАВНА КАРТА С ВРЕМЕТО (КОРИГИРАНА ЗА ЧЕТЛИВОСТ) --- */
+/* --- ГЛАВНА КАРТА С ВРЕМЕТО (ИЗЧИСТЕНА) --- */
 .main-card { 
   border: none; 
   position: relative;
   background-size: cover !important;
   background-position: center !important;
-  color: white; 
-  /* Добавяме плътен, тъмен градиент отляво надясно, за да осигурим четимост на текста */
-  background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%), var(--bg-image-url);
+  color: white;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .main-top { 
   display: flex; 
   justify-content: space-between; 
   align-items: center; 
-  margin-bottom: 32px; 
-  position: relative; 
   z-index: 2; 
-  padding: 20px; /* Добавихме малко вътрешен отстъп */
+  padding: 32px; 
 }
 
-/* Настройваме текста да има по-добра сянка */
-.main-info-left { text-align: left; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
-.main-info-left h2 { font-size: 2.5rem; margin-bottom: 8px; color: #ffffff; }
-.main-info-left .desc { font-size: 1.2rem; opacity: 0.9; text-transform: capitalize; color: #ffffff; }
-.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-top: 16px; color: #ffffff; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  z-index: 2;
+  padding: 0 32px 32px 32px;
+}
+
 .stat-box {
-  background: rgba(255, 255, 255, 0.2); 
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.25); 
+  backdrop-filter: blur(10px);
   padding: 16px;
   border-radius: 20px;
   text-align: center;
   color: white;
   border: 1px solid rgba(255,255,255,0.3);
 }
-.stat-box p { margin: 0; }
-.stat-box .label { font-size: 0.85rem; opacity: 0.8; margin: 8px 0 4px; }
-.stat-box .value { font-weight: bold; font-size: 1.2rem; }
 
-/* --- ХОРИЗОНТАЛНИ СПИСЪЦИ (ЧАСОВЕ И ДНИ) --- */
-.hourly-row, .daily-grid { 
-  display: flex; 
-  overflow-x: auto; 
-  gap: 16px; 
-  padding-bottom: 16px; 
-  -webkit-overflow-scrolling: touch;
-}
-.hourly-row::-webkit-scrollbar, .daily-grid::-webkit-scrollbar { height: 6px; }
-.hourly-row::-webkit-scrollbar-thumb, .daily-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
-
-.hour-box {
-  background: #ade3ff; 
-  min-width: 100px; padding: 16px; border-radius: 20px;
-  text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-  display: flex; flex-direction: column; gap: 8px; align-items: center;
-}
-.hour-time { font-weight: bold; color: #1e293b; }
-.hour-temp { font-size: 1.3rem; font-weight: bold; }
-
-.day-box {
-  background: #ade3ff; 
-  min-width: 120px;
-  padding: 16px; border-radius: 20px; text-align: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-  display: flex; flex-direction: column; gap: 8px; align-items: center;
-  transition: transform 0.2s;
-  flex-shrink: 0;
-}
-.day-box:hover { transform: translateY(-3px); }
-.day-name { font-weight: bold; font-size: 1.1rem; }
-.day-temp { font-size: 1.2rem; }
-.day-temp .max { font-weight: bold; }
-.day-temp .min { opacity: 0.6; font-size: 0.9rem; margin-top: 4px; display: block; }
-
-/* --- ГРАФИКИ ЗА 24 ЧАСА (GRID 2x2) --- */
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-.mini-chart {
-  background: rgba(0,0,0,0.02);
-  padding: 16px;
-  border-radius: 20px;
-}
-canvas {
-  max-width: 100%;
-  height: auto !important;
-  display: block;
-}
-
-/* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (ПОПЪПИ) --- */
-.popup-card {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  width: 90% !important; 
-  max-width: 360px !important;
-  padding: 24px !important;
-  border-radius: 24px !important;
-  margin: 0 !important;
-  z-index: 9999;
-}
-.chart-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
-.chart-tab {
-  padding: 8px 16px; border-radius: 20px; border: none; background: #f1f5f9;
-  color: #64748b; cursor: pointer; font-weight: 600; transition: 0.2s;
-}
-.chart-tab.active-temp { background: #f97316; color: white; }
-.chart-tab.active-rain { background: #3b82f6; color: white; }
-.chart-tab.active-wind { background: #10b981; color: white; }
-.chart-tab.active-pressure { background: #a855f7; color: white; }
-.popup-grid { gap: 12px !important; display: grid; grid-template-columns: repeat(2, 1fr); }
-.popup-grid .stat-box { background: #f1f5f9 !important; box-shadow: none !important; color: #1e293b !important; }
-.popup-grid .sea-temp-box { background: #ade3ff !important; }
-
-/* --- FOOTER --- */
-.footer { text-align: center; margin-top: 40px; opacity: 0.5; font-size: 0.9rem; }
-
-/* --- DARK MODE --- */
-.weather-app.dark { background: #0f172a; color: #f8fafc; }
-.weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
-.weather-app.dark .mini-chart { background: rgba(255,255,255,0.05); }
-.weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
-.weather-app.dark .alert-item { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
-
-/* --- АНИМАЦИИ --- */
-.float { animation: float-soft 4s ease-in-out infinite; }
-@keyframes float-soft { 
-  0%, 100% { transform: translateY(0) scale(1); } 
-  50% { transform: translateY(-5px) scale(1.03); } 
-}
-.spin-slow { animation: spin-pulse 12s linear infinite; }
-@keyframes spin-pulse { 
-  0% { transform: rotate(0deg) scale(1); } 
-  50% { transform: rotate(180deg) scale(1.08); }
-  100% { transform: rotate(360deg) scale(1); } 
-}
-.bounce-rain { animation: rain-drop 1.5s ease-in-out infinite; }
-@keyframes rain-drop { 
-  0%, 100% { transform: translateY(0) rotate(0deg); } 
-  50% { transform: translateY(4px) rotate(2deg); } 
-}
-.flash { animation: storm-flash 3s ease-out infinite; }
-@keyframes storm-flash { 
-  0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); } 
-  10%, 20% { transform: scale(1.1) rotate(-3deg); }
-  15% { transform: scale(1.2) rotate(3deg); filter: brightness(1.4); } 
-  50% { transform: scale(1) rotate(0deg); filter: brightness(1); } 
-}
-.fall { animation: snow-fall 4s ease-in-out infinite; }
-@keyframes snow-fall { 
-  0%, 100% { transform: translateY(0) translateX(0); } 
-  33% { transform: translateY(2px) translateX(-3px); } 
-  66% { transform: translateY(-2px) translateX(3px); } 
-}
-.drift { animation: fog-drift 5s ease-in-out infinite; }
-@keyframes fog-drift { 
-  0%, 100% { transform: translateX(0); opacity: 1; } 
-  50% { transform: translateX(5px); opacity: 0.7; } 
-}
-
-/* --- МОБИЛНА ОПТИМИЗАЦИЯ --- */
-@media (max-width: 850px) {
-  .charts-grid { grid-template-columns: 1fr; }
-  .mini-chart { min-width: 100%; }
-}
-
-@media (max-width: 650px) {
-  .weather-app { padding: 12px; }
-  .header-row { flex-direction: column; gap: 16px; text-align: center; }
-  .main-top { flex-direction: column; text-align: center; }
-  .main-info-left { text-align: center; width: 100%; }
-  .big-temp { font-size: 4rem; text-align: center; }
-  .big-icon { margin-right: 0; margin-top: 16px; }
-}
+.main-info-left { text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-top: 16px; }
