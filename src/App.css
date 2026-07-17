@@ -133,29 +133,32 @@ html, body, #root {
 }
 .card h3 { margin-bottom: 20px; font-size: 1.4rem; opacity: 0.9; }
 
-/* --- ГЛАВНА КАРТА С ВРЕМЕТО (СЪС СНИМКА) --- */
+/* --- ГЛАВНА КАРТА С ВРЕМЕТО (КОРИГИРАНА ЗА ЧЕТЛИВОСТ) --- */
 .main-card { 
   border: none; 
   position: relative;
   background-size: cover !important;
   background-position: center !important;
   color: white; 
-  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  /* Добавяме плътен, тъмен градиент отляво надясно, за да осигурим четимост на текста */
+  background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%), var(--bg-image-url);
 }
-.main-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; position: relative; z-index: 2; }
-.main-info-left { text-align: left; }
-.main-info-left h2 { font-size: 2.5rem; margin-bottom: 8px; }
-.main-info-left .desc { font-size: 1.2rem; opacity: 0.9; text-transform: capitalize; }
-.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-top: 16px; text-align: left; }
-.big-icon { margin-right: 8%; }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 16px;
-  position: relative;
-  z-index: 2;
+.main-top { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 32px; 
+  position: relative; 
+  z-index: 2; 
+  padding: 20px; /* Добавихме малко вътрешен отстъп */
 }
+
+/* Настройваме текста да има по-добра сянка */
+.main-info-left { text-align: left; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+.main-info-left h2 { font-size: 2.5rem; margin-bottom: 8px; color: #ffffff; }
+.main-info-left .desc { font-size: 1.2rem; opacity: 0.9; text-transform: capitalize; color: #ffffff; }
+.big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-top: 16px; color: #ffffff; }
 .stat-box {
   background: rgba(255, 255, 255, 0.2); 
   backdrop-filter: blur(8px);
