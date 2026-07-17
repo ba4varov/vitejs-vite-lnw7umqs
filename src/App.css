@@ -133,12 +133,19 @@ html, body, #root {
 }
 .card h3 { margin-bottom: 20px; font-size: 1.4rem; opacity: 0.9; }
 
-/* --- ГЛАВНА КАРТА С ВРЕМЕТО --- */
-.main-card { border: 1px solid rgba(255,255,255,0.4); }
-.main-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+/* --- ГЛАВНА КАРТА С ВРЕМЕТО (СЪС СНИМКА) --- */
+.main-card { 
+  border: none; 
+  position: relative;
+  background-size: cover !important;
+  background-position: center !important;
+  color: white; 
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+.main-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; position: relative; z-index: 2; }
 .main-info-left { text-align: left; }
 .main-info-left h2 { font-size: 2.5rem; margin-bottom: 8px; }
-.main-info-left .desc { font-size: 1.2rem; opacity: 0.8; text-transform: capitalize; }
+.main-info-left .desc { font-size: 1.2rem; opacity: 0.9; text-transform: capitalize; }
 .big-temp { font-size: 5.5rem; font-weight: 800; line-height: 1; margin-top: 16px; text-align: left; }
 .big-icon { margin-right: 8%; }
 
@@ -146,16 +153,20 @@ html, body, #root {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 16px;
+  position: relative;
+  z-index: 2;
 }
 .stat-box {
-  background: #ade3ff; 
+  background: rgba(255, 255, 255, 0.2); 
+  backdrop-filter: blur(8px);
   padding: 16px;
   border-radius: 20px;
   text-align: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
 }
 .stat-box p { margin: 0; }
-.stat-box .label { font-size: 0.85rem; opacity: 0.7; margin: 8px 0 4px; }
+.stat-box .label { font-size: 0.85rem; opacity: 0.8; margin: 8px 0 4px; }
 .stat-box .value { font-weight: bold; font-size: 1.2rem; }
 
 /* --- ХОРИЗОНТАЛНИ СПИСЪЦИ (ЧАСОВЕ И ДНИ) --- */
@@ -210,9 +221,7 @@ canvas {
   display: block;
 }
 
-/* ========================================= */
-/* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (ВИНАГИ ЦЕНТРИРАНИ) --- */
-/* ========================================= */
+/* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (ПОПЪПИ) --- */
 .popup-card {
   position: fixed !important;
   top: 50% !important;
@@ -223,20 +232,8 @@ canvas {
   padding: 24px !important;
   border-radius: 24px !important;
   margin: 0 !important;
+  z-index: 9999;
 }
-.popup-card .chart-tabs { margin-bottom: 16px !important; gap: 8px; display: flex; flex-wrap: wrap; justify-content: center; }
-.popup-card .chart-tab { padding: 8px 12px; font-size: 0.85rem; border-radius: 16px; }
-
-.popup-grid { gap: 12px !important; }
-.popup-grid .stat-box {
-  padding: 12px !important; border-radius: 16px !important;
-  background: #f1f5f9 !important; box-shadow: none !important;
-}
-.popup-grid .sea-temp-box { background: #ade3ff !important; }
-.popup-grid .stat-box .label { margin: 4px 0 2px !important; font-size: 0.8rem !important; }
-.popup-grid .stat-box .value { font-size: 1.1rem !important; }
-
-/* --- ГРАФИКА ТАБОВЕ --- */
 .chart-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
 .chart-tab {
   padding: 8px 16px; border-radius: 20px; border: none; background: #f1f5f9;
@@ -246,94 +243,67 @@ canvas {
 .chart-tab.active-rain { background: #3b82f6; color: white; }
 .chart-tab.active-wind { background: #10b981; color: white; }
 .chart-tab.active-pressure { background: #a855f7; color: white; }
+.popup-grid { gap: 12px !important; display: grid; grid-template-columns: repeat(2, 1fr); }
+.popup-grid .stat-box { background: #f1f5f9 !important; box-shadow: none !important; color: #1e293b !important; }
+.popup-grid .sea-temp-box { background: #ade3ff !important; }
 
-.center-text { text-align: center; }
+/* --- FOOTER --- */
 .footer { text-align: center; margin-top: 40px; opacity: 0.5; font-size: 0.9rem; }
 
 /* --- DARK MODE --- */
 .weather-app.dark { background: #0f172a; color: #f8fafc; }
 .weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
 .weather-app.dark .mini-chart { background: rgba(255,255,255,0.05); }
-.weather-app.dark .popup-grid .stat-box { background: rgba(255,255,255,0.05) !important; }
-.weather-app.dark .popup-grid .sea-temp-box { background: rgba(56, 189, 248, 0.2) !important;}
 .weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
 .weather-app.dark .alert-item { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
 
 /* --- АНИМАЦИИ --- */
+.float { animation: float-soft 4s ease-in-out infinite; }
 @keyframes float-soft { 
   0%, 100% { transform: translateY(0) scale(1); } 
   50% { transform: translateY(-5px) scale(1.03); } 
 }
-.float { animation: float-soft 4s ease-in-out infinite; }
+.spin-slow { animation: spin-pulse 12s linear infinite; }
 @keyframes spin-pulse { 
   0% { transform: rotate(0deg) scale(1); } 
   50% { transform: rotate(180deg) scale(1.08); }
   100% { transform: rotate(360deg) scale(1); } 
 }
-.spin-slow { animation: spin-pulse 12s linear infinite; }
+.bounce-rain { animation: rain-drop 1.5s ease-in-out infinite; }
 @keyframes rain-drop { 
   0%, 100% { transform: translateY(0) rotate(0deg); } 
   50% { transform: translateY(4px) rotate(2deg); } 
 }
-.bounce-rain { animation: rain-drop 1.5s ease-in-out infinite; }
+.flash { animation: storm-flash 3s ease-out infinite; }
 @keyframes storm-flash { 
   0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); } 
   10%, 20% { transform: scale(1.1) rotate(-3deg); }
   15% { transform: scale(1.2) rotate(3deg); filter: brightness(1.4); } 
   50% { transform: scale(1) rotate(0deg); filter: brightness(1); } 
 }
-.flash { animation: storm-flash 3s ease-out infinite; }
+.fall { animation: snow-fall 4s ease-in-out infinite; }
 @keyframes snow-fall { 
   0%, 100% { transform: translateY(0) translateX(0); } 
   33% { transform: translateY(2px) translateX(-3px); } 
   66% { transform: translateY(-2px) translateX(3px); } 
 }
-.fall { animation: snow-fall 4s ease-in-out infinite; }
+.drift { animation: fog-drift 5s ease-in-out infinite; }
 @keyframes fog-drift { 
   0%, 100% { transform: translateX(0); opacity: 1; } 
   50% { transform: translateX(5px); opacity: 0.7; } 
 }
-.drift { animation: fog-drift 5s ease-in-out infinite; }
 
 /* --- МОБИЛНА ОПТИМИЗАЦИЯ --- */
 @media (max-width: 850px) {
-  .charts-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .mini-chart {
-    min-width: 100%;
-  }
-  .main-top {
-    flex-direction: row; 
-  }
+  .charts-grid { grid-template-columns: 1fr; }
+  .mini-chart { min-width: 100%; }
 }
 
 @media (max-width: 650px) {
   .weather-app { padding: 12px; }
-  
-  .header-row { 
-    flex-direction: column; gap: 16px; text-align: center; 
-    padding: 16px; margin-bottom: 20px;
-  }
-  .header-title-wrapper h1 { font-size: 1.6rem; }
-  
-  .search-row input { padding: 14px 20px; font-size: 1rem; }
-  .city-btn { padding: 8px 16px; font-size: 0.85rem; }
-  
-  .card { padding: 20px; border-radius: 24px; margin-bottom: 16px; }
-  .card h3 { font-size: 1.2rem; }
-  
+  .header-row { flex-direction: column; gap: 16px; text-align: center; }
   .main-top { flex-direction: column; text-align: center; }
   .main-info-left { text-align: center; width: 100%; }
-  .main-info-left h2 { font-size: 2rem; justify-content: center; }
-  .big-temp { font-size: 4rem; text-align: center; margin-bottom: 24px; }
+  .big-temp { font-size: 4rem; text-align: center; }
   .big-icon { margin-right: 0; margin-top: 16px; }
-  
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  
-  .stat-box, .day-box, .hour-box { padding: 12px; border-radius: 16px; }
-  
-  .alert-item { font-size: 0.9rem; padding: 12px 16px; }
 }
