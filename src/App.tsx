@@ -40,6 +40,15 @@ const translations = {
     tabMain: 'Основни',
     tabAtmosphere: 'Атмосфера',
     tabWaterWind: 'Вода и Вятър',
+    minMaxTemp: 'Мин / Макс Темп.',
+    precipProb: 'Вероятност валеж',
+    precipSum: 'Общо валежи',
+    maxWind: 'Макс. вятър',
+    airQuality: 'Качество на въздуха (AQI)',
+    aqi: 'AQI Индекс',
+    pm10: 'ФПЧ 10 (PM10)',
+    pm25: 'ФПЧ 2.5 (PM2.5)',
+    aqiChart: 'AQI Индекс (24 часа)',
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
     highTemp: 'Опасно високи температури! (Над 35°C)',
@@ -107,6 +116,15 @@ const translations = {
     tabMain: 'Main',
     tabAtmosphere: 'Atmosphere',
     tabWaterWind: 'Water & Wind',
+    minMaxTemp: 'Min / Max Temp',
+    precipProb: 'Precip Chance',
+    precipSum: 'Total Precip',
+    maxWind: 'Max Wind',
+    airQuality: 'Air Quality (AQI)',
+    aqi: 'AQI Index',
+    pm10: 'PM10',
+    pm25: 'PM2.5',
+    aqiChart: 'AQI (24 Hours)',
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     highTemp: 'Extreme high temperatures! (Above 35°C)',
@@ -127,7 +145,7 @@ const translations = {
     quickCities: [
       { name: 'Varna', lat: 43.2141, lon: 27.9147 },
       { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
-      { name: 'Pловдив', lat: 42.1522, lon: 24.7454 },
+      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
       { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
       { name: 'London', lat: 51.5074, lon: -0.1278 },
       { name: 'Paris', lat: 48.8566, lon: 2.3522 },
@@ -138,25 +156,21 @@ const translations = {
   }
 }
 
-// НОВА ФУНКЦИЯ: Интелигентно сливане на цвета за температурата със снимката на града!
 const getDynamicBackground = (temp: number, imgUrl: string) => {
   let rgbDark, rgbLight;
-  
   if (temp <= 0) {
-    rgbDark = '15, 23, 42'; // Студено: Тъмно синьо (Dark Navy)
-    rgbLight = '56, 189, 248'; // Светло ледено синьо
+    rgbDark = '15, 23, 42'; 
+    rgbLight = '56, 189, 248'; 
   } else if (temp <= 15) {
-    rgbDark = '6, 78, 59'; // Хладно: Тъмно изумрудено зелено
-    rgbLight = '52, 211, 153'; // Светло зелено
+    rgbDark = '6, 78, 59'; 
+    rgbLight = '52, 211, 153'; 
   } else if (temp <= 29) {
-    rgbDark = '120, 53, 15'; // Топло: Тъмно кехлибарено
-    rgbLight = '251, 191, 36'; // Златисто жълто
+    rgbDark = '120, 53, 15'; 
+    rgbLight = '251, 191, 36'; 
   } else {
-    rgbDark = '127, 29, 29'; // Горещо: Тъмно червено
-    rgbLight = '248, 113, 113'; // Светло червено
+    rgbDark = '127, 29, 29'; 
+    rgbLight = '248, 113, 113'; 
   }
-
-  // Градиентът е почти плътен (0.95) отляво за текста, избледнява плавно в средата и леко тонира снимката вдясно
   return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%), url('${imgUrl}') center / cover no-repeat`;
 }
 
@@ -196,11 +210,12 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }: any) => {
       type === 'temp' ? h.temp :
       type === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
       type === 'pressure' ? h.pressure :
+      type === 'aqi' ? h.aqi :
       h.wind
     )
     const labels = hourly.map((h: any) => h.hour)
 
-    let minVal = type === 'rain' ? 0 : Math.min(...data)
+    let minVal = type === 'rain' || type === 'aqi' ? 0 : Math.min(...data)
     let maxVal = type === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
     if (minVal === maxVal) { maxVal += 1; minVal -= 1; }
     const range = maxVal - minVal
@@ -388,17 +403,21 @@ const WeatherApp = () => {
     setError(null)
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
-        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index' + 
+        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
         '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
-        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
 
       const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
         '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15';
 
-      const [weatherRes, marineRes] = await Promise.allSettled([
+      const aqiUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + lat + '&longitude=' + lon + 
+        '&current=european_aqi,pm10,pm2_5&hourly=european_aqi&timezone=auto&forecast_days=3';
+
+      const [weatherRes, marineRes, aqiRes] = await Promise.allSettled([
         fetch(weatherUrl),
-        fetch(marineUrl)
+        fetch(marineUrl),
+        fetch(aqiUrl)
       ])
       
       if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error('Моля проверете връзката си с интернет.')
@@ -418,9 +437,32 @@ const WeatherApp = () => {
         } catch (e) {}
       }
 
+      let currentAqi = null, currentPm10 = null, currentPm25 = null;
+      let hourlyAqi: any[] = [];
+      if (aqiRes.status === 'fulfilled' && aqiRes.value.ok) {
+        try {
+          const aqiData = await aqiRes.value.json();
+          if (aqiData.current) {
+            currentAqi = Math.round(aqiData.current.european_aqi);
+            currentPm10 = aqiData.current.pm10;
+            currentPm25 = aqiData.current.pm2_5;
+          }
+          if (aqiData.hourly && aqiData.hourly.european_aqi) {
+            hourlyAqi = aqiData.hourly.european_aqi;
+          }
+        } catch (e) {}
+      }
+
       const cur = decodeWeatherCode(data.current.weather_code)
+      
       setWeather({
         temp: Math.round(data.current.temperature_2m),
+        minTemp: Math.round(data.daily.temperature_2m_min[0]),
+        maxTemp: Math.round(data.daily.temperature_2m_max[0]),
+        precipProb: data.daily.precipitation_probability_max[0] || 0,
+        precipSum: (data.daily.precipitation_sum[0] || 0).toFixed(1),
+        cloudCover: data.current.cloud_cover || 0,
+        maxWindSpeedDaily: Math.round(data.daily.wind_speed_10m_max[0] || 0),
         humidity: data.current.relative_humidity_2m,
         windSpeed: Math.round(data.current.wind_speed_10m),
         feelsLike: Math.round(data.current.apparent_temperature),
@@ -432,7 +474,10 @@ const WeatherApp = () => {
         code: data.current.weather_code,
         seaTemp: seaTemp,
         description: cur.desc,
-        icon: cur.icon
+        icon: cur.icon,
+        aqi: currentAqi,
+        pm10: currentPm10,
+        pm25: currentPm25
       })
 
       const now = new Date()
@@ -449,6 +494,7 @@ const WeatherApp = () => {
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
         const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
+        const aqiVal = hourlyAqi.length > idx ? hourlyAqi[idx] : null
         
         hr.push({
           hour: data.hourly.time[idx].slice(11, 16),
@@ -462,6 +508,7 @@ const WeatherApp = () => {
           dewPoint: Math.round(data.hourly.dew_point_2m[idx]),
           cloudCover: Math.round(data.hourly.cloud_cover[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
+          aqi: aqiVal !== null ? Math.round(aqiVal) : 0,
           icon: code.icon
         })
       }
@@ -517,9 +564,11 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
+      // ПОДОБРЕН КАТАЛОГ СЪС СНИМКИ ЧРЕЗ POLLINATIONS AI
       const cityNameForImage = city.split(',')[0].trim();
       const timestamp = new Date().getTime();
-      setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},city?random=${timestamp}`);
+      const prompt = encodeURIComponent(`${cityNameForImage} beautiful city landmark landscape daytime photography high quality 8k`);
+      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&random=${timestamp}`);
 
     } catch (e: any) {
       console.error(e);
@@ -694,9 +743,14 @@ const WeatherApp = () => {
             </div>
             
             <div className="stats-grid">
+              <div className="stat-box"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
+              <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
+              <div className="stat-box"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{weather.precipProb}%</p></div>
+              <div className="stat-box"><p>🌧️</p><p className="label">{t.precipSum}</p><p className="value">{weather.precipSum} {t.mm}</p></div>
+              <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{weather.cloudCover}%</p></div>
               <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
               <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
-              <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
+              <div className="stat-box"><p>🌪️</p><p className="label">{t.maxWind}</p><p className="value">{weather.maxWindSpeedDaily} {t.windUnit}</p></div>
               <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
               <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
               <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
@@ -781,6 +835,22 @@ const WeatherApp = () => {
               ))}
             </div>
           </div>
+
+          {/* НОВ СЕКТОР: Качество на въздуха */}
+          {weather.aqi !== null && (
+            <div className="card">
+              <h3>🍃 {t.airQuality}</h3>
+              <div className="stats-grid" style={{ marginBottom: '24px' }}>
+                  <div className="stat-box"><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
+                  <div className="stat-box"><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
+                  <div className="stat-box"><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
+              </div>
+              <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
+                  <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" />
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
