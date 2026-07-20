@@ -156,7 +156,8 @@ const translations = {
   }
 }
 
-const getDynamicBackground = (temp: number, imgUrl: string) => {
+// Функцията вече генерира САМО цветовия градиент, който ще седи като слой върху HTML снимката
+const getDynamicOverlay = (temp: number) => {
   let rgbDark, rgbLight;
   if (temp <= 0) {
     rgbDark = '15, 23, 42'; 
@@ -171,7 +172,7 @@ const getDynamicBackground = (temp: number, imgUrl: string) => {
     rgbDark = '127, 29, 29'; 
     rgbLight = '248, 113, 113'; 
   }
-  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%), url('${imgUrl}') center / cover no-repeat`;
+  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%)`;
 }
 
 const getIconAnimation = (icon: string) => {
@@ -564,7 +565,6 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      // ПОДОБРЕН КАТАЛОГ СЪС СНИМКИ ЧРЕЗ POLLINATIONS AI
       const cityNameForImage = city.split(',')[0].trim();
       const timestamp = new Date().getTime();
       const prompt = encodeURIComponent(`${cityNameForImage} beautiful city landmark landscape daytime photography high quality 8k`);
@@ -715,50 +715,83 @@ const WeatherApp = () => {
             </div>
           )}
 
-          <div className="card main-card" style={{ 
-            background: getDynamicBackground(weather.temp, bgImageUrl)
-          }}>
-            <div className="main-top">
-              <div className="main-info-left">
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                  <span>📍 {city}</span>
-                  {exactLocation && (
-                    <span style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
-                    </span>
-                  )}
-                  <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
-                    {favoriteCity?.name === city ? '⭐' : '☆'}
-                  </button>
-                </h2>
-                <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
-                {lastUpdated && (
-                  <p style={{ fontSize: '0.85rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                )}
-                <div className="big-temp">{weather.temp}°C</div>
-              </div>
-              <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
-            </div>
+          {/* НАЙ-ВАЖНОТО: Използваме реален HTML <img> за снимката, за да гарантираме че покрива всичко */}
+          <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             
-            <div className="stats-grid">
-              <div className="stat-box"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
-              <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
-              <div className="stat-box"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{weather.precipProb}%</p></div>
-              <div className="stat-box"><p>🌧️</p><p className="label">{t.precipSum}</p><p className="value">{weather.precipSum} {t.mm}</p></div>
-              <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{weather.cloudCover}%</p></div>
-              <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-              <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
-              <div className="stat-box"><p>🌪️</p><p className="label">{t.maxWind}</p><p className="value">{weather.maxWindSpeedDaily} {t.windUnit}</p></div>
-              <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
-              <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
-              <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
-              <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{weather.sunrise}</p></div>
-              <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{weather.sunset}</p></div>
-              {weather.seaTemp !== null && (
-                <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
-              )}
+            {/* 1. Снимката */}
+            {bgImageUrl && (
+              <img 
+                src={bgImageUrl} 
+                alt="City Background" 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 0
+                }} 
+              />
+            )}
+
+            {/* 2. Цветният филтър върху снимката (Градиентът) */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: getDynamicOverlay(weather.temp),
+              zIndex: 1
+            }}></div>
+
+            {/* 3. Съдържанието на картата */}
+            <div style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
+              
+              <div className="main-top" style={{ padding: 0, marginBottom: '24px' }}>
+                <div className="main-info-left">
+                  <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    <span>📍 {city}</span>
+                    {exactLocation && (
+                      <span style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
+                      </span>
+                    )}
+                    <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
+                      {favoriteCity?.name === city ? '⭐' : '☆'}
+                    </button>
+                  </h2>
+                  <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
+                  {lastUpdated && (
+                    <p style={{ fontSize: '0.85rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                  <div className="big-temp">{weather.temp}°C</div>
+                </div>
+                <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
+              </div>
+              
+              <div className="stats-grid" style={{ padding: 0 }}>
+                <div className="stat-box"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
+                <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
+                <div className="stat-box"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{weather.precipProb}%</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.precipSum}</p><p className="value">{weather.precipSum} {t.mm}</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{weather.cloudCover}%</p></div>
+                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
+                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+                <div className="stat-box"><p>🌪️</p><p className="label">{t.maxWind}</p><p className="value">{weather.maxWindSpeedDaily} {t.windUnit}</p></div>
+                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
+                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
+                <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
+                <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{weather.sunrise}</p></div>
+                <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{weather.sunset}</p></div>
+                {weather.seaTemp !== null && (
+                  <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
+                )}
+              </div>
+
             </div>
           </div>
 
@@ -841,9 +874,9 @@ const WeatherApp = () => {
             <div className="card">
               <h3>🍃 {t.airQuality}</h3>
               <div className="stats-grid" style={{ marginBottom: '24px' }}>
-                  <div className="stat-box"><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
-                  <div className="stat-box"><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
-                  <div className="stat-box"><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
+                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
+                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
+                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
               </div>
               <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
                   <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" />
