@@ -524,8 +524,7 @@ const WeatherApp = () => {
 
       const cityNameForImage = city.split(',')[0].trim()
       const timestamp = new Date().getTime()
-      const prompt = encodeURIComponent(cityNameForImage + ' beautiful city landmark landscape daytime photography high quality')
-      setBgImageUrl('https://image.pollinations.ai/prompt/' + prompt + '?width=1200&height=800&nologo=true&seed=' + timestamp)
+      setBgImageUrl('https://source.unsplash.com/1200x800/?' + encodeURIComponent(cityNameForImage + ' city landmark') + '&t=' + timestamp)
     } catch (e) {
       setError(t.error)
       setLoading(false)
