@@ -127,7 +127,7 @@ const translations = {
     quickCities: [
       { name: 'Varna', lat: 43.2141, lon: 27.9147 },
       { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
-      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
+      { name: 'Pловдив', lat: 42.1522, lon: 24.7454 },
       { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
       { name: 'London', lat: 51.5074, lon: -0.1278 },
       { name: 'Paris', lat: 48.8566, lon: 2.3522 },
@@ -136,6 +136,28 @@ const translations = {
       { name: 'Dubai', lat: 25.2048, lon: 55.2708 },
     ]
   }
+}
+
+// НОВА ФУНКЦИЯ: Интелигентно сливане на цвета за температурата със снимката на града!
+const getDynamicBackground = (temp: number, imgUrl: string) => {
+  let rgbDark, rgbLight;
+  
+  if (temp <= 0) {
+    rgbDark = '15, 23, 42'; // Студено: Тъмно синьо (Dark Navy)
+    rgbLight = '56, 189, 248'; // Светло ледено синьо
+  } else if (temp <= 15) {
+    rgbDark = '6, 78, 59'; // Хладно: Тъмно изумрудено зелено
+    rgbLight = '52, 211, 153'; // Светло зелено
+  } else if (temp <= 29) {
+    rgbDark = '120, 53, 15'; // Топло: Тъмно кехлибарено
+    rgbLight = '251, 191, 36'; // Златисто жълто
+  } else {
+    rgbDark = '127, 29, 29'; // Горещо: Тъмно червено
+    rgbLight = '248, 113, 113'; // Светло червено
+  }
+
+  // Градиентът е почти плътен (0.95) отляво за текста, избледнява плавно в средата и леко тонира снимката вдясно
+  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%), url('${imgUrl}') center / cover no-repeat`;
 }
 
 const getIconAnimation = (icon: string) => {
@@ -495,7 +517,6 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      // Гарантирано нова снимка на всеки ъпдейт, използвайки timestamp за избягване на кеша
       const cityNameForImage = city.split(',')[0].trim();
       const timestamp = new Date().getTime();
       setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},city?random=${timestamp}`);
@@ -645,13 +666,8 @@ const WeatherApp = () => {
             </div>
           )}
 
-          {/* АБСОЛЮТНО ТВЪРДИ ИНСТРУКЦИИ ЗА ФОНА ТУК */}
           <div className="card main-card" style={{ 
-            backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.1) 100%), url('${bgImageUrl}')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundColor: '#1e293b'
+            background: getDynamicBackground(weather.temp, bgImageUrl)
           }}>
             <div className="main-top">
               <div className="main-info-left">
