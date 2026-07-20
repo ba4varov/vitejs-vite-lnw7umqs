@@ -495,8 +495,10 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
+      // Гарантирано нова снимка на всеки ъпдейт, използвайки timestamp за избягване на кеша
       const cityNameForImage = city.split(',')[0].trim();
-      setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},city/all?lock=${new Date().getTime()}`);
+      const timestamp = new Date().getTime();
+      setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},city?random=${timestamp}`);
 
     } catch (e: any) {
       console.error(e);
@@ -643,8 +645,13 @@ const WeatherApp = () => {
             </div>
           )}
 
+          {/* АБСОЛЮТНО ТВЪРДИ ИНСТРУКЦИИ ЗА ФОНА ТУК */}
           <div className="card main-card" style={{ 
-            backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 60%, transparent 100%), url('${bgImageUrl}')` 
+            backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.1) 100%), url('${bgImageUrl}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundColor: '#1e293b'
           }}>
             <div className="main-top">
               <div className="main-info-left">
