@@ -40,7 +40,7 @@ const translations = {
     tabMain: 'Основни',
     tabAtmosphere: 'Атмосфера',
     tabWaterWind: 'Вода и Вятър',
-    minMaxTemp: 'Мин / Макс Темп.',
+    minMaxTemp: 'Мин / Макс',
     precipProb: 'Вероятност валеж',
     precipSum: 'Общо валежи',
     maxWind: 'Макс. вятър',
@@ -116,7 +116,7 @@ const translations = {
     tabMain: 'Main',
     tabAtmosphere: 'Atmosphere',
     tabWaterWind: 'Water & Wind',
-    minMaxTemp: 'Min / Max Temp',
+    minMaxTemp: 'Min / Max',
     precipProb: 'Precip Chance',
     precipSum: 'Total Precip',
     maxWind: 'Max Wind',
@@ -156,7 +156,6 @@ const translations = {
   }
 }
 
-// Функцията вече генерира САМО цветовия градиент, който ще седи като слой върху HTML снимката
 const getDynamicOverlay = (temp: number) => {
   let rgbDark, rgbLight;
   if (temp <= 0) {
@@ -565,10 +564,11 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
+      // ПОДОБРЕН КАТАЛОГ: Използваме seed за да сме сигурни че снимката е различна всеки път!
       const cityNameForImage = city.split(',')[0].trim();
-      const timestamp = new Date().getTime();
-      const prompt = encodeURIComponent(`${cityNameForImage} beautiful city landmark landscape daytime photography high quality 8k`);
-      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&random=${timestamp}`);
+      const timestamp = new Date().getTime(); // Уникален идентификатор за всяко зареждане
+      const prompt = encodeURIComponent(`${cityNameForImage} beautiful city landmark landscape daytime photography high quality`);
+      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&seed=${timestamp}`);
 
     } catch (e: any) {
       console.error(e);
@@ -715,7 +715,7 @@ const WeatherApp = () => {
             </div>
           )}
 
-          {/* НАЙ-ВАЖНОТО: Използваме реален HTML <img> за снимката, за да гарантираме че покрива всичко */}
+          {/* НАЙ-ВАЖНОТО: Използваме реален HTML <img> за снимката, за да гарантираме че покрива всичко на 100% */}
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             
             {/* 1. Снимката */}
@@ -746,7 +746,7 @@ const WeatherApp = () => {
               zIndex: 1
             }}></div>
 
-            {/* 3. Съдържанието на картата */}
+            {/* 3. Съдържанието на главната карта */}
             <div style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
               
               <div className="main-top" style={{ padding: 0, marginBottom: '24px' }}>
@@ -870,13 +870,13 @@ const WeatherApp = () => {
           </div>
 
           {/* НОВ СЕКТОР: Качество на въздуха */}
-          {weather.aqi !== null && (
+          {weather.aqi !== null && weather.aqi !== undefined && (
             <div className="card">
               <h3>🍃 {t.airQuality}</h3>
               <div className="stats-grid" style={{ marginBottom: '24px' }}>
-                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
-                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
-                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
+                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
+                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
+                  <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
               </div>
               <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
                   <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" />
