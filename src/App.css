@@ -224,6 +224,9 @@ html, body, #root {
   grid-template-columns: repeat(2, 1fr);
   gap: 24px;
 }
+.aqi-chart-wrapper canvas {
+  max-height: 150px;
+}
 .mini-chart {
   background: rgba(0,0,0,0.02);
   padding: 16px;
