@@ -564,10 +564,8 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      const cityNameForImage = city.split(',')[0].trim();
       const timestamp = new Date().getTime(); 
-      const prompt = encodeURIComponent(`${cityNameForImage} beautiful city landmark landscape daytime photography high quality`);
-      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&seed=${timestamp}`);
+      setBgImageUrl(`https://loremflickr.com/1200/800/city,landscape,architecture/all?lock=${timestamp}`);
 
     } catch (e: any) {
       console.error(e);
