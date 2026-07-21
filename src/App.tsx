@@ -193,7 +193,6 @@ const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
   )
 }
 
-// ДОБАВЕНА НАСТРОЙКА height с по подразбиране 400
 const SingleChart = ({ hourly, darkMode, type, label, unit, color, height = 400 }: any) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -565,12 +564,12 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      // ЗАЩИТЕН КАТАЛОГ СЪС СНИМКИ
+      // КАТАЛОГ СЪС СНИМКИ ОТ КОНКРЕТНИЯ ГРАД
       const cityNameForImage = city.split(',')[0].trim();
       const timestamp = new Date().getTime();
-      const prompt = encodeURIComponent(`Beautiful city landscape photography of ${cityNameForImage} architecture daytime 8k resolution`);
       
-      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&seed=${timestamp}`);
+      // Използваме стабилния Flickr каталог, но този път ИЗИСКВАМЕ името на града!
+      setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},city,landmark?lock=${timestamp}`);
 
     } catch (e: any) {
       console.error(e);
@@ -763,7 +762,9 @@ const WeatherApp = () => {
                 alt="" 
                 onError={(e) => {
                   const backupTime = new Date().getTime();
-                  e.currentTarget.src = `https://loremflickr.com/1200/800/city,architecture?lock=${backupTime}`;
+                  const cityFallback = city.split(',')[0].trim();
+                  // Дори резервната снимка вече търси града
+                  e.currentTarget.src = `https://loremflickr.com/1200/800/${encodeURIComponent(cityFallback)},architecture?lock=${backupTime}`;
                 }}
                 style={{
                   position: 'absolute',
