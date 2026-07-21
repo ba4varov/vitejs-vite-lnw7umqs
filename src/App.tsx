@@ -762,7 +762,7 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
                 <div className="stat-box"><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
               </div>
-              <div className="aqi-chart-wrapper">
+             <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
   <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" />
 </div>
             </div>
