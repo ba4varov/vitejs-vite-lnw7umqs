@@ -564,8 +564,13 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      const timestamp = new Date().getTime(); 
-      setBgImageUrl(`https://loremflickr.com/1200/800/city,landscape,architecture/all?lock=${timestamp}`);
+      // ГЕНЕРИРАНЕ НА СНИМКАТА
+      const cityNameForImage = city.split(',')[0].trim();
+      const timestamp = new Date().getTime();
+      const prompt = encodeURIComponent(`Beautiful city landscape photography of ${cityNameForImage} architecture daytime 8k resolution`);
+      
+      // Залагаме на Pollinations AI като основен източник
+      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&seed=${timestamp}`);
 
     } catch (e: any) {
       console.error(e);
@@ -728,10 +733,16 @@ const WeatherApp = () => {
 
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             
+            {/* ДВОЙНА ЖЕЛЯЗНА ЗАЩИТА НА СНИМКАТА: */}
             {bgImageUrl && (
               <img 
                 src={bgImageUrl} 
-                alt="City Background" 
+                alt="" 
+                onError={(e) => {
+                  // Ако Pollinations се провали или е блокиран, веднага зареждаме резервната снимка!
+                  const backupTime = new Date().getTime();
+                  e.currentTarget.src = `https://loremflickr.com/1200/800/city,architecture?lock=${backupTime}`;
+                }}
                 style={{
                   position: 'absolute',
                   top: 0,
