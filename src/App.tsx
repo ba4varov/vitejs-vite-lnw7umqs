@@ -40,7 +40,7 @@ const translations = {
     tabMain: 'Основни',
     tabAtmosphere: 'Атмосфера',
     tabWaterWind: 'Вода и Вятър',
-    minMaxTemp: 'Мин / Макс',
+    minMaxTemp: 'Мин / Макс Темп.',
     precipProb: 'Вероятност валеж',
     precipSum: 'Общо валежи',
     maxWind: 'Макс. вятър',
@@ -116,7 +116,7 @@ const translations = {
     tabMain: 'Main',
     tabAtmosphere: 'Atmosphere',
     tabWaterWind: 'Water & Wind',
-    minMaxTemp: 'Min / Max',
+    minMaxTemp: 'Min / Max Temp',
     precipProb: 'Precip Chance',
     precipSum: 'Total Precip',
     maxWind: 'Max Wind',
@@ -156,16 +156,25 @@ const translations = {
   }
 }
 
-const getDynamicOverlay = (temp) => {
-  let rgbDark, rgbLight
-  if (temp <= 0) { rgbDark = '15, 23, 42'; rgbLight = '56, 189, 248' }
-  else if (temp <= 15) { rgbDark = '6, 78, 59'; rgbLight = '52, 211, 153' }
-  else if (temp <= 29) { rgbDark = '120, 53, 15'; rgbLight = '251, 191, 36' }
-  else { rgbDark = '127, 29, 29'; rgbLight = '248, 113, 113' }
-  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%)`
+const getDynamicOverlay = (temp: number) => {
+  let rgbDark, rgbLight;
+  if (temp <= 0) {
+    rgbDark = '15, 23, 42'; 
+    rgbLight = '56, 189, 248'; 
+  } else if (temp <= 15) {
+    rgbDark = '6, 78, 59'; 
+    rgbLight = '52, 211, 153'; 
+  } else if (temp <= 29) {
+    rgbDark = '120, 53, 15'; 
+    rgbLight = '251, 191, 36'; 
+  } else {
+    rgbDark = '127, 29, 29'; 
+    rgbLight = '248, 113, 113'; 
+  }
+  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%)`;
 }
 
-const getIconAnimation = (icon) => {
+const getIconAnimation = (icon: string) => {
   if (icon === '☀️') return 'spin-slow'
   if (icon === '🌤️' || icon === '⛅') return 'float'
   if (icon === '🌧️' || icon === '🌦️') return 'bounce-rain'
@@ -175,7 +184,7 @@ const getIconAnimation = (icon) => {
   return 'float'
 }
 
-const AnimatedIcon = ({ icon, size }) => {
+const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
   const sz = size || '1.5rem'
   return (
     <span className={'animated-icon ' + getIconAnimation(icon)} style={{ fontSize: sz, display: 'inline-block' }}>
@@ -184,8 +193,9 @@ const AnimatedIcon = ({ icon, size }) => {
   )
 }
 
-const SingleChart = ({ hourly, darkMode, type, label, unit, color }) => {
-  const canvasRef = useRef(null)
+// ДОБАВЕНА НАСТРОЙКА height с по подразбиране 400
+const SingleChart = ({ hourly, darkMode, type, label, unit, color, height = 400 }: any) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     if (!canvasRef.current || !hourly.length) return
@@ -193,74 +203,79 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = canvas.width, H = canvas.height
-    const padL = 40, padR = 15, padT = 30, padB = 60
+    const padL = 40, padR = 15, padT = 30, padB = 60 
     const chartW = W - padL - padR, chartH = H - padT - padB
     ctx.clearRect(0, 0, W, H)
 
-    const data = hourly.map(h =>
+    const data = hourly.map((h: any) =>
       type === 'temp' ? h.temp :
       type === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
       type === 'pressure' ? h.pressure :
       type === 'aqi' ? h.aqi :
       h.wind
     )
-    const labels = hourly.map(h => h.hour)
+    const labels = hourly.map((h: any) => h.hour)
 
     let minVal = type === 'rain' || type === 'aqi' ? 0 : Math.min(...data)
     let maxVal = type === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
-    if (minVal === maxVal) { maxVal += 1; minVal -= 1 }
+    if (minVal === maxVal) { maxVal += 1; minVal -= 1; }
     const range = maxVal - minVal
 
     const xStep = chartW / (data.length - 1)
-    const yScale = (val) => padT + chartH - ((val - minVal) / range) * chartH
-    const xScale = (i) => padL + i * xStep
+    const yScale = (val: number) => padT + chartH - ((val - minVal) / range) * chartH
+    const xScale = (i: number) => padL + i * xStep
 
     const textColor = darkMode ? '#e2e8f0' : '#1e293b'
     const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
 
     ctx.strokeStyle = gridColor
     ctx.lineWidth = 1
+    
     for (let i = 0; i <= 4; i++) {
       const y = padT + (chartH / 4) * i
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
+      
       ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'right'
       ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
     }
+    
+    ctx.fillStyle = textColor; 
+    ctx.font = 'bold 12px Arial'; 
+    ctx.textAlign = 'right'; 
+    ctx.textBaseline = 'middle'; 
 
-    ctx.fillStyle = textColor
-    ctx.font = 'bold 12px Arial'
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'middle'
-    data.forEach((_, i) => {
-      const x = xScale(i)
-      const y = padT + chartH + 18
-      ctx.save()
-      ctx.translate(x, y)
-      ctx.rotate(-Math.PI / 4)
-      ctx.fillText(labels[i], 0, 0)
-      ctx.restore()
+    data.forEach((_: any, i: number) => { 
+      const x = xScale(i);
+      const y = padT + chartH + 18; 
+      
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillText(labels[i], 0, 0);
+      ctx.restore();
     })
 
     const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
     grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00')
+    
     ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
-    data.forEach((val, i) => {
+    data.forEach((val: number, i: number) => {
       if (i === 0) return
       const cpx = (xScale(i - 1) + xScale(i)) / 2
       ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
     })
     ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
     ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
-
+    
     ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5
-    data.forEach((val, i) => {
+    data.forEach((val: number, i: number) => {
       if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
       const cpx = (xScale(i - 1) + xScale(i)) / 2
       ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
     })
     ctx.stroke()
-
-    data.forEach((val, i) => {
+    
+    data.forEach((val: number, i: number) => {
       ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
       ctx.fillStyle = color; ctx.fill()
       ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
@@ -272,18 +287,19 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color }) => {
       <h4 style={{ color: color, marginBottom: '16px', textAlign: 'center', fontSize: '1.1rem' }}>
         {label} <span style={{ opacity: 0.7, fontSize: '0.8em' }}>({unit})</span>
       </h4>
-      <canvas ref={canvasRef} width={800} height={400} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <canvas ref={canvasRef} width={800} height={height} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   )
 }
 
-const Chart = ({ hourly, darkMode, t }) => {
+const Chart = ({ hourly, darkMode, t }: any) => {
   const chartsData = [
     { key: 'temp', label: t.temp, unit: '°C', color: '#f97316' },
     { key: 'rain', label: t.rain, unit: t.mm, color: '#3b82f6' },
     { key: 'wind', label: t.windChart, unit: t.windUnit, color: '#10b981' },
     { key: 'pressure', label: t.pressureChart, unit: t.hpa, color: '#a855f7' }
   ]
+
   return (
     <div className="card">
       <h3>{t.chart}</h3>
@@ -300,28 +316,34 @@ const WeatherApp = () => {
   const [lang, setLang] = useState('bg')
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
-  const [exactLocation, setExactLocation] = useState(null)
+  const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
-  const [suggestions, setSuggestions] = useState([])
+  const [suggestions, setSuggestions] = useState<any[]>([])
   const [darkMode, setDarkMode] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [weather, setWeather] = useState(null)
-  const [hourly, setHourly] = useState([])
-  const [forecast, setForecast] = useState([])
-  const [favoriteCity, setFavoriteCity] = useState(null)
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const [bgImageUrl, setBgImageUrl] = useState('')
-  const [selectedDay, setSelectedDay] = useState(null)
-  const [selectedHour, setSelectedHour] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [weather, setWeather] = useState<any>(null)
+  const [hourly, setHourly] = useState<any[]>([])
+  const [forecast, setForecast] = useState<any[]>([])
+  const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
+  const [bgImageUrl, setBgImageUrl] = useState<string>('')
+  
+  const [selectedDay, setSelectedDay] = useState<any>(null)
+  const [selectedHour, setSelectedHour] = useState<any>(null)
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
   const [detailTab, setDetailTab] = useState('main')
-  const searchTimer = useRef(null)
-  const t = translations[lang]
+  
+  const searchTimer = useRef<any>(null)
+  const t = translations[lang as keyof typeof translations]
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
-    if (savedFav) { try { setFavoriteCity(JSON.parse(savedFav)) } catch (e) {} }
+    if (savedFav) {
+      try {
+        setFavoriteCity(JSON.parse(savedFav))
+      } catch (e) {}
+    }
   }, [])
 
   const toggleFavorite = () => {
@@ -335,17 +357,17 @@ const WeatherApp = () => {
     }
   }
 
-  const decodeWeatherCode = (code) => {
-    const icons = {
+  const decodeWeatherCode = (code: number) => {
+    const icons: Record<number, string> = {
       0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
       51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
       71: '🌨️', 73: '🌨️', 75: '❄️', 80: '🌦️', 81: '🌧️', 82: '⛈️',
       95: '⛈️', 96: '⛈️', 99: '⛈️'
     }
-    return { icon: icons[code] || '🌡️', desc: t.weather[code] || 'Unknown' }
+    return { icon: icons[code] || '🌡️', desc: (t.weather as any)[code] || 'Unknown' }
   }
 
-  const searchCities = async (query) => {
+  const searchCities = async (query: string) => {
     if (query.length < 2) { setSuggestions([]); return }
     try {
       const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
@@ -354,13 +376,13 @@ const WeatherApp = () => {
     } catch (e) { setSuggestions([]) }
   }
 
-  const handleSearchInput = (val) => {
+  const handleSearchInput = (val: string) => {
     setSearchInput(val)
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => searchCities(val), 300)
   }
 
-  const selectCity = (result) => {
+  const selectCity = (result: any) => {
     const name = result.name + (result.country ? ', ' + result.country : '')
     setCity(name)
     setCoords({ lat: result.latitude, lon: result.longitude })
@@ -368,63 +390,72 @@ const WeatherApp = () => {
     setSuggestions([])
     setSelectedDay(null)
     setSelectedHour(null)
-    setExactLocation(null)
+    setExactLocation(null) 
   }
 
-  const formatTime = (isoString) => {
-    if (!isoString) return '--:--'
-    const date = new Date(isoString)
-    return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+  const formatTime = (isoString: string) => {
+    if (!isoString) return '--:--';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-  const fetchWeather = async (lat, lon) => {
+  const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
     setError(null)
     try {
-      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' +
-        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' +
-        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' +
-        '&timezone=auto&forecast_days=15'
+      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
+        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
+        '&timezone=auto&forecast_days=15';
 
-      const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon +
-        '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15'
+      const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
+        '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15';
 
-      const aqiUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + lat + '&longitude=' + lon +
-        '&current=european_aqi,pm10,pm2_5&hourly=european_aqi&timezone=auto&forecast_days=3'
+      const aqiUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + lat + '&longitude=' + lon + 
+        '&current=european_aqi,pm10,pm2_5&hourly=european_aqi&timezone=auto&forecast_days=3';
 
       const [weatherRes, marineRes, aqiRes] = await Promise.allSettled([
-        fetch(weatherUrl), fetch(marineUrl), fetch(aqiUrl)
+        fetch(weatherUrl),
+        fetch(marineUrl),
+        fetch(aqiUrl)
       ])
-
-      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error()
+      
+      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error('Моля проверете връзката си с интернет.')
       const data = await weatherRes.value.json()
 
-      let seaTemp = null, hourlySeaTemp = []
+      let seaTemp = null
+      let hourlySeaTemp: any[] = []
       if (marineRes.status === 'fulfilled' && marineRes.value.ok) {
         try {
           const marineData = await marineRes.value.json()
-          if (marineData.current && marineData.current.sea_surface_temperature != null)
+          if (marineData.current && marineData.current.sea_surface_temperature != null) {
             seaTemp = Math.round(marineData.current.sea_surface_temperature)
-          if (marineData.hourly && marineData.hourly.sea_surface_temperature)
+          }
+          if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
             hourlySeaTemp = marineData.hourly.sea_surface_temperature
+          }
         } catch (e) {}
       }
 
-      let currentAqi = null, currentPm10 = null, currentPm25 = null, hourlyAqi = []
+      let currentAqi = null, currentPm10 = null, currentPm25 = null;
+      let hourlyAqi: any[] = [];
       if (aqiRes.status === 'fulfilled' && aqiRes.value.ok) {
         try {
-          const aqiData = await aqiRes.value.json()
+          const aqiData = await aqiRes.value.json();
           if (aqiData.current) {
-            currentAqi = Math.round(aqiData.current.european_aqi)
-            currentPm10 = aqiData.current.pm10
-            currentPm25 = aqiData.current.pm2_5
+            currentAqi = Math.round(aqiData.current.european_aqi);
+            currentPm10 = aqiData.current.pm10;
+            currentPm25 = aqiData.current.pm2_5;
           }
-          if (aqiData.hourly && aqiData.hourly.european_aqi) hourlyAqi = aqiData.hourly.european_aqi
+          if (aqiData.hourly && aqiData.hourly.european_aqi) {
+            hourlyAqi = aqiData.hourly.european_aqi;
+          }
         } catch (e) {}
       }
 
       const cur = decodeWeatherCode(data.current.weather_code)
+      
       setWeather({
         temp: Math.round(data.current.temperature_2m),
         minTemp: Math.round(data.daily.temperature_2m_min[0]),
@@ -442,8 +473,12 @@ const WeatherApp = () => {
         sunrise: data.daily.sunrise && data.daily.sunrise[0] ? formatTime(data.daily.sunrise[0]) : '--:--',
         sunset: data.daily.sunset && data.daily.sunset[0] ? formatTime(data.daily.sunset[0]) : '--:--',
         code: data.current.weather_code,
-        seaTemp, description: cur.desc, icon: cur.icon,
-        aqi: currentAqi, pm10: currentPm10, pm25: currentPm25
+        seaTemp: seaTemp,
+        description: cur.desc,
+        icon: cur.icon,
+        aqi: currentAqi,
+        pm10: currentPm10,
+        pm25: currentPm25
       })
 
       const now = new Date()
@@ -451,16 +486,17 @@ const WeatherApp = () => {
         String(now.getMonth() + 1).padStart(2, '0') + '-' +
         String(now.getDate()).padStart(2, '0') + 'T' +
         String(now.getHours()).padStart(2, '0')
-      let startIdx = data.hourly.time.findIndex((time) => time.slice(0, 13) === localISO)
+      let startIdx = data.hourly.time.findIndex((time: string) => time.slice(0, 13) === localISO)
       if (startIdx === -1) startIdx = 0
 
-      const hr = []
+      const hr: any[] = []
       for (let i = 0; i < 24; i++) {
         const idx = startIdx + i
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
         const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
         const aqiVal = hourlyAqi.length > idx ? hourlyAqi[idx] : null
+        
         hr.push({
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
@@ -479,28 +515,35 @@ const WeatherApp = () => {
       }
       setHourly(hr)
 
-      const days = []
+      const days: any[] = []
       for (let i = 1; i < Math.min(15, data.daily.time.length); i++) {
         const d = new Date(data.daily.time[i])
         const code = decodeWeatherCode(data.daily.weather_code[i])
-        let sumHum = 0, sumPress = 0, sumVis = 0, sumDew = 0, sumCloud = 0, sumSea = 0
-        let count = 0, seaCount = 0
-        const startH = i * 24
-        for (let h = startH; h < startH + 24; h++) {
+        
+        let sumHum = 0, sumPress = 0, sumVis = 0, sumDew = 0, sumCloud = 0, sumSea = 0;
+        let count = 0, seaCount = 0;
+        const startH = i * 24;
+        
+        for(let h = startH; h < startH + 24; h++) {
           if (data.hourly && h < data.hourly.time.length) {
-            sumHum += data.hourly.relative_humidity_2m[h] || 0
-            sumPress += data.hourly.surface_pressure[h] || 0
-            sumVis += data.hourly.visibility[h] || 0
-            sumDew += data.hourly.dew_point_2m[h] || 0
-            sumCloud += data.hourly.cloud_cover[h] || 0
-            count++
-            if (hourlySeaTemp.length > h && hourlySeaTemp[h] !== null) { sumSea += hourlySeaTemp[h]; seaCount++ }
+            sumHum += data.hourly.relative_humidity_2m[h] || 0;
+            sumPress += data.hourly.surface_pressure[h] || 0;
+            sumVis += data.hourly.visibility[h] || 0;
+            sumDew += data.hourly.dew_point_2m[h] || 0;
+            sumCloud += data.hourly.cloud_cover[h] || 0;
+            count++;
+            
+            if (hourlySeaTemp.length > h && hourlySeaTemp[h] !== null) {
+               sumSea += hourlySeaTemp[h];
+               seaCount++;
+            }
           }
         }
+
         days.push({
           dateStr: data.daily.time[i],
-          dayName: t.weekDays[d.getDay()],
-          dateFormatted: d.getDate() + ' ' + t.months[d.getMonth()],
+          dayName: (t.weekDays as any)[d.getDay()],
+          dateFormatted: `${d.getDate()} ${(t.months as any)[d.getMonth()]}`,
           max: Math.round(data.daily.temperature_2m_max[i]),
           min: Math.round(data.daily.temperature_2m_min[i]),
           feelsLikeMax: Math.round(data.daily.apparent_temperature_max[i] || data.daily.temperature_2m_max[i]),
@@ -522,10 +565,15 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      const cityNameForImage = city.split(',')[0].trim()
-      const timestamp = new Date().getTime()
-      setBgImageUrl('https://source.unsplash.com/1200x800/?' + encodeURIComponent(cityNameForImage + ' city landmark') + '&t=' + timestamp)
-    } catch (e) {
+      // ЗАЩИТЕН КАТАЛОГ СЪС СНИМКИ
+      const cityNameForImage = city.split(',')[0].trim();
+      const timestamp = new Date().getTime();
+      const prompt = encodeURIComponent(`Beautiful city landscape photography of ${cityNameForImage} architecture daytime 8k resolution`);
+      
+      setBgImageUrl(`https://image.pollinations.ai/prompt/${prompt}?width=1200&height=800&nologo=true&seed=${timestamp}`);
+
+    } catch (e: any) {
+      console.error(e);
       setError(t.error)
       setLoading(false)
     }
@@ -543,54 +591,94 @@ const WeatherApp = () => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
-          const res = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&accept-language=' + lang + '&zoom=18')
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=18`)
           const data = await res.json()
-          const address = data.address
-          const mainCity = address.city || address.town || address.village || address.county || t.myLocation
-          setCity(mainCity)
-          const exactDetails = []
-          const street = address.road || address.pedestrian || address.street
-          if (street) exactDetails.push(street)
-          if (address.house_number) exactDetails.push(address.house_number)
-          if (exactDetails.length === 0) {
-            const neighborhood = address.suburb || address.neighbourhood || address.city_district
-            if (neighborhood) exactDetails.push(neighborhood)
+          
+          const address = data.address;
+          const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
+          setCity(mainCity);
+
+          const exactDetails = [];
+          const street = address.road || address.pedestrian || address.street;
+          
+          if (street) {
+            exactDetails.push(street);
           }
-          setExactLocation(exactDetails.length > 0 ? exactDetails.join(' ') : null)
+          if (address.house_number) {
+            exactDetails.push(address.house_number);
+          }
+          
+          if (exactDetails.length === 0) {
+            const neighborhood = address.suburb || address.neighbourhood || address.city_district;
+            if (neighborhood) exactDetails.push(neighborhood);
+          }
+          
+          if (exactDetails.length > 0) {
+            setExactLocation(exactDetails.join(' '));
+          } else {
+            setExactLocation(null);
+          }
+
         } catch (e) { setCity(t.myLocation) }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
 
-  const activeAlerts = []
+  const activeAlerts = [];
   if (weather) {
-    if (weather.temp >= 35) activeAlerts.push({ icon: '🔥', text: t.highTemp })
-    if (weather.temp <= -5) activeAlerts.push({ icon: '❄️', text: t.lowTemp })
-    if (weather.windSpeed >= 65) activeAlerts.push({ icon: '⚠️', text: t.highWind })
-    if (weather.uvIndex >= 8) activeAlerts.push({ icon: '☀️', text: t.highUv })
-    if ([95, 96, 99].includes(weather.code)) activeAlerts.push({ icon: '⚡', text: t.storm })
-    if (weather.code === 75) activeAlerts.push({ icon: '🌨️', text: t.heavySnow })
-    if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: t.heavyRain })
+    if (weather.temp >= 35) activeAlerts.push({ icon: '🔥', text: (t as any).highTemp });
+    if (weather.temp <= -5) activeAlerts.push({ icon: '❄️', text: (t as any).lowTemp });
+    if (weather.windSpeed >= 65) activeAlerts.push({ icon: '⚠️', text: (t as any).highWind });
+    if (weather.uvIndex >= 8) activeAlerts.push({ icon: '☀️', text: (t as any).highUv });
+    if ([95, 96, 99].includes(weather.code)) activeAlerts.push({ icon: '⚡', text: (t as any).storm });
+    if (weather.code === 75) activeAlerts.push({ icon: '🌨️', text: (t as any).heavySnow });
+    if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
   }
 
-  const openPopup = (e, item) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    let x = rect.left + (rect.width / 2) - 150
-    let y = rect.top - 320
-    if (x < 10) x = 10
-    if (x + 300 > window.innerWidth - 10) x = window.innerWidth - 310
-    if (y < 10) y = rect.bottom + 15
-    setPopupPos({ x, y })
-    setDetailTab('main')
-    return { x, y }
+  const openPopup = (e: any, item: any) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    let x = rect.left + (rect.width / 2) - 150;
+    let y = rect.top - 320;
+    if (x < 10) x = 10;
+    if (x + 300 > window.innerWidth - 10) x = window.innerWidth - 310;
+    if (y < 10) y = rect.bottom + 15;
+    setPopupPos({ x, y });
+    setDetailTab('main');
   }
 
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
+      <style>{`
+        @media (min-width: 1100px) {
+          .main-card .stats-grid {
+            grid-template-columns: repeat(7, 1fr) !important;
+          }
+        }
+        @media (max-width: 1099px) and (min-width: 768px) {
+          .main-card .stats-grid {
+            grid-template-columns: repeat(4, 1fr) !important;
+          }
+        }
+        .popup-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        .popup-grid .stat-box {
+           background: #f1f5f9;
+           box-shadow: none;
+           color: #1e293b;
+        }
+        .weather-app.dark .popup-grid .stat-box {
+           background: rgba(255,255,255,0.1);
+           color: #ffffff;
+        }
+      `}</style>
+
       <div className="header-row">
-        <div className="header-title-wrapper">
+        <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
           <h1>{t.title}</h1>
-          <p className="subtitle">{t.subtitle}</p>
+          <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
           <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
@@ -625,16 +713,19 @@ const WeatherApp = () => {
 
       <div className="city-row">
         {favoriteCity && (
-          <button onClick={() => { setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }); setExactLocation(null) }}
-            className={city === favoriteCity.name ? 'city-btn fav-btn active' : 'city-btn fav-btn'}>
+          <button 
+            onClick={() => { setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }); setExactLocation(null); }}
+            className={city === favoriteCity.name ? 'city-btn fav-btn active' : 'city-btn fav-btn'}
+          >
             ⭐ {favoriteCity.name}
           </button>
         )}
-        {t.quickCities.map((c) => {
-          if (favoriteCity && favoriteCity.name === c.name) return null
+        
+        {t.quickCities.map((c: any) => {
+          if (favoriteCity && favoriteCity.name === c.name) return null;
           return (
             <button key={c.name}
-              onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null) }}
+              onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -657,7 +748,7 @@ const WeatherApp = () => {
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
                 <div key={idx} className="alert-item">
-                  <span style={{ fontSize: '1.8rem' }}>{alert.icon}</span>
+                  <span style={{fontSize: '1.8rem'}}>{alert.icon}</span>
                   <span>{alert.text}</span>
                 </div>
               ))}
@@ -665,27 +756,55 @@ const WeatherApp = () => {
           )}
 
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
+            
             {bgImageUrl && (
-              <img src={bgImageUrl} alt="City Background" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+              <img 
+                src={bgImageUrl} 
+                alt="" 
+                onError={(e) => {
+                  const backupTime = new Date().getTime();
+                  e.currentTarget.src = `https://loremflickr.com/1200/800/city,architecture?lock=${backupTime}`;
+                }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 0
+                }} 
+              />
             )}
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: getDynamicOverlay(weather.temp), zIndex: 1 }}></div>
+
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: getDynamicOverlay(weather.temp),
+              zIndex: 1
+            }}></div>
+
             <div style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
+              
               <div className="main-top" style={{ padding: 0, marginBottom: '24px' }}>
                 <div className="main-info-left">
                   <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
                     <span>📍 {city}</span>
                     {exactLocation && (
-                      <span style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal' }}>
-                        <span style={{ opacity: 0.5, margin: '0 4px' }}>|</span> 🎯 {exactLocation}
+                      <span style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
                       </span>
                     )}
-                    <button onClick={toggleFavorite} className="star-btn" title={t.favorite}>
-                      {favoriteCity && favoriteCity.name === city ? '⭐' : '☆'}
+                    <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
+                      {favoriteCity?.name === city ? '⭐' : '☆'}
                     </button>
                   </h2>
                   <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
                   {lastUpdated && (
-                    <p style={{ fontSize: '0.85rem', opacity: 0.75 }}>
+                    <p style={{ fontSize: '0.85rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: '5px' }}>
                       🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}
@@ -693,6 +812,7 @@ const WeatherApp = () => {
                 </div>
                 <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
               </div>
+              
               <div className="stats-grid" style={{ padding: 0 }}>
                 <div className="stat-box"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
@@ -711,6 +831,7 @@ const WeatherApp = () => {
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
                 )}
               </div>
+
             </div>
           </div>
 
@@ -757,14 +878,14 @@ const WeatherApp = () => {
           {weather.aqi !== null && weather.aqi !== undefined && (
             <div className="card">
               <h3>🍃 {t.airQuality}</h3>
-              <div className="stats-grid" style={{ marginBottom: '24px' }}>
-                <div className="stat-box"><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
-                <div className="stat-box"><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
-                <div className="stat-box"><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
+              <div className="stats-grid" style={{ marginBottom: '16px' }}>
+                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
+                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
+                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
               </div>
-             <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
-  <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" />
-</div>
+              <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
+                <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} />
+              </div>
             </div>
           )}
         </div>
@@ -772,7 +893,7 @@ const WeatherApp = () => {
 
       {selectedDay && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
-          <div className="card popup-card" style={{ background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
               <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedDay(null)}>❌</button>
@@ -813,7 +934,7 @@ const WeatherApp = () => {
 
       {selectedHour && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedHour(null)}>
-          <div className="card popup-card" style={{ background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
               <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedHour(null)}>❌</button>
