@@ -564,12 +564,9 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      // КАТАЛОГ СЪС СНИМКИ ОТ КОНКРЕТНИЯ ГРАД
-      const cityNameForImage = city.split(',')[0].trim();
-      const timestamp = new Date().getTime();
-      
-      // Използваме стабилния Flickr каталог, но този път ИЗИСКВАМЕ името на града!
-      setBgImageUrl(`https://loremflickr.com/1200/800/${encodeURIComponent(cityNameForImage)},city,landmark?lock=${timestamp}`);
+      // ОГРОМЕН РАЗНООБРАЗЕН КАТАЛОГ С ГОЛЕМИ ГРАДСКИ И АРХИТЕКТУРНИ КАТЕГОРИИ
+      const randomId = Math.floor(Math.random() * 1000) + 1;
+      setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
 
     } catch (e: any) {
       console.error(e);
@@ -760,12 +757,6 @@ const WeatherApp = () => {
               <img 
                 src={bgImageUrl} 
                 alt="" 
-                onError={(e) => {
-                  const backupTime = new Date().getTime();
-                  const cityFallback = city.split(',')[0].trim();
-                  // Дори резервната снимка вече търси града
-                  e.currentTarget.src = `https://loremflickr.com/1200/800/${encodeURIComponent(cityFallback)},architecture?lock=${backupTime}`;
-                }}
                 style={{
                   position: 'absolute',
                   top: 0,
