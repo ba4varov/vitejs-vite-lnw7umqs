@@ -632,6 +632,20 @@ const WeatherApp = () => {
 
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
+      {/* СТИЛОВЕ ЗА РАВНОМЕРНИТЕ 2 РЕДА В ГЛАВНАТА КАРТА */}
+      <style>{`
+        @media (min-width: 1100px) {
+          .main-card .stats-grid {
+            grid-template-columns: repeat(7, 1fr) !important;
+          }
+        }
+        @media (max-width: 1099px) and (min-width: 768px) {
+          .main-card .stats-grid {
+            grid-template-columns: repeat(4, 1fr) !important;
+          }
+        }
+      `}</style>
+
       <div className="header-row">
         <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
           <h1>{t.title}</h1>
