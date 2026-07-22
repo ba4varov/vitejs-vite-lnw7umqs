@@ -26,6 +26,7 @@ const translations = {
     hpa: 'hPa',
     hours24: '⏰ Следващите 24 часа',
     days14: '📅 Прогноза за 14 дни',
+    interactiveMap: 'Жива метеорологична карта',
     myLocation: 'Моето местоположение',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
     chart: '📊 Графики за 24 часа',
@@ -102,6 +103,7 @@ const translations = {
     hpa: 'hPa',
     hours24: '⏰ Next 24 Hours',
     days14: '📅 14-Day Forecast',
+    interactiveMap: 'Live Weather Map',
     myLocation: 'My Location',
     error: 'Failed to load weather data. Please try again.',
     chart: '📊 24-Hour Charts',
@@ -564,7 +566,6 @@ const WeatherApp = () => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      // ОГРОМЕН РАЗНООБРАЗЕН КАТАЛОГ С ГОЛЕМИ ГРАДСКИ И АРХИТЕКТУРНИ КАТЕГОРИИ
       const randomId = Math.floor(Math.random() * 1000) + 1;
       setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
 
@@ -864,6 +865,21 @@ const WeatherApp = () => {
                   <p className="day-wind">🌬️ {day.wind}{t.windUnit}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* ИНТЕРАКТИВНА КАРТА WINDY */}
+          <div className="card">
+            <h3>🌍 {t.interactiveMap}</h3>
+            <div style={{ borderRadius: '12px', overflow: 'hidden', marginTop: '16px', background: darkMode ? '#1e293b' : '#f1f5f9' }}>
+              <iframe
+                width="100%"
+                height="450"
+                src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`}
+                frameBorder="0"
+                title="Windy Map"
+                style={{ display: 'block' }}
+              ></iframe>
             </div>
           </div>
 
