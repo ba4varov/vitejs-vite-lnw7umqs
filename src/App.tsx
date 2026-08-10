@@ -411,7 +411,7 @@ const WeatherApp = () => {
     try {
       const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
       
-      const prompt = `Ти си приятелски настроен и забавен метеоролог. Твоята задача е да анализираш подадените метеорологични данни за температура, вятър, влажност и град, след което да генерираш точно едно кратко изречение с практичен и полезен съвет за деня. Тонът ти трябва да бъде свеж, земен и позитивен, все едно си говориш с приятел. Абсолютно задължително е всяко едно твое съобщение да завършва точно с тази фраза: Всичко е СМЯХ и ЛЮБОВ! Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко е СМЯХ и ЛЮБОВ!`;
+      const prompt = `Ти си приятелски настроен и забавен метеоролог. Твоята задача е да анализираш тези метеорологични данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Генерирай точно едно кратко изречение с практичен и полезен съвет за деня. Тонът ти трябва да бъде свеж, земен и позитивен. Абсолютно задължително е да завършиш съвета с фразата: Всичко Е СМЯХ и ЛЮБОВ`;
       
       const response = await fetch(url, {
         method: "POST",
@@ -420,6 +420,13 @@ const WeatherApp = () => {
       });
       
       const data = await response.json();
+      
+      // Проверка за грешка с ключа или заявката
+      if (data.error) {
+        console.error("Грешка от Google API:", data.error.message);
+        return;
+      }
+
       if (data.candidates && data.candidates.length > 0) {
         setAiAdvice(data.candidates[0].content.parts[0].text);
       }
