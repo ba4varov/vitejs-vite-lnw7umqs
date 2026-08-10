@@ -342,7 +342,7 @@ const WeatherApp = () => {
   const t = translations[lang as keyof typeof translations]
 
   // Тук поставяме твоя ключ директно
-  const API_KEY = "AQ.Ab8RN6K9QbUsm9k0szXgEXQsJH0SS_l7EG3zybyA0ejfmIwAog";
+  const API_KEY = "AQ.Ab8RN6IdeifD-KWo0KnPtfy44F4BCdRvdtXCAoZZv2-O-4mqeg";
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
