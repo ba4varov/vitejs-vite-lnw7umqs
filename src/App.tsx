@@ -335,8 +335,14 @@ const WeatherApp = () => {
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
   const [detailTab, setDetailTab] = useState('main')
   
+  // Добавяме новото състояние за AI съвета
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null)
+  
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
+
+  // Тук поставяме твоя ключ директно
+  const API_KEY = "AQ.Ab8RN6K9QbUsm9k0szXgEXQsJH0SS_l7EG3zybyA0ejfmIwAog";
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
@@ -398,6 +404,28 @@ const WeatherApp = () => {
     if (!isoString) return '--:--';
     const date = new Date(isoString);
     return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Функцията, която взима съвет от Gemini
+  const fetchAiAdvice = async (dataForAi: any) => {
+    try {
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
+      
+      const prompt = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко е СМЯХ и ЛЮБОВ!`;
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      
+      const data = await response.json();
+      if (data.candidates && data.candidates.length > 0) {
+        setAiAdvice(data.candidates[0].content.parts[0].text);
+      }
+    } catch (err) {
+      console.error("Грешка при връзката с Gemini:", err);
+    }
   }
 
   const fetchWeather = async (lat: number, lon: number) => {
@@ -481,6 +509,14 @@ const WeatherApp = () => {
         pm10: currentPm10,
         pm25: currentPm25
       })
+
+      // Извикване на AI функцията с реални данни
+      fetchAiAdvice({
+        city: city,
+        temp: Math.round(data.current.temperature_2m),
+        wind: Math.round(data.current.wind_speed_10m),
+        humidity: data.current.relative_humidity_2m
+      });
 
       const now = new Date()
       const localISO = now.getFullYear() + '-' +
@@ -796,11 +832,20 @@ const WeatherApp = () => {
                     </button>
                   </h2>
                   <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>
+                  
                   {lastUpdated && (
                     <p style={{ fontSize: '0.85rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: '5px' }}>
                       🔄 {t.updated} {lastUpdated.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}
+                  
+                  {/* Тук се появява AI съветът от Gemini */}
+                  {aiAdvice && (
+                    <div style={{ marginTop: '12px', marginBottom: '12px', padding: '12px 16px', background: 'rgba(255,255,255,0.15)', borderRadius: '8px', fontStyle: 'italic', fontSize: '0.95rem', lineHeight: '1.4' }}>
+                      🤖 <strong>Метео съвет:</strong> {aiAdvice}
+                    </div>
+                  )}
+
                   <div className="big-temp">{weather.temp}°C</div>
                 </div>
                 <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
@@ -868,7 +913,6 @@ const WeatherApp = () => {
             </div>
           </div>
 
-          {/* ИНТЕРАКТИВНА КАРТА WINDY */}
           <div className="card">
             <h3>🌍 {t.interactiveMap}</h3>
             <div style={{ borderRadius: '12px', overflow: 'hidden', marginTop: '16px', background: darkMode ? '#1e293b' : '#f1f5f9' }}>
