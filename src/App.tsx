@@ -405,52 +405,36 @@ const WeatherApp = () => {
     return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-// Функцията, която взима съвет от Gemini
+// Локална функция, която генерира светкавичен съвет без външни сървъри
   const fetchAiAdvice = async (dataForAi: any) => {
-    if (!API_KEY) {
-      console.error("Ключът липсва от Vercel!");
-      setAiAdvice(lang === 'bg' ? "Изчаквам връзка със синоптика..." : "Waiting for connection with the forecaster...");
-      return;
-    }
-    
-    // Моментална промяна на текста при ново търсене
-    setAiAdvice(lang === 'bg' ? "Генериране на нов съвет..." : "Generating new advice...");
+    const temp = parseFloat(dataForAi.temp);
+    const wind = parseFloat(dataForAi.wind);
+    let advice = "";
 
-    try {
-      // ИЗПОЛЗВАМЕ 1.5-flash, ЗАЩОТО ПОЗВОЛЯВА 15 ЗАЯВКИ В МИНУТА
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + API_KEY;
-      const promptBg = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
-      
-      const promptEn = `You are a funny meteorologist. Write 1 short, friendly sentence with advice for the day based on this weather data: City: ${dataForAi.city}, Temperature: ${dataForAi.temp}°C, Wind: ${dataForAi.wind} km/h, Humidity: ${dataForAi.humidity}%. Always end your sentence exactly with the phrase: Everything is LAUGHTER and LOVE!`;
-      
-      const finalPrompt = lang === 'en' ? promptEn : promptBg;
-      
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] })
-      });
-      
-      const data = await response.json();
-      
-      // Защита, ако случайно превишим дори 15-те заявки на минута
-      if (data.error) {
-        console.error("Грешка от Google:", data.error.message);
-        setAiAdvice(lang === 'bg' 
-          ? "Синоптикът си поема дъх. Изчакай малко и избери друг град!" 
-          : "The forecaster is taking a breath. Wait a bit and try again!");
-        return;
-      }
-
-      if (data.candidates && data.candidates.length > 0) {
-        setAiAdvice(data.candidates[0].content.parts[0].text);
+    if (lang === 'bg') {
+      if (temp >= 28) {
+        advice = `С тези тропически ${temp}°C, грабвайте банските и бягайте към плажа, защото в град ${dataForAi.city} днес работата е забранена! И не забравяйте - Всичко Е СМЯХ и ЛЮБОВ!`;
+      } else if (temp <= 10) {
+        advice = `Бррр, в град ${dataForAi.city} си е направо хладилник с тези ${temp}°C! Обличайте дебелите якета, пийте топъл чай и помнете - Всичко Е СМЯХ и ЛЮБОВ!`;
+      } else if (wind >= 20) {
+        advice = `Дръжте си здраво шапките, че в ${dataForAi.city} духа с ${wind} км/ч! Но дори и да ви отвее вятърът, Всичко Е СМЯХ и ЛЮБОВ!`;
       } else {
-        setAiAdvice(lang === 'bg' ? "Синоптикът остана без думи!" : "The forecaster is speechless!");
+        advice = `Времето в град ${dataForAi.city} е направо приказка с тези приятни ${temp}°C. Излизайте навън да се радвате на живота, защото Всичко Е СМЯХ и ЛЮБОВ!`;
       }
-    } catch (err) {
-      console.error("Грешка при връзката с Gemini:", err);
-      setAiAdvice(lang === 'bg' ? "Грешка при връзката със синоптика." : "Error connecting to the forecaster.");
+    } else {
+      if (temp >= 28) {
+        advice = `With these tropical ${temp}°C, grab your swimsuits and head to the beach, because work is forbidden in ${dataForAi.city} today! And remember - Everything is LAUGHTER and LOVE!`;
+      } else if (temp <= 10) {
+        advice = `Brrr, ${dataForAi.city} is a literal fridge with these ${temp}°C! Put on your thick jackets, drink some hot tea, and remember - Everything is LAUGHTER and LOVE!`;
+      } else if (wind >= 20) {
+        advice = `Hold onto your hats, the wind in ${dataForAi.city} is blowing at ${wind} km/h! But even if you get blown away, Everything is LAUGHTER and LOVE!`;
+      } else {
+        advice = `The weather in ${dataForAi.city} is an absolute dream with these pleasant ${temp}°C. Go outside and enjoy life, because Everything is LAUGHTER and LOVE!`;
+      }
     }
+
+    // Текстът се зарежда на секундата, без забавяне
+    setAiAdvice(advice);
   }
   const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
