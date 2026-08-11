@@ -413,7 +413,7 @@ const WeatherApp = () => {
       return;
     }
     
-    // Моментална промяна на текста при ново търсене или смяна на език
+    // Моментална промяна на текста при ново търсене
     setAiAdvice(lang === 'bg' ? "Генериране на нов съвет..." : "Generating new advice...");
 
     try {
@@ -432,8 +432,20 @@ const WeatherApp = () => {
       });
       
       const data = await response.json();
+      
+      // Проверка за вътрешни грешки от сървъра на Google (напр. претоварване от бързо цъкане)
+      if (data.error) {
+        console.error("Грешка от Google:", data.error.message);
+        setAiAdvice(lang === 'bg' 
+          ? "Синоптикът се задъха от бързи въпроси. Изчакай секунда и натисни 'Нов съвет'!" 
+          : "The forecaster needs a quick break. Wait a second and try again!");
+        return;
+      }
+
       if (data.candidates && data.candidates.length > 0) {
         setAiAdvice(data.candidates[0].content.parts[0].text);
+      } else {
+        setAiAdvice(lang === 'bg' ? "Синоптикът остана без думи!" : "The forecaster is speechless!");
       }
     } catch (err) {
       console.error("Грешка при връзката с Gemini:", err);
