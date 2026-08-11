@@ -412,6 +412,10 @@ const WeatherApp = () => {
       setAiAdvice(lang === 'bg' ? "Изчаквам връзка със синоптика..." : "Waiting for connection with the forecaster...");
       return;
     }
+    
+    // Моментална промяна на текста при ново търсене или смяна на език
+    setAiAdvice(lang === 'bg' ? "Генериране на нов съвет..." : "Generating new advice...");
+
     try {
       const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + API_KEY;
       
@@ -433,9 +437,9 @@ const WeatherApp = () => {
       }
     } catch (err) {
       console.error("Грешка при връзката с Gemini:", err);
+      setAiAdvice(lang === 'bg' ? "Грешка при връзката със синоптика." : "Error connecting to the forecaster.");
     }
   }
-
   const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
     setError(null)
@@ -847,10 +851,10 @@ const WeatherApp = () => {
                     </p>
                   )}
                   
-                  {/* Тук се появява AI съветът от Gemini */}
+                 {/* Тук се появява AI съветът от Gemini */}
                   {aiAdvice && (
                     <div style={{ marginTop: '12px', marginBottom: '12px', padding: '12px 16px', background: 'rgba(255,255,255,0.15)', borderRadius: '8px', fontStyle: 'italic', fontSize: '0.95rem', lineHeight: '1.4' }}>
-                      🤖 <strong>Метео съвет:</strong> {aiAdvice}
+                      🤖 <strong>{lang === 'bg' ? 'Метео съвет:' : 'Meteo advice:'}</strong> {aiAdvice}
                     </div>
                   )}
 
