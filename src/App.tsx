@@ -417,7 +417,7 @@ const WeatherApp = () => {
     setAiAdvice(lang === 'bg' ? "Генериране на нов съвет..." : "Generating new advice...");
 
     try {
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + API_KEY;
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=" + API_KEY;
       
       const promptBg = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
       
