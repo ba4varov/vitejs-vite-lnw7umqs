@@ -418,7 +418,7 @@ const WeatherApp = () => {
 
     try {
       // ИЗПОЛЗВАМЕ 1.5-flash, ЗАЩОТО ПОЗВОЛЯВА 15 ЗАЯВКИ В МИНУТА
-     const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + API_KEY;
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + API_KEY;
       const promptBg = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
       
       const promptEn = `You are a funny meteorologist. Write 1 short, friendly sentence with advice for the day based on this weather data: City: ${dataForAi.city}, Temperature: ${dataForAi.temp}°C, Wind: ${dataForAi.wind} km/h, Humidity: ${dataForAi.humidity}%. Always end your sentence exactly with the phrase: Everything is LAUGHTER and LOVE!`;
