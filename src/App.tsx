@@ -405,36 +405,81 @@ const WeatherApp = () => {
     return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-// Локална функция, която генерира светкавичен съвет без външни сървъри
+// Локална функция с голямо разнообразие от светкавични съвети
   const fetchAiAdvice = async (dataForAi: any) => {
     const temp = parseFloat(dataForAi.temp);
     const wind = parseFloat(dataForAi.wind);
-    let advice = "";
+    let adviceBg = "";
+    let adviceEn = "";
 
-    if (lang === 'bg') {
-      if (temp >= 28) {
-        advice = `С тези тропически ${temp}°C, грабвайте банските и бягайте към плажа, защото в град ${dataForAi.city} днес работата е забранена! И не забравяйте - Всичко Е СМЯХ и ЛЮБОВ!`;
-      } else if (temp <= 10) {
-        advice = `Бррр, в град ${dataForAi.city} си е направо хладилник с тези ${temp}°C! Обличайте дебелите якета, пийте топъл чай и помнете - Всичко Е СМЯХ и ЛЮБОВ!`;
-      } else if (wind >= 20) {
-        advice = `Дръжте си здраво шапките, че в ${dataForAi.city} духа с ${wind} км/ч! Но дори и да ви отвее вятърът, Всичко Е СМЯХ и ЛЮБОВ!`;
-      } else {
-        advice = `Времето в град ${dataForAi.city} е направо приказка с тези приятни ${temp}°C. Излизайте навън да се радвате на живота, защото Всичко Е СМЯХ и ЛЮБОВ!`;
-      }
+    // Функция за избиране на случайна фраза от списък
+    const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+    // Варианти за ЖЕГА (над 28 градуса)
+    const hotBg = [
+      `С тези тропически ${temp}°C, грабвайте банските и бягайте към плажа, защото в град ${dataForAi.city} днес работата е забранена! И не забравяйте - Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Време е за сладолед и студени напитки! В ${dataForAi.city} жегата е сериозна (${temp}°C), затова се пазете от слънцето, защото Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Слагайте слънчевите очила! При ${temp}°C в ${dataForAi.city} асфалтът се топи, но настроението е на макс. Всичко Е СМЯХ и ЛЮБОВ!`
+    ];
+    const hotEn = [
+      `With these tropical ${temp}°C, grab your swimsuits and head to the beach, because work is forbidden in ${dataForAi.city} today! And remember - Everything is LAUGHTER and LOVE!`,
+      `Time for ice cream and cold drinks! The heat in ${dataForAi.city} is serious (${temp}°C), so stay out of the sun, because Everything is LAUGHTER and LOVE!`,
+      `Put on your sunglasses! At ${temp}°C in ${dataForAi.city} the asphalt is melting, but the mood is great. Everything is LAUGHTER and LOVE!`
+    ];
+
+    // Варианти за СТУД (под 10 градуса)
+    const coldBg = [
+      `Бррр, в град ${dataForAi.city} си е направо хладилник с тези ${temp}°C! Обличайте дебелите якета, пийте топъл чай и помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Време е да извадите плетените чорапи! Навън в ${dataForAi.city} е едва ${temp}°C. Стоплете се с усмивка, защото Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Пингвините в ${dataForAi.city} днес празнуват при тези ${temp}°C! Завийте се добре и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`
+    ];
+    const coldEn = [
+      `Brrr, ${dataForAi.city} is a literal fridge with these ${temp}°C! Put on your thick jackets, drink some hot tea, and remember - Everything is LAUGHTER and LOVE!`,
+      `Time to get those knitted socks out! It's only ${temp}°C outside in ${dataForAi.city}. Warm up with a smile, because Everything is LAUGHTER and LOVE!`,
+      `The penguins in ${dataForAi.city} are celebrating today at these ${temp}°C! Bundle up and remember that Everything is LAUGHTER and LOVE!`
+    ];
+
+    // Варианти за СИЛЕН ВЯТЪР (над 20 км/ч)
+    const windyBg = [
+      `Дръжте си здраво шапките, че в ${dataForAi.city} духа с цели ${wind} км/ч! Но дори и да ви отвее вятърът, Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Вятърът в ${dataForAi.city} днес е ${wind} км/ч. Идеално време за пускане на хвърчила! И помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
+      `С този вятър от ${wind} км/ч в ${dataForAi.city}, прическата ви няма шанс! Радвайте се на рошавия ден, защото Всичко Е СМЯХ и ЛЮБОВ!`
+    ];
+    const windyEn = [
+      `Hold onto your hats, the wind in ${dataForAi.city} is blowing at ${wind} km/h! But even if you get blown away, Everything is LAUGHTER and LOVE!`,
+      `The wind in ${dataForAi.city} today is at ${wind} km/h. Perfect weather for flying kites! And remember - Everything is LAUGHTER and LOVE!`,
+      `With this ${wind} km/h wind in ${dataForAi.city}, your hairstyle doesn't stand a chance! Enjoy the messy hair day, because Everything is LAUGHTER and LOVE!`
+    ];
+
+    // Варианти за ПЕРФЕКТНО ВРЕМЕ
+    const niceBg = [
+      `Времето в град ${dataForAi.city} е направо приказка с тези приятни ${temp}°C. Излизайте навън да се радвате на живота, защото Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Нито топло, нито студено – идеалните ${temp}°C в ${dataForAi.city}! Перфектният ден за дълга разходка. Всичко Е СМЯХ и ЛЮБОВ!`,
+      `Град ${dataForAi.city} ви очаква с прекрасни ${temp}°C! Усмихнете се на деня и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`
+    ];
+    const niceEn = [
+      `The weather in ${dataForAi.city} is an absolute dream with these pleasant ${temp}°C. Go outside and enjoy life, because Everything is LAUGHTER and LOVE!`,
+      `Neither hot nor cold – the perfect ${temp}°C in ${dataForAi.city}! A perfect day for a long walk. Everything is LAUGHTER and LOVE!`,
+      `${dataForAi.city} awaits you with a wonderful ${temp}°C! Smile at the day and remember that Everything is LAUGHTER and LOVE!`
+    ];
+
+    // Логика за избор според градусите и вятъра
+    if (temp >= 28) {
+      adviceBg = getRandom(hotBg);
+      adviceEn = getRandom(hotEn);
+    } else if (temp <= 10) {
+      adviceBg = getRandom(coldBg);
+      adviceEn = getRandom(coldEn);
+    } else if (wind >= 20) {
+      adviceBg = getRandom(windyBg);
+      adviceEn = getRandom(windyEn);
     } else {
-      if (temp >= 28) {
-        advice = `With these tropical ${temp}°C, grab your swimsuits and head to the beach, because work is forbidden in ${dataForAi.city} today! And remember - Everything is LAUGHTER and LOVE!`;
-      } else if (temp <= 10) {
-        advice = `Brrr, ${dataForAi.city} is a literal fridge with these ${temp}°C! Put on your thick jackets, drink some hot tea, and remember - Everything is LAUGHTER and LOVE!`;
-      } else if (wind >= 20) {
-        advice = `Hold onto your hats, the wind in ${dataForAi.city} is blowing at ${wind} km/h! But even if you get blown away, Everything is LAUGHTER and LOVE!`;
-      } else {
-        advice = `The weather in ${dataForAi.city} is an absolute dream with these pleasant ${temp}°C. Go outside and enjoy life, because Everything is LAUGHTER and LOVE!`;
-      }
+      adviceBg = getRandom(niceBg);
+      adviceEn = getRandom(niceEn);
     }
 
-    // Текстът се зарежда на секундата, без забавяне
-    setAiAdvice(advice);
+    // Зареждаме текста на секундата според избрания език
+    setAiAdvice(lang === 'bg' ? adviceBg : adviceEn);
   }
   const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
