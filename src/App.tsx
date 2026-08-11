@@ -417,7 +417,8 @@ const WeatherApp = () => {
     setAiAdvice(lang === 'bg' ? "Генериране на нов съвет..." : "Generating new advice...");
 
     try {
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=" + API_KEY;
+      // ИЗПОЛЗВАМЕ 1.5-flash, ЗАЩОТО ПОЗВОЛЯВА 15 ЗАЯВКИ В МИНУТА
+     const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
       
       const promptBg = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
       
@@ -433,12 +434,12 @@ const WeatherApp = () => {
       
       const data = await response.json();
       
-      // Проверка за вътрешни грешки от сървъра на Google (напр. претоварване от бързо цъкане)
+      // Защита, ако случайно превишим дори 15-те заявки на минута
       if (data.error) {
         console.error("Грешка от Google:", data.error.message);
         setAiAdvice(lang === 'bg' 
-          ? "Синоптикът се задъха от бързи въпроси. Изчакай секунда и натисни 'Нов съвет'!" 
-          : "The forecaster needs a quick break. Wait a second and try again!");
+          ? "Синоптикът си поема дъх. Изчакай малко и избери друг град!" 
+          : "The forecaster is taking a breath. Wait a bit and try again!");
         return;
       }
 
