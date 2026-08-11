@@ -413,7 +413,7 @@ const WeatherApp = () => {
       return;
     }
     try {
-      const url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + API_KEY;
       
       const prompt = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
       
