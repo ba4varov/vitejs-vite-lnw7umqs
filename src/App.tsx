@@ -967,13 +967,13 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{selectedDay.sunset}</p></div>
                 <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedDay.humidity}%</p></div>
                 <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{selectedDay.uv}</p></div>
-              <//>}
+              </>}
               {detailTab === 'atmosphere' && <>
                 <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedDay.pressure} {t.hpa}</p></div>
                 <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{selectedDay.visibility} {t.km}</p></div>
                 <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{selectedDay.cloudCover}%</p></div>
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedDay.dewPoint}°C</p></div>
-              <//>}
+              </>}
               {detailTab === 'water' && <>
                 <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedDay.rain} {t.mm}</p></div>
@@ -982,7 +982,7 @@ const WeatherApp = () => {
                 ) : (
                   <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
                 )}
-              <//>}
+              </>}
             </div>
           </div>
         </div>
@@ -1006,13 +1006,13 @@ const WeatherApp = () => {
                 <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike}°C</p></div>
                 <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity}%</p></div>
                 <div className="stat-box"><p>☁️</p><p className="label">Време</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
-              <//>}
+              </>}
               {detailTab === 'atmosphere' && <>
                 <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedHour.pressure} {t.hpa}</p></div>
                 <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{selectedHour.visibility} {t.km}</p></div>
                 <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{selectedHour.cloudCover}%</p></div>
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedHour.dewPoint}°C</p></div>
-              <//>}
+              </>}
               {detailTab === 'water' && <>
                 <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain} {t.mm}</p></div>
@@ -1021,7 +1021,7 @@ const WeatherApp = () => {
                 ) : (
                   <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
                 )}
-              <//>}
+              </>}
             </div>
           </div>
         </div>
