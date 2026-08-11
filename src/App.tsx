@@ -405,22 +405,26 @@ const WeatherApp = () => {
     return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Функцията, която взима съвет от Gemini
+// Функцията, която взима съвет от Gemini
   const fetchAiAdvice = async (dataForAi: any) => {
     if (!API_KEY) {
       console.error("Ключът липсва от Vercel!");
-      setAiAdvice("Изчаквам връзка със синоптика...");
+      setAiAdvice(lang === 'bg' ? "Изчаквам връзка със синоптика..." : "Waiting for connection with the forecaster...");
       return;
     }
     try {
       const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + API_KEY;
       
-      const prompt = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
+      const promptBg = `Ти си забавен метеоролог. Напиши 1 кратко, приятелско изречение със съвет за деня според тези данни: Град: ${dataForAi.city}, Температура: ${dataForAi.temp} градуса, Вятър: ${dataForAi.wind} км/ч, Влажност: ${dataForAi.humidity}%. Задължително завърши изречението си с фразата: Всичко Е СМЯХ и ЛЮБОВ!`;
+      
+      const promptEn = `You are a funny meteorologist. Write 1 short, friendly sentence with advice for the day based on this weather data: City: ${dataForAi.city}, Temperature: ${dataForAi.temp}°C, Wind: ${dataForAi.wind} km/h, Humidity: ${dataForAi.humidity}%. Always end your sentence exactly with the phrase: Everything is LAUGHTER and LOVE!`;
+      
+      const finalPrompt = lang === 'en' ? promptEn : promptBg;
       
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] })
       });
       
       const data = await response.json();
