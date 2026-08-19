@@ -532,8 +532,8 @@ const fetchAiAdvice = async (dataForAi: any) => {
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
 
-      const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
-        '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=15';
+     const marineUrl = 'https://marine-api.open-meteo.com/v1/marine?latitude=' + lat + '&longitude=' + lon + 
+        '&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=auto&forecast_days=8';
 
       const aqiUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + lat + '&longitude=' + lon + 
         '&current=european_aqi,pm10,pm2_5&hourly=european_aqi&timezone=auto&forecast_days=3';
