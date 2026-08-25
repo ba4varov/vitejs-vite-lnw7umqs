@@ -1,199 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
-
-const translations = {
-  bg: {
-    title: '🌤️ Доброто време с Боби',
-    subtitle: 'Твоят метео гид',
-    search: 'Търси град по целия свят...',
-    info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
-    loading: '⏳ Зареждане...',
-    tryAgain: 'Опитай отново',
-    favorite: 'Любим град',
-    humidity: 'Влажност',
-    wind: 'Вятър',
-    windUnit: 'км/ч',
-    updated: 'Обновено',
-    feelsLike: 'Усеща се като',
-    visibility: 'Видимост',
-    pressure: 'Налягане',
-    uvIndex: 'UV индекс',
-    seaTemp: 'Темп. на водата',
-    sunrise: 'Изгрев',
-    sunset: 'Залез',
-    noSeaData: 'няма данни',
-    km: 'км',
-    hpa: 'hPa',
-    hours24: '⏰ Следващите 24 часа',
-    days14: '📅 Прогноза за 14 дни',
-    interactiveMap: 'Жива метеорологична карта',
-    myLocation: 'Моето местоположение',
-    error: 'Неуспешно зареждане. Моля, опитайте отново.',
-    chart: '📊 Графики за 24 часа',
-    temp: 'Температура',
-    rain: 'Валежи',
-    windChart: 'Вятър',
-    pressureChart: 'Налягане',
-    mm: 'мм',
-    cloudCover: 'Облачност',
-    dewPoint: 'Точ. оросяване',
-    detailsFor: 'Подробности за',
-    tabMain: 'Основни',
-    tabAtmosphere: 'Атмосфера',
-    tabWaterWind: 'Вода и Вятър',
-    minMaxTemp: 'Мин / Макс Темп.',
-    precipProb: 'Вероятност валеж',
-    precipSum: 'Общо валежи',
-    maxWind: 'Макс. вятър',
-    airQuality: 'Качество на въздуха (AQI)',
-    aqi: 'AQI Индекс',
-    pm10: 'ФПЧ 10 (PM10)',
-    pm25: 'ФПЧ 2.5 (PM2.5)',
-    aqiChart: 'AQI Индекс (24 часа)',
-    weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
-    months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
-    highTemp: 'Опасно високи температури! (Над 35°C)',
-    lowTemp: 'Опасно ниски температури! Опасност от измръзване.',
-    highWind: 'Предупреждение за силен ураганен вятър!',
-    highUv: 'Екстремен UV индекс! Пазете се от слънцето.',
-    storm: 'Опасност: Приближава гръмотевична буря!',
-    heavySnow: 'Предупреждение за обилен снеговалеж!',
-    heavyRain: 'Опасност от проливни дъждове и наводнения!',
-    weather: {
-      0: 'Ясно небе', 1: 'Предимно ясно', 2: 'Частично облачно', 3: 'Облачно',
-      45: 'Мъгла', 48: 'Замръзваща мъгла', 51: 'Лек ръмеж', 53: 'Умерен ръмеж',
-      55: 'Силен ръмеж', 61: 'Слаб дъжд', 63: 'Умерен дъжд', 65: 'Силен дъжд',
-      71: 'Слаб снеговалеж', 73: 'Умерен снеговалеж', 75: 'Силен снеговалеж',
-      80: 'Превалявания', 81: 'Умерени превалявания', 82: 'Силни превалявания',
-      95: 'Гръмотевична буря', 96: 'Буря с градушка', 99: 'Силна буря'
-    },
-    quickCities: [
-      { name: 'Варна', lat: 43.2141, lon: 27.9147 },
-      { name: 'София', lat: 42.6977, lon: 23.3219 },
-      { name: 'Пловдив', lat: 42.1522, lon: 24.7454 },
-      { name: 'Бургас', lat: 42.5048, lon: 27.4732 },
-      { name: 'Лондон', lat: 51.5074, lon: -0.1278 },
-      { name: 'Париж', lat: 48.8566, lon: 2.3522 },
-      { name: 'Ню Йорк', lat: 40.7128, lon: -74.006 },
-      { name: 'Токио', lat: 35.6762, lon: 139.6503 },
-      { name: 'Дубай', lat: 25.2048, lon: 55.2708 },
-    ]
-  },
-  en: {
-    title: '🌤️ Great Weather with Bobby',
-    subtitle: 'Your meteo guide',
-    search: 'Search any city in the world...',
-    info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
-    loading: '⏳ Loading...',
-    tryAgain: 'Try Again',
-    favorite: 'Favorite City',
-    humidity: 'Humidity',
-    wind: 'Wind',
-    windUnit: 'km/h',
-    updated: 'Updated',
-    feelsLike: 'Feels Like',
-    visibility: 'Visibility',
-    pressure: 'Pressure',
-    uvIndex: 'UV Index',
-    seaTemp: 'Water Temp',
-    sunrise: 'Sunrise',
-    sunset: 'Sunset',
-    noSeaData: 'n/a',
-    km: 'km',
-    hpa: 'hPa',
-    hours24: '⏰ Next 24 Hours',
-    days14: '📅 14-Day Forecast',
-    interactiveMap: 'Live Weather Map',
-    myLocation: 'My Location',
-    error: 'Failed to load weather data. Please try again.',
-    chart: '📊 24-Hour Charts',
-    temp: 'Temperature',
-    rain: 'Precipitation',
-    windChart: 'Wind',
-    pressureChart: 'Pressure',
-    mm: 'mm',
-    cloudCover: 'Cloud Cover',
-    dewPoint: 'Dew Point',
-    detailsFor: 'Details for',
-    tabMain: 'Main',
-    tabAtmosphere: 'Atmosphere',
-    tabWaterWind: 'Water & Wind',
-    minMaxTemp: 'Min / Max Temp',
-    precipProb: 'Precip Chance',
-    precipSum: 'Total Precip',
-    maxWind: 'Max Wind',
-    airQuality: 'Air Quality (AQI)',
-    aqi: 'AQI Index',
-    pm10: 'PM10',
-    pm25: 'PM2.5',
-    aqiChart: 'AQI (24 Hours)',
-    weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    highTemp: 'Extreme high temperatures! (Above 35°C)',
-    lowTemp: 'Extreme low temperatures! Frost warning.',
-    highWind: 'Severe gale/hurricane wind warning!',
-    highUv: 'Extreme UV index! Avoid sun exposure.',
-    storm: 'Danger: Thunderstorm approaching!',
-    heavySnow: 'Heavy snowfall warning!',
-    heavyRain: 'Heavy rainfall and flooding risk!',
-    weather: {
-      0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
-      45: 'Fog', 48: 'Freezing fog', 51: 'Light drizzle', 53: 'Moderate drizzle',
-      55: 'Heavy drizzle', 61: 'Light rain', 63: 'Moderate rain', 65: 'Heavy rain',
-      71: 'Light snow', 73: 'Moderate snow', 75: 'Heavy snow',
-      80: 'Rain showers', 81: 'Moderate showers', 82: 'Violent showers',
-      95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Heavy thunderstorm'
-    },
-    quickCities: [
-      { name: 'Varna', lat: 43.2141, lon: 27.9147 },
-      { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
-      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
-      { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
-      { name: 'London', lat: 51.5074, lon: -0.1278 },
-      { name: 'Paris', lat: 48.8566, lon: 2.3522 },
-      { name: 'New York', lat: 40.7128, lon: -74.006 },
-      { name: 'Tokyo', lat: 35.6762, lon: 139.6503 },
-      { name: 'Dubai', lat: 25.2048, lon: 55.2708 },
-    ]
-  }
-}
-
-const getDynamicOverlay = (temp: number) => {
-  let rgbDark, rgbLight;
-  if (temp <= 0) {
-    rgbDark = '15, 23, 42'; 
-    rgbLight = '56, 189, 248'; 
-  } else if (temp <= 15) {
-    rgbDark = '6, 78, 59'; 
-    rgbLight = '52, 211, 153'; 
-  } else if (temp <= 29) {
-    rgbDark = '120, 53, 15'; 
-    rgbLight = '251, 191, 36'; 
-  } else {
-    rgbDark = '127, 29, 29'; 
-    rgbLight = '248, 113, 113'; 
-  }
-  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%)`;
-}
-
-const getIconAnimation = (icon: string) => {
-  if (icon === '☀️') return 'spin-slow'
-  if (icon === '🌤️' || icon === '⛅') return 'float'
-  if (icon === '🌧️' || icon === '🌦️') return 'bounce-rain'
-  if (icon === '⛈️') return 'flash'
-  if (icon === '❄️' || icon === '🌨️') return 'fall'
-  if (icon === '🌫️') return 'drift'
-  return 'float'
-}
-
-const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
-  const sz = size || '1.5rem'
-  return (
-    <span className={'animated-icon ' + getIconAnimation(icon)} style={{ fontSize: sz, display: 'inline-block' }}>
-      {icon}
-    </span>
-  )
-}
+import { AnimatedIcon } from './components/AnimatedIcon'
+import { useCitySearch } from './hooks/useCitySearch'
+import { useFavoriteCity } from './hooks/useFavoriteCity'
+import { translations } from './i18n/translations'
+import { reverseGeocode } from './services/locationService'
+import { getWeatherAdvice } from './services/weatherAdvice'
+import type { CitySuggestion, Coordinates, Language } from './types/weather'
+import { getDynamicOverlay } from './utils/weatherPresentation'
 
 const SingleChart = ({ hourly, darkMode, type, label, unit, color, height = 400 }: any) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -314,19 +128,16 @@ const Chart = ({ hourly, darkMode, t }: any) => {
 }
 
 const WeatherApp = () => {
-  const [lang, setLang] = useState('bg')
+  const [lang, setLang] = useState<Language>('bg')
   const [city, setCity] = useState('Варна')
-  const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
+  const [coords, setCoords] = useState<Coordinates>({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
-  const [searchInput, setSearchInput] = useState('')
-  const [suggestions, setSuggestions] = useState<any[]>([])
   const [darkMode, setDarkMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
-  const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
   const [bgImageUrl, setBgImageUrl] = useState<string>('')
   
@@ -337,31 +148,10 @@ const WeatherApp = () => {
   
   const [aiAdvice, setAiAdvice] = useState<string | null>(null)
   
-  const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
 
-  // Взимаме сигурния ключ от Vercel
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-  useEffect(() => {
-    const savedFav = localStorage.getItem('bobbyWeatherFav')
-    if (savedFav) {
-      try {
-        setFavoriteCity(JSON.parse(savedFav))
-      } catch (e) {}
-    }
-  }, [])
-
-  const toggleFavorite = () => {
-    if (favoriteCity && favoriteCity.name === city) {
-      setFavoriteCity(null)
-      localStorage.removeItem('bobbyWeatherFav')
-    } else {
-      const newFav = { name: city, lat: coords.lat, lon: coords.lon }
-      setFavoriteCity(newFav)
-      localStorage.setItem('bobbyWeatherFav', JSON.stringify(newFav))
-    }
-  }
+  const { favoriteCity, toggleFavorite } = useFavoriteCity()
+  const { searchInput, suggestions, setSuggestions, handleSearchInput, clearSearch } = useCitySearch(lang)
 
   const decodeWeatherCode = (code: number) => {
     const icons: Record<number, string> = {
@@ -373,27 +163,11 @@ const WeatherApp = () => {
     return { icon: icons[code] || '🌡️', desc: (t.weather as any)[code] || 'Unknown' }
   }
 
-  const searchCities = async (query: string) => {
-    if (query.length < 2) { setSuggestions([]); return }
-    try {
-      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
-      const data = await res.json()
-      setSuggestions(data.results || [])
-    } catch (e) { setSuggestions([]) }
-  }
-
-  const handleSearchInput = (val: string) => {
-    setSearchInput(val)
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => searchCities(val), 300)
-  }
-
-  const selectCity = (result: any) => {
+  const selectCity = (result: CitySuggestion) => {
     const name = result.name + (result.country ? ', ' + result.country : '')
     setCity(name)
     setCoords({ lat: result.latitude, lon: result.longitude })
-    setSearchInput('')
-    setSuggestions([])
+    clearSearch()
     setSelectedDay(null)
     setSelectedHour(null)
     setExactLocation(null) 
@@ -405,123 +179,6 @@ const WeatherApp = () => {
     return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-const fetchAiAdvice = async (dataForAi: any) => {
-    if (!dataForAi) return;
-
-    const temp = parseFloat(dataForAi.temp);
-    const wind = parseFloat(dataForAi.wind);
-    const rain = parseFloat(dataForAi.rain || dataForAi.precipitation) || 0;
-    const snow = parseFloat(dataForAi.snow) || 0; // Добавен параметър за сняг
-    const currentCity = dataForAi.city;
-    let advice = "";
-
-    const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
-
-    // Варианти за СНЯГ (Най-висок приоритет)
-    const snowBg = [
-      `Сняг се сипе на парцали в град ${currentCity}! Вадете шейните, правете снежни човеци и помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Време е за битки със снежни топки, защото в ${currentCity} вали сняг! Облечете се топло и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Зимна приказка в ${currentCity}! Снегът трупа, затова си направете горещ шоколад и се наслаждавайте, защото Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const snowEn = [
-      `Snow is falling heavily in ${currentCity}! Get your sleds out, build snowmen, and remember - Everything is LAUGHTER and LOVE!`,
-      `It's time for snowball fights because it's snowing in ${currentCity}! Dress warmly and remember that Everything is LAUGHTER and LOVE!`,
-      `A winter wonderland in ${currentCity}! The snow is piling up, so make some hot chocolate and enjoy, because Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за ДЪЖД
-    const rainBg = [
-      `Вземайте чадърите, че в град ${currentCity} се очертава мокро време! Но нека локвите не ви плашат, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Днес в ${currentCity} ще ви трябва лодка или поне здрав дъждобран. Скачайте смело в локвите, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Идеално време за гушкане на топло с чаша кафе, защото в ${currentCity} си вали. Усмихнете се на дъжда и помнете - Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const rainEn = [
-      `Grab your umbrellas, it looks wet in ${currentCity}! But don't let the puddles scare you, because Everything is LAUGHTER and LOVE!`,
-      `Today in ${currentCity} you'll need a boat or at least a good raincoat. Jump boldly into the puddles, because Everything is LAUGHTER and LOVE!`,
-      `Perfect weather for cuddling up warm with a cup of coffee, because it's raining in ${currentCity}. Smile at the rain and remember - Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за ЖЕГА
-    const hotBg = [
-      `С тези тропически ${temp}°C, грабвайте банските и бягайте към плажа, защото в град ${currentCity} днес работата е забранена! И не забравяйте - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Време е за сладолед и студени напитки! В ${currentCity} жегата е сериозна (${temp}°C), затова се пазете от слънцето, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Слагайте слънчевите очила! При ${temp}°C в ${currentCity} асфалтът се топи, но настроението е на макс. Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const hotEn = [
-      `With these tropical ${temp}°C, grab your swimsuits and head to the beach, because work is forbidden in ${currentCity} today! And remember - Everything is LAUGHTER and LOVE!`,
-      `Time for ice cream and cold drinks! The heat in ${currentCity} is serious (${temp}°C), so stay out of the sun, because Everything is LAUGHTER and LOVE!`,
-      `Put on your sunglasses! At ${temp}°C in ${currentCity} the asphalt is melting, but the mood is great. Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за СТУД
-    const coldBg = [
-      `Бррр, в град ${currentCity} си е направо хладилник с тези ${temp}°C! Обличайте дебелите якета, пийте топъл чай и помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Време е да извадите плетените чорапи! Навън в ${currentCity} е едва ${temp}°C. Стоплете се с усмивка, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Пингвините в ${currentCity} днес празнуват при тези ${temp}°C! Завийте се добре и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const coldEn = [
-      `Brrr, ${currentCity} is a literal fridge with these ${temp}°C! Put on your thick jackets, drink some hot tea, and remember - Everything is LAUGHTER and LOVE!`,
-      `Time to get those knitted socks out! It's only ${temp}°C outside in ${currentCity}. Warm up with a smile, because Everything is LAUGHTER and LOVE!`,
-      `The penguins in ${currentCity} are celebrating today at these ${temp}°C! Bundle up and remember that Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за СИЛЕН ВЯТЪР
-    const windyBg = [
-      `Дръжте си здраво шапките, че в ${currentCity} духа с цели ${wind} км/ч! Но дори и да ви отвее вятърът, Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Вятърът в ${currentCity} днес е ${wind} км/ч. Идеално време за пускане на хвърчила! И помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `С този вятър от ${wind} км/ч в ${currentCity}, прическата ви няма шанс! Радвайте се на рошавия ден, защото Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const windyEn = [
-      `Hold onto your hats, the wind in ${currentCity} is blowing at ${wind} km/h! But even if you get blown away, Everything is LAUGHTER and LOVE!`,
-      `The wind in ${currentCity} today is at ${wind} km/h. Perfect weather for flying kites! And remember - Everything is LAUGHTER and LOVE!`,
-      `With this ${wind} km/h wind in ${currentCity}, your hairstyle doesn't stand a chance! Enjoy the messy hair day, because Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за ПЕРФЕКТНО ВРЕМЕ
-    const niceBg = [
-      `Времето в град ${currentCity} е направо приказка с тези приятни ${temp}°C. Излизайте навън да се радвате на живота, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Нито топло, нито студено - идеалните ${temp}°C в ${currentCity}! Перфектният ден за дълга разходка. Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Град ${currentCity} ви очаква с прекрасни ${temp}°C! Усмихнете се на деня и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const niceEn = [
-      `The weather in ${currentCity} is an absolute dream with these pleasant ${temp}°C. Go outside and enjoy life, because Everything is LAUGHTER and LOVE!`,
-      `Neither hot nor cold - the perfect ${temp}°C in ${currentCity}! A perfect day for a long walk. Everything is LAUGHTER and LOVE!`,
-      `${currentCity} awaits you with a wonderful ${temp}°C! Smile at the day and remember that Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Логика с приоритет на сняг, дъжд и вятър
-    if (lang === 'bg') {
-      if (snow > 0) {
-        advice = getRandom(snowBg);
-      } else if (rain > 0) {
-        advice = getRandom(rainBg);
-      } else if (wind >= 20) {
-        advice = getRandom(windyBg);
-      } else if (temp >= 28) {
-        advice = getRandom(hotBg);
-      } else if (temp <= 10) {
-        advice = getRandom(coldBg);
-      } else {
-        advice = getRandom(niceBg);
-      }
-    } else {
-      if (snow > 0) {
-        advice = getRandom(snowEn);
-      } else if (rain > 0) {
-        advice = getRandom(rainEn);
-      } else if (wind >= 20) {
-        advice = getRandom(windyEn);
-      } else if (temp >= 28) {
-        advice = getRandom(hotEn);
-      } else if (temp <= 10) {
-        advice = getRandom(coldEn);
-      } else {
-        advice = getRandom(niceEn);
-      }
-    }
-
-    setAiAdvice(advice);
-  }
   const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
     setError(null)
@@ -605,12 +262,12 @@ const fetchAiAdvice = async (dataForAi: any) => {
       })
 
       // Извикване на AI функцията с реални данни
-      fetchAiAdvice({
+      setAiAdvice(getWeatherAdvice({
         city: city,
         temp: Math.round(data.current.temperature_2m),
         wind: Math.round(data.current.wind_speed_10m),
         humidity: data.current.relative_humidity_2m
-      });
+      }, lang));
 
       const now = new Date()
       const localISO = now.getFullYear() + '-' +
@@ -718,8 +375,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=18`)
-          const data = await res.json()
+          const data = await reverseGeocode(lat, lon, lang)
           
           const address = data.address;
           const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
@@ -762,7 +418,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
     if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
   }
 
-  const openPopup = (e: any, item: any) => {
+  const openPopup = (e: any) => {
     const rect = e.currentTarget.getBoundingClientRect();
     let x = rect.left + (rect.width / 2) - 150;
     let y = rect.top - 320;
@@ -921,7 +577,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
                         <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
                       </span>
                     )}
-                    <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
+                    <button onClick={() => toggleFavorite(city, coords)} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
                       {favoriteCity?.name === city ? '⭐' : '☆'}
                     </button>
                   </h2>
@@ -972,7 +628,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="hourly-row">
               {hourly.map((h, i) => (
                 <div key={i} className="hour-box"
-                  onClick={(e) => { openPopup(e, h); setSelectedHour(h); setSelectedDay(null) }}
+                  onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
                   style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
@@ -991,7 +647,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="daily-grid">
               {forecast.map((day, i) => (
                 <div key={i} className="day-box"
-                  onClick={(e) => { openPopup(e, day); setSelectedDay(day); setSelectedHour(null) }}
+                  onClick={(e) => { openPopup(e); setSelectedDay(day); setSelectedHour(null) }}
                   style={{ cursor: 'pointer', transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="day-name">{day.dayName}</p>
                   <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
