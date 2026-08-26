@@ -357,6 +357,7 @@ const WeatherApp = () => {
   const [forecast, setForecast] = useState<any[]>([])
   const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState('')
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
@@ -754,6 +755,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
       setForecast(days)
       setLoading(false)
       setLastUpdated(new Date())
+      setBackgroundImageUrl(`https://picsum.photos/seed/meteopulse-${Date.now()}-${Math.random().toString(36).slice(2)}/1600/900`)
 
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
@@ -937,10 +939,11 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             <img
               className="main-card-image"
-              src={getWeatherBackground(weather.code)}
+              src={backgroundImageUrl || getWeatherBackground(weather.code)}
               alt=""
               aria-hidden="true"
               fetchPriority="high"
+              onError={() => setBackgroundImageUrl('')}
             />
 
             <div style={{
