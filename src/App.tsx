@@ -352,6 +352,7 @@ const WeatherApp = () => {
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'bot', text: string }>>([])
   
   const searchTimer = useRef<any>(null)
+  const chatMessagesRef = useRef<HTMLDivElement>(null)
   const t = translations[lang as keyof typeof translations]
 
   useEffect(() => {
@@ -366,6 +367,13 @@ const WeatherApp = () => {
   useEffect(() => {
     setChatMessages([{ role: 'bot', text: t.chatGreeting }])
   }, [lang, city])
+
+  useEffect(() => {
+    const messagesContainer = chatMessagesRef.current
+    if (messagesContainer) {
+      messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' })
+    }
+  }, [chatMessages])
 
   useEffect(() => {
     document.documentElement.lang = lang
@@ -1068,7 +1076,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
               </div>
               <span className="chat-location">📍 {city}</span>
             </div>
-            <div className="chat-messages" aria-live="polite">
+            <div className="chat-messages" aria-live="polite" ref={chatMessagesRef}>
               {chatMessages.map((message, index) => (
                 <div key={index} className={`chat-message ${message.role}`}>
                   {message.role === 'bot' && <span aria-hidden="true">🌤️</span>}
