@@ -27,6 +27,7 @@ const translations = {
     hours24: '⏰ Следващите 24 часа',
     days14: '📅 Прогноза за 14 дни',
     interactiveMap: 'Жива метеорологична карта',
+    mapTitle: 'Жива карта с прогноза за дъжд',
     myLocation: 'Моето местоположение',
     useLocation: 'Използвай моето местоположение',
     locationError: 'Не успяхме да определим местоположението ви.',
@@ -111,6 +112,7 @@ const translations = {
     hours24: '⏰ Next 24 Hours',
     days14: '📅 14-Day Forecast',
     interactiveMap: 'Live Weather Map',
+    mapTitle: 'Live rain forecast map',
     myLocation: 'My Location',
     useLocation: 'Use my location',
     locationError: 'We could not determine your location.',
@@ -1054,9 +1056,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
               <iframe
                 width="100%"
                 height="450"
-                src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`}
+                src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&metricRain=mm&radarRange=-1`}
                 frameBorder="0"
-                title="Windy Map"
+                title={t.mapTitle}
                 loading="lazy"
                 style={{ display: 'block' }}
               ></iframe>
