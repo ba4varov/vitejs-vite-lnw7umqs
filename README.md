@@ -1,32 +1,39 @@
-# React + TypeScript + Vite
+# Метео Пулс
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Клиентско приложение за текущо време, 24-часова и 14-дневна прогноза, качество на въздуха и морски условия.
 
-Currently, two official plugins are available:
+## Технологии
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19, TypeScript и Vite
+- Open-Meteo Forecast, Marine, Air Quality и Geocoding API
+- OpenStreetMap Nominatim за обратно геокодиране
+- Windy за интерактивната карта
 
-## React Compiler
+Приложението не изисква API ключ. Всички заявки се изпълняват директно от браузъра.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Локално стартиране
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Проверки и production build
+
+```bash
+npm run lint
+npm run build
+npm run preview
+```
+
+## Публикуване във Vercel
+
+- Build command: `npm run build`
+- Output directory: `dist`
+- Framework preset: Vite
+
+## Данни и поверителност
+
+Геолокацията се изисква само след натискане на бутона за текущо местоположение. Координатите се изпращат до Open-Meteo и OpenStreetMap Nominatim, за да се зареди прогнозата и приблизителното име на района. Любимият град, езикът и темата се пазят само в `localStorage` на браузъра.
+
+Показаните предупреждения са автоматично изчислени от прогнозните стойности и не заместват официалните предупреждения на местните власти.
