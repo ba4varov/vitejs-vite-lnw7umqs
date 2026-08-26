@@ -1,0 +1,18 @@
+{
+  "name": "Доброто време с Боби",
+  "short_name": "Времето с Боби",
+  "description": "Актуална почасова и 14-дневна прогноза за времето.",
+  "lang": "bg",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef6ff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
