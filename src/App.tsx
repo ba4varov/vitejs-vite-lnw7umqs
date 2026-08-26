@@ -462,6 +462,8 @@ const WeatherApp = () => {
       .replace(/(?:^|\s)(?:ще|дали|какво|какъв|каква|какви|през|около|is it|will it|during|around)(?:\s|[?!,.]|$).*$/iu, '')
       .replace(/[?!,.]+$/g, '')
       .trim()
+    const nonLocationPhrases = /^(?:разходка|спорт|тичане|бягане|плаж|излизане|навън|работа|училище|walk|walking|sport|running|run|beach|going out|outside|work|school)(?:\s|$)/iu
+    if (nonLocationPhrases.test(locationQuery)) return null
     if (!locationQuery || city.toLocaleLowerCase().includes(locationQuery.toLocaleLowerCase())) return null
 
     try {
