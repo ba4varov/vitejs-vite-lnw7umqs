@@ -1,0 +1,18 @@
+{
+  "name": "Метео Пулс",
+  "short_name": "Метео Пулс",
+  "description": "Актуална прогноза за времето и персонални метео съвети.",
+  "lang": "bg",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef6ff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
