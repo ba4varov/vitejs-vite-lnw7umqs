@@ -6,6 +6,8 @@ const translations = {
     title: '🌤️ Доброто време с Боби',
     subtitle: 'Твоят метео гид',
     search: 'Търси град по целия свят...',
+    searchResults: 'Резултати от търсенето',
+    close: 'Затвори',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
     loading: '⏳ Зареждане...',
     tryAgain: 'Опитай отново',
@@ -83,6 +85,8 @@ const translations = {
     title: '🌤️ Great Weather with Bobby',
     subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
+    searchResults: 'Search results',
+    close: 'Close',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
     loading: '⏳ Loading...',
     tryAgain: 'Try Again',
@@ -320,6 +324,7 @@ const WeatherApp = () => {
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
+  const [activeSuggestion, setActiveSuggestion] = useState(-1)
   const [darkMode, setDarkMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -338,6 +343,9 @@ const WeatherApp = () => {
   const [aiAdvice, setAiAdvice] = useState<string | null>(null)
   
   const searchTimer = useRef<any>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const dialogCloseRef = useRef<HTMLButtonElement>(null)
+  const popupTriggerRef = useRef<HTMLElement | null>(null)
   const t = translations[lang as keyof typeof translations]
 
   // Взимаме сигурния ключ от Vercel
@@ -384,6 +392,7 @@ const WeatherApp = () => {
 
   const handleSearchInput = (val: string) => {
     setSearchInput(val)
+    setActiveSuggestion(-1)
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => searchCities(val), 300)
   }
@@ -394,6 +403,7 @@ const WeatherApp = () => {
     setCoords({ lat: result.latitude, lon: result.longitude })
     setSearchInput('')
     setSuggestions([])
+    setActiveSuggestion(-1)
     setSelectedDay(null)
     setSelectedHour(null)
     setExactLocation(null) 
@@ -762,7 +772,8 @@ const fetchAiAdvice = async (dataForAi: any) => {
     if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
   }
 
-  const openPopup = (e: any, item: any) => {
+  const openPopup = (e: any) => {
+    popupTriggerRef.current = e.currentTarget
     const rect = e.currentTarget.getBoundingClientRect();
     let x = rect.left + (rect.width / 2) - 150;
     let y = rect.top - 320;
@@ -772,6 +783,44 @@ const fetchAiAdvice = async (dataForAi: any) => {
     setPopupPos({ x, y });
     setDetailTab('main');
   }
+
+  const closePopup = () => {
+    setSelectedDay(null)
+    setSelectedHour(null)
+    window.setTimeout(() => popupTriggerRef.current?.focus(), 0)
+  }
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setSuggestions([])
+      setActiveSuggestion(-1)
+      return
+    }
+    if (!suggestions.length || !['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return
+    e.preventDefault()
+    if (e.key === 'ArrowDown') setActiveSuggestion((current) => (current + 1) % suggestions.length)
+    if (e.key === 'ArrowUp') setActiveSuggestion((current) => current <= 0 ? suggestions.length - 1 : current - 1)
+    if (e.key === 'Enter' && activeSuggestion >= 0) selectCity(suggestions[activeSuggestion])
+  }
+
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closePopup()
+      return
+    }
+    if (e.key !== 'Tab' || !dialogRef.current) return
+    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+    if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  }
+
+  useEffect(() => {
+    if (selectedDay || selectedHour) dialogCloseRef.current?.focus()
+  }, [selectedDay, selectedHour])
 
   return (
     <div className={darkMode ? 'weather-app dark' : 'weather-app'}>
@@ -821,16 +870,26 @@ const fetchAiAdvice = async (dataForAi: any) => {
         <div className="search-row">
           <input type="text" placeholder={t.search} value={searchInput}
             onChange={(e) => handleSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setSuggestions([])}
+            onKeyDown={handleSearchKeyDown}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={suggestions.length > 0}
+            aria-controls="city-suggestions"
+            aria-activedescendant={activeSuggestion >= 0 ? `city-suggestion-${activeSuggestion}` : undefined}
             autoComplete="off" />
         </div>
         {suggestions.length > 0 && (
-          <div className="suggestions">
+          <div id="city-suggestions" className="suggestions" role="listbox" aria-label={t.searchResults}>
             {suggestions.map((s, i) => (
-              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
+              <button key={i} id={`city-suggestion-${i}`} type="button" role="option"
+                aria-selected={activeSuggestion === i}
+                className={'suggestion-item ' + (activeSuggestion === i ? 'active' : '')}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActiveSuggestion(i)}
+                onClick={() => selectCity(s)}>
                 <span className="sug-name">{s.name}</span>
                 <span className="sug-country">{s.admin1 ? s.admin1 + ', ' : ''}{s.country}</span>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -971,15 +1030,16 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <h3>{t.hours24}</h3>
             <div className="hourly-row">
               {hourly.map((h, i) => (
-                <div key={i} className="hour-box"
-                  onClick={(e) => { openPopup(e, h); setSelectedHour(h); setSelectedDay(null) }}
-                  style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
+                <button key={i} type="button" className="hour-box"
+                  aria-label={`${t.detailsFor} ${h.hour}: ${h.temp}°C`}
+                  onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
+                  style={{ transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
                   <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
                   {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -990,9 +1050,10 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <h3>{t.days14}</h3>
             <div className="daily-grid">
               {forecast.map((day, i) => (
-                <div key={i} className="day-box"
-                  onClick={(e) => { openPopup(e, day); setSelectedDay(day); setSelectedHour(null) }}
-                  style={{ cursor: 'pointer', transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
+                <button key={i} type="button" className="day-box"
+                  aria-label={`${t.detailsFor} ${day.dayName}, ${day.dateFormatted}: ${day.min}° / ${day.max}°`}
+                  onClick={(e) => { openPopup(e); setSelectedDay(day); setSelectedHour(null) }}
+                  style={{ transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="day-name">{day.dayName}</p>
                   <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
                   <p className="day-icon"><AnimatedIcon icon={day.icon} size="2rem" /></p>
@@ -1002,7 +1063,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
                   </p>
                   <p className="day-rain">🌧 {day.rain}{t.mm}</p>
                   <p className="day-wind">🌬️ {day.wind}{t.windUnit}</p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -1038,16 +1099,18 @@ const fetchAiAdvice = async (dataForAi: any) => {
       )}
 
       {selectedDay && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
-          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closePopup()}>
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="day-dialog-title"
+            onKeyDown={handleDialogKeyDown} className="card popup-card"
+            style={{ top: popupPos.y, left: popupPos.x, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
-              <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedDay(null)}>❌</button>
+              <h4 id="day-dialog-title" style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
+              <button ref={dialogCloseRef} className="icon-btn dialog-close" aria-label={t.close} onClick={closePopup}>✕</button>
             </div>
-            <div className="chart-tabs">
-              <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
-              <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
-              <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
+            <div className="chart-tabs" role="tablist">
+              <button role="tab" aria-selected={detailTab === 'main'} className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
+              <button role="tab" aria-selected={detailTab === 'atmosphere'} className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
+              <button role="tab" aria-selected={detailTab === 'water'} className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
             </div>
             <div className="popup-grid">
               {detailTab === 'main' && <>
@@ -1079,16 +1142,18 @@ const fetchAiAdvice = async (dataForAi: any) => {
       )}
 
       {selectedHour && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedHour(null)}>
-          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closePopup()}>
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="hour-dialog-title"
+            onKeyDown={handleDialogKeyDown} className="card popup-card"
+            style={{ top: popupPos.y, left: popupPos.x, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
-              <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedHour(null)}>❌</button>
+              <h4 id="hour-dialog-title" style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
+              <button ref={dialogCloseRef} className="icon-btn dialog-close" aria-label={t.close} onClick={closePopup}>✕</button>
             </div>
-            <div className="chart-tabs">
-              <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
-              <button className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
-              <button className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
+            <div className="chart-tabs" role="tablist">
+              <button role="tab" aria-selected={detailTab === 'main'} className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
+              <button role="tab" aria-selected={detailTab === 'atmosphere'} className={'chart-tab ' + (detailTab === 'atmosphere' ? 'active-temp' : '')} onClick={() => setDetailTab('atmosphere')}>{t.tabAtmosphere}</button>
+              <button role="tab" aria-selected={detailTab === 'water'} className={'chart-tab ' + (detailTab === 'water' ? 'active-temp' : '')} onClick={() => setDetailTab('water')}>{t.tabWaterWind}</button>
             </div>
             <div className="popup-grid">
               {detailTab === 'main' && <>
