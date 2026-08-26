@@ -340,6 +340,34 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
 
+  const changeLanguage = async (nextLang: 'bg' | 'en') => {
+    setLang(nextLang)
+    setSuggestions([])
+
+    const localizedQuickCity = translations[nextLang].quickCities.find(
+      (quickCity) => Math.abs(quickCity.lat - coords.lat) < 0.0001 && Math.abs(quickCity.lon - coords.lon) < 0.0001
+    )
+
+    if (localizedQuickCity) {
+      setCity(localizedQuickCity.name)
+      return
+    }
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lon}&format=json&accept-language=${nextLang}&zoom=10`
+      )
+      if (!res.ok) return
+
+      const data = await res.json()
+      const address = data.address || {}
+      const localizedName = address.city || address.town || address.village || address.county
+      if (localizedName) setCity(localizedName)
+    } catch {
+      // Keep the existing city name if a localized reverse-geocoding result is unavailable.
+    }
+  }
+
   // Взимаме сигурния ключ от Vercel
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -808,7 +836,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
-          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
+          <button className="lang-btn" onClick={() => changeLanguage(lang === 'bg' ? 'en' : 'bg')}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
           <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
