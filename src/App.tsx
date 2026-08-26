@@ -367,6 +367,27 @@ const WeatherApp = () => {
     setChatMessages([{ role: 'bot', text: t.chatGreeting }])
   }, [lang, city])
 
+  useEffect(() => {
+    document.documentElement.lang = lang
+    const title = lang === 'bg'
+      ? `Времето в ${city} | Доброто време с Боби`
+      : `Weather in ${city} | Great Weather with Bobby`
+    const description = weather
+      ? (lang === 'bg'
+          ? `Актуално време в ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Почасова и 14-дневна прогноза с персонални метео съвети.`
+          : `Current weather in ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Hourly and 14-day forecast with personalized weather advice.`)
+      : (lang === 'bg'
+          ? `Актуална почасова и 14-дневна прогноза за времето в ${city} с персонални метео съвети.`
+          : `Current hourly and 14-day weather forecast for ${city} with personalized weather advice.`)
+
+    document.title = title
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description)
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title)
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description)
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', title)
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', description)
+  }, [city, lang, weather])
+
   const getChatAnswer = (question: string) => {
     if (!weather) return t.loading
     const q = question.toLocaleLowerCase(lang === 'bg' ? 'bg-BG' : 'en-US')
