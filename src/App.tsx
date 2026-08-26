@@ -340,15 +340,12 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
 
-  // Взимаме сигурния ключ от Vercel
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
     if (savedFav) {
       try {
         setFavoriteCity(JSON.parse(savedFav))
-      } catch (e) {}
+      } catch {}
     }
   }, [])
 
@@ -379,7 +376,7 @@ const WeatherApp = () => {
       const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
       const data = await res.json()
       setSuggestions(data.results || [])
-    } catch (e) { setSuggestions([]) }
+    } catch { setSuggestions([]) }
   }
 
   const handleSearchInput = (val: string) => {
@@ -558,7 +555,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
             hourlySeaTemp = marineData.hourly.sea_surface_temperature
           }
-        } catch (e) {}
+        } catch {}
       }
 
       let currentAqi = null, currentPm10 = null, currentPm25 = null;
@@ -574,7 +571,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (aqiData.hourly && aqiData.hourly.european_aqi) {
             hourlyAqi = aqiData.hourly.european_aqi;
           }
-        } catch (e) {}
+        } catch {}
       }
 
       const cur = decodeWeatherCode(data.current.weather_code)
@@ -746,7 +743,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             setExactLocation(null);
           }
 
-        } catch (e) { setCity(t.myLocation) }
+        } catch { setCity(t.myLocation) }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
@@ -762,7 +759,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
     if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
   }
 
-  const openPopup = (e: any, item: any) => {
+  const openPopup = (e: any, _item: any) => {
     const rect = e.currentTarget.getBoundingClientRect();
     let x = rect.left + (rect.width / 2) - 150;
     let y = rect.top - 320;
