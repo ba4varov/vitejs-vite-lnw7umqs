@@ -337,19 +337,22 @@ const WeatherApp = () => {
   
   const [aiAdvice, setAiAdvice] = useState<string | null>(null)
   
-  const searchTimer = useRef<any>(null)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const t = translations[lang as keyof typeof translations]
-
-  // Взимаме сигурния ключ от Vercel
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
     if (savedFav) {
       try {
         setFavoriteCity(JSON.parse(savedFav))
-      } catch (e) {}
+      } catch {
+        localStorage.removeItem('bobbyWeatherFav')
+      }
     }
+  }, [])
+
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
   }, [])
 
   const toggleFavorite = () => {
@@ -379,7 +382,9 @@ const WeatherApp = () => {
       const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
       const data = await res.json()
       setSuggestions(data.results || [])
-    } catch (e) { setSuggestions([]) }
+    } catch {
+      setSuggestions([])
+    }
   }
 
   const handleSearchInput = (val: string) => {
@@ -558,7 +563,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
             hourlySeaTemp = marineData.hourly.sea_surface_temperature
           }
-        } catch (e) {}
+        } catch {
+          // Marine data is optional; the weather forecast remains usable without it.
+        }
       }
 
       let currentAqi = null, currentPm10 = null, currentPm25 = null;
@@ -574,7 +581,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (aqiData.hourly && aqiData.hourly.european_aqi) {
             hourlyAqi = aqiData.hourly.european_aqi;
           }
-        } catch (e) {}
+        } catch {
+          // Air-quality data is optional; the weather forecast remains usable without it.
+        }
       }
 
       const cur = decodeWeatherCode(data.current.weather_code)
@@ -746,7 +755,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
             setExactLocation(null);
           }
 
-        } catch (e) { setCity(t.myLocation) }
+        } catch {
+          setCity(t.myLocation)
+        }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
@@ -762,7 +773,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
     if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
   }
 
-  const openPopup = (e: any, item: any) => {
+  const openPopup = (e: React.MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     let x = rect.left + (rect.width / 2) - 150;
     let y = rect.top - 320;
@@ -972,7 +983,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="hourly-row">
               {hourly.map((h, i) => (
                 <div key={i} className="hour-box"
-                  onClick={(e) => { openPopup(e, h); setSelectedHour(h); setSelectedDay(null) }}
+                  onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
                   style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
@@ -991,7 +1002,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="daily-grid">
               {forecast.map((day, i) => (
                 <div key={i} className="day-box"
-                  onClick={(e) => { openPopup(e, day); setSelectedDay(day); setSelectedHour(null) }}
+                  onClick={(e) => { openPopup(e); setSelectedDay(day); setSelectedHour(null) }}
                   style={{ cursor: 'pointer', transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="day-name">{day.dayName}</p>
                   <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
