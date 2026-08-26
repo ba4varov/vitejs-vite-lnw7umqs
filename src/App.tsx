@@ -28,6 +28,12 @@ const translations = {
     days14: '📅 Прогноза за 14 дни',
     interactiveMap: 'Жива метеорологична карта',
     myLocation: 'Моето местоположение',
+    useLocation: 'Използвай моето местоположение',
+    locationError: 'Не успяхме да определим местоположението ви.',
+    close: 'Затвори',
+    weatherLabel: 'Време',
+    upTo: 'до',
+    advisoryNote: 'Автоматично изчислено по прогнозни данни. При опасно време проверете официалните предупреждения.',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
     chart: '📊 Графики за 24 часа',
     temp: 'Температура',
@@ -105,6 +111,12 @@ const translations = {
     days14: '📅 14-Day Forecast',
     interactiveMap: 'Live Weather Map',
     myLocation: 'My Location',
+    useLocation: 'Use my location',
+    locationError: 'We could not determine your location.',
+    close: 'Close',
+    weatherLabel: 'Weather',
+    upTo: 'up to',
+    advisoryNote: 'Automatically calculated from forecast data. Check official warnings during severe weather.',
     error: 'Failed to load weather data. Please try again.',
     chart: '📊 24-Hour Charts',
     temp: 'Temperature',
@@ -288,7 +300,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color, height = 400 
       <h4 style={{ color: color, marginBottom: '16px', textAlign: 'center', fontSize: '1.1rem' }}>
         {label} <span style={{ opacity: 0.7, fontSize: '0.8em' }}>({unit})</span>
       </h4>
-      <canvas ref={canvasRef} width={800} height={height} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <canvas ref={canvasRef} width={800} height={height} role="img" aria-label={`${label}, ${unit}, 24 hours`} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   )
 }
@@ -314,41 +326,63 @@ const Chart = ({ hourly, darkMode, t }: any) => {
 }
 
 const WeatherApp = () => {
-  const [lang, setLang] = useState('bg')
+  const [lang, setLang] = useState(() => localStorage.getItem('bobbyWeatherLang') === 'en' ? 'en' : 'bg')
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('bobbyWeatherTheme')
+    return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
   const [loading, setLoading] = useState(true)
+  const [locating, setLocating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
   const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
-  const [bgImageUrl, setBgImageUrl] = useState<string>('')
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
-  const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
   const [detailTab, setDetailTab] = useState('main')
   
   const [aiAdvice, setAiAdvice] = useState<string | null>(null)
   
-  const searchTimer = useRef<any>(null)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchController = useRef<AbortController | null>(null)
+  const weatherController = useRef<AbortController | null>(null)
   const t = translations[lang as keyof typeof translations]
 
-  // Взимаме сигурния ключ от Vercel
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  useEffect(() => {
+    document.documentElement.lang = lang
+    localStorage.setItem('bobbyWeatherLang', lang)
+  }, [lang])
+
+  useEffect(() => {
+    localStorage.setItem('bobbyWeatherTheme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedDay(null)
+        setSelectedHour(null)
+        setSuggestions([])
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [])
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
     if (savedFav) {
       try {
         setFavoriteCity(JSON.parse(savedFav))
-      } catch (e) {}
+      } catch {}
     }
   }, [])
 
@@ -375,11 +409,17 @@ const WeatherApp = () => {
 
   const searchCities = async (query: string) => {
     if (query.length < 2) { setSuggestions([]); return }
+    searchController.current?.abort()
+    const controller = new AbortController()
+    searchController.current = controller
     try {
-      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
+      const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json', { signal: controller.signal })
+      if (!res.ok) throw new Error('Geocoding request failed')
       const data = await res.json()
       setSuggestions(data.results || [])
-    } catch (e) { setSuggestions([]) }
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') setSuggestions([])
+    }
   }
 
   const handleSearchInput = (val: string) => {
@@ -523,11 +563,14 @@ const fetchAiAdvice = async (dataForAi: any) => {
     setAiAdvice(advice);
   }
   const fetchWeather = async (lat: number, lon: number) => {
+    weatherController.current?.abort()
+    const controller = new AbortController()
+    weatherController.current = controller
     setLoading(true)
     setError(null)
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
-        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
+        '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover,precipitation,rain,snowfall' +
         '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
@@ -539,10 +582,14 @@ const fetchAiAdvice = async (dataForAi: any) => {
         '&current=european_aqi,pm10,pm2_5&hourly=european_aqi&timezone=auto&forecast_days=3';
 
       const [weatherRes, marineRes, aqiRes] = await Promise.allSettled([
-        fetch(weatherUrl),
-        fetch(marineUrl),
-        fetch(aqiUrl)
+        fetch(weatherUrl, { signal: controller.signal }),
+        fetch(marineUrl, { signal: controller.signal }),
+        fetch(aqiUrl, { signal: controller.signal })
       ])
+
+      if (weatherRes.status === 'rejected' && weatherRes.reason?.name === 'AbortError') {
+        throw weatherRes.reason
+      }
       
       if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error('Моля проверете връзката си с интернет.')
       const data = await weatherRes.value.json()
@@ -558,7 +605,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
             hourlySeaTemp = marineData.hourly.sea_surface_temperature
           }
-        } catch (e) {}
+        } catch {}
       }
 
       let currentAqi = null, currentPm10 = null, currentPm25 = null;
@@ -574,7 +621,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (aqiData.hourly && aqiData.hourly.european_aqi) {
             hourlyAqi = aqiData.hourly.european_aqi;
           }
-        } catch (e) {}
+        } catch {}
       }
 
       const cur = decodeWeatherCode(data.current.weather_code)
@@ -609,15 +656,12 @@ const fetchAiAdvice = async (dataForAi: any) => {
         city: city,
         temp: Math.round(data.current.temperature_2m),
         wind: Math.round(data.current.wind_speed_10m),
-        humidity: data.current.relative_humidity_2m
+        rain: data.current.rain ?? data.current.precipitation ?? 0,
+        snow: data.current.snowfall ?? 0
       });
 
-      const now = new Date()
-      const localISO = now.getFullYear() + '-' +
-        String(now.getMonth() + 1).padStart(2, '0') + '-' +
-        String(now.getDate()).padStart(2, '0') + 'T' +
-        String(now.getHours()).padStart(2, '0')
-      let startIdx = data.hourly.time.findIndex((time: string) => time.slice(0, 13) === localISO)
+      const currentHour = data.current.time.slice(0, 13)
+      let startIdx = data.hourly.time.findIndex((time: string) => time.slice(0, 13) === currentHour)
       if (startIdx === -1) startIdx = 0
 
       const hr: any[] = []
@@ -696,13 +740,12 @@ const fetchAiAdvice = async (dataForAi: any) => {
       setLoading(false)
       setLastUpdated(new Date())
 
-      const randomId = Math.floor(Math.random() * 1000) + 1;
-      setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
-
-    } catch (e: any) {
-      console.error(e);
-      setError(t.error)
-      setLoading(false)
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error(error)
+        setError(t.error)
+        setLoading(false)
+      }
     }
   }
 
@@ -712,13 +755,18 @@ const fetchAiAdvice = async (dataForAi: any) => {
     return () => clearInterval(interval)
   }, [coords, lang])
 
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+  const useCurrentLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setError(t.locationError)
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(async (pos) => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=18`)
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=10`)
+          if (!res.ok) throw new Error('Reverse geocoding request failed')
           const data = await res.json()
           
           const address = data.address;
@@ -726,19 +774,8 @@ const fetchAiAdvice = async (dataForAi: any) => {
           setCity(mainCity);
 
           const exactDetails = [];
-          const street = address.road || address.pedestrian || address.street;
-          
-          if (street) {
-            exactDetails.push(street);
-          }
-          if (address.house_number) {
-            exactDetails.push(address.house_number);
-          }
-          
-          if (exactDetails.length === 0) {
-            const neighborhood = address.suburb || address.neighbourhood || address.city_district;
-            if (neighborhood) exactDetails.push(neighborhood);
-          }
+          const neighborhood = address.suburb || address.neighbourhood || address.city_district;
+          if (neighborhood) exactDetails.push(neighborhood);
           
           if (exactDetails.length > 0) {
             setExactLocation(exactDetails.join(' '));
@@ -746,10 +783,13 @@ const fetchAiAdvice = async (dataForAi: any) => {
             setExactLocation(null);
           }
 
-        } catch (e) { setCity(t.myLocation) }
-      }, () => {}, { timeout: 5000 })
-    }
-  }, [])
+        } catch { setCity(t.myLocation) }
+        finally { setLocating(false) }
+      }, () => {
+        setLocating(false)
+        setError(t.locationError)
+      }, { timeout: 8000 })
+  }
 
   const activeAlerts = [];
   if (weather) {
@@ -760,17 +800,6 @@ const fetchAiAdvice = async (dataForAi: any) => {
     if ([95, 96, 99].includes(weather.code)) activeAlerts.push({ icon: '⚡', text: (t as any).storm });
     if (weather.code === 75) activeAlerts.push({ icon: '🌨️', text: (t as any).heavySnow });
     if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
-  }
-
-  const openPopup = (e: any, item: any) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    let x = rect.left + (rect.width / 2) - 150;
-    let y = rect.top - 320;
-    if (x < 10) x = 10;
-    if (x + 300 > window.innerWidth - 10) x = window.innerWidth - 310;
-    if (y < 10) y = rect.bottom + 15;
-    setPopupPos({ x, y });
-    setDetailTab('main');
   }
 
   return (
@@ -808,10 +837,10 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
-          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
+          <button type="button" className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
-          <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
+          <button type="button" className="icon-btn" aria-label={darkMode ? 'Light theme' : 'Dark theme'} onClick={() => setDarkMode(!darkMode)}>
             {darkMode ? '☀️' : '🌙'}
           </button>
         </div>
@@ -819,24 +848,31 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       <div className="search-wrapper">
         <div className="search-row">
-          <input type="text" placeholder={t.search} value={searchInput}
+          <label className="sr-only" htmlFor="city-search">{t.search}</label>
+          <input id="city-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded={suggestions.length > 0} aria-controls="city-suggestions" placeholder={t.search} value={searchInput}
             onChange={(e) => handleSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setSuggestions([])}
             autoComplete="off" />
         </div>
         {suggestions.length > 0 && (
-          <div className="suggestions">
+          <div className="suggestions" id="city-suggestions" role="listbox">
             {suggestions.map((s, i) => (
-              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
+              <button type="button" key={`${s.latitude}-${s.longitude}-${i}`} className="suggestion-item" onClick={() => selectCity(s)}>
                 <span className="sug-name">{s.name}</span>
                 <span className="sug-country">{s.admin1 ? s.admin1 + ', ' : ''}{s.country}</span>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </div>
 
       <div className="info-line">{t.info}</div>
+
+      <div className="location-row">
+        <button type="button" className="location-btn" onClick={useCurrentLocation} disabled={locating}>
+          {locating ? t.loading : `📍 ${t.useLocation}`}
+        </button>
+      </div>
 
       <div className="city-row">
         {favoriteCity && (
@@ -872,34 +908,19 @@ const fetchAiAdvice = async (dataForAi: any) => {
       {!loading && !error && weather && (
         <div>
           {activeAlerts.length > 0 && (
-            <div className="alerts-container">
+            <div className="alerts-container" role="status" aria-label={t.advisoryNote}>
               {activeAlerts.map((alert, idx) => (
                 <div key={idx} className="alert-item">
                   <span style={{fontSize: '1.8rem'}}>{alert.icon}</span>
                   <span>{alert.text}</span>
                 </div>
               ))}
+              <p className="alerts-note">{t.advisoryNote}</p>
             </div>
           )}
 
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             
-            {bgImageUrl && (
-              <img 
-                src={bgImageUrl} 
-                alt="" 
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  zIndex: 0
-                }} 
-              />
-            )}
-
             <div style={{
               position: 'absolute',
               top: 0,
@@ -971,15 +992,15 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <h3>{t.hours24}</h3>
             <div className="hourly-row">
               {hourly.map((h, i) => (
-                <div key={i} className="hour-box"
-                  onClick={(e) => { openPopup(e, h); setSelectedHour(h); setSelectedDay(null) }}
+                <button type="button" key={i} className="hour-box"
+                  onClick={() => { setDetailTab('main'); setSelectedHour(h); setSelectedDay(null) }}
                   style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
                   <p className="hour-temp">{h.temp}°C</p>
                   <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
                   {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -989,9 +1010,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <div className="card">
             <h3>{t.days14}</h3>
             <div className="daily-grid">
-              {forecast.map((day, i) => (
-                <div key={i} className="day-box"
-                  onClick={(e) => { openPopup(e, day); setSelectedDay(day); setSelectedHour(null) }}
+              {forecast.map((day) => (
+                <button type="button" key={day.dateStr} className="day-box"
+                  onClick={() => { setDetailTab('main'); setSelectedDay(day); setSelectedHour(null) }}
                   style={{ cursor: 'pointer', transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="day-name">{day.dayName}</p>
                   <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
@@ -1002,7 +1023,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
                   </p>
                   <p className="day-rain">🌧 {day.rain}{t.mm}</p>
                   <p className="day-wind">🌬️ {day.wind}{t.windUnit}</p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -1016,6 +1037,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
                 src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`}
                 frameBorder="0"
                 title="Windy Map"
+                loading="lazy"
                 style={{ display: 'block' }}
               ></iframe>
             </div>
@@ -1039,10 +1061,10 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       {selectedDay && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
-          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-labelledby="day-dialog-title" className="card popup-card" style={{ background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
-              <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedDay(null)}>❌</button>
+              <h4 id="day-dialog-title" style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedDay.dayName}</h4>
+              <button aria-label={t.close} className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedDay(null)}>✕</button>
             </div>
             <div className="chart-tabs">
               <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
@@ -1052,7 +1074,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="popup-grid">
               {detailTab === 'main' && <>
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedDay.min}° / {selectedDay.max}°</p></div>
-                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">до {selectedDay.feelsLikeMax}°</p></div>
+                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{t.upTo} {selectedDay.feelsLikeMax}°</p></div>
                 <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{selectedDay.sunrise}</p></div>
                 <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{selectedDay.sunset}</p></div>
                 <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedDay.humidity}%</p></div>
@@ -1080,10 +1102,10 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       {selectedHour && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedHour(null)}>
-          <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-labelledby="hour-dialog-title" className="card popup-card" style={{ background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour} ч.</h4>
-              <button className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedHour(null)}>❌</button>
+              <h4 id="hour-dialog-title" style={{ fontSize: '1.1rem', margin: 0 }}>{t.detailsFor} {selectedHour.hour}</h4>
+              <button aria-label={t.close} className="icon-btn" style={{ fontSize: '0.9rem', padding: '4px 8px' }} onClick={() => setSelectedHour(null)}>✕</button>
             </div>
             <div className="chart-tabs">
               <button className={'chart-tab ' + (detailTab === 'main' ? 'active-temp' : '')} onClick={() => setDetailTab('main')}>{t.tabMain}</button>
@@ -1095,7 +1117,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp}°C</p></div>
                 <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike}°C</p></div>
                 <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity}%</p></div>
-                <div className="stat-box"><p>☁️</p><p className="label">Време</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{t.weatherLabel}</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
               </>}
               {detailTab === 'atmosphere' && <>
                 <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedHour.pressure} {t.hpa}</p></div>
