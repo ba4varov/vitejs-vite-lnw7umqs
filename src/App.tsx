@@ -667,16 +667,36 @@ const WeatherApp = () => {
     }
   }
 
+  const getLocalizedExactLocation = async (lat: number, lon: number, targetLang: 'bg' | 'en', fallback: string) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${targetLang}&zoom=18`)
+      if (!response.ok) return fallback
+      const data = await response.json()
+      const address = data.address || {}
+      const street = address.road || address.pedestrian || address.street
+      const exactDetails = street
+        ? [street, address.house_number].filter(Boolean)
+        : [address.suburb || address.neighbourhood || address.city_district].filter(Boolean)
+      return exactDetails.length > 0 ? exactDetails.join(' ') : fallback
+    } catch {
+      return fallback
+    }
+  }
+
   const changeLanguage = async () => {
     const targetLang: 'bg' | 'en' = lang === 'bg' ? 'en' : 'bg'
-    const [localizedCity, localizedFavoriteName] = await Promise.all([
+    const [localizedCity, localizedFavoriteName, localizedExactLocation] = await Promise.all([
       getLocalizedLocationName(coords.lat, coords.lon, targetLang, city),
       favoriteCity
         ? getLocalizedLocationName(favoriteCity.lat, favoriteCity.lon, targetLang, favoriteCity.name)
+        : Promise.resolve(null),
+      exactLocation
+        ? getLocalizedExactLocation(coords.lat, coords.lon, targetLang, exactLocation)
         : Promise.resolve(null)
     ])
 
     setCity(localizedCity)
+    if (localizedExactLocation) setExactLocation(localizedExactLocation)
     if (favoriteCity && localizedFavoriteName) {
       const localizedFavorite = { ...favoriteCity, name: localizedFavoriteName }
       setFavoriteCity(localizedFavorite)
