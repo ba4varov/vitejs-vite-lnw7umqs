@@ -50,6 +50,12 @@ const translations = {
     pm10: 'ФПЧ 10 (PM10)',
     pm25: 'ФПЧ 2.5 (PM2.5)',
     aqiChart: 'AQI Индекс (24 часа)',
+    chatTitle: 'Попитай Боби за времето',
+    chatSubtitle: 'Съветите се съобразяват с актуалната прогноза за избраното място.',
+    chatPlaceholder: 'Напр. Да взема ли чадър?',
+    chatSend: 'Изпрати',
+    chatGreeting: 'Здравей! Аз съм Боби. Попитай ме как да се подготвиш за времето.',
+    chatSuggestions: ['Да взема ли чадър?', 'Как да се облека?', 'Подходящо ли е за разходка?'],
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
     highTemp: 'Опасно високи температури! (Над 35°C)',
@@ -127,6 +133,12 @@ const translations = {
     pm10: 'PM10',
     pm25: 'PM2.5',
     aqiChart: 'AQI (24 Hours)',
+    chatTitle: 'Ask Bobby about the weather',
+    chatSubtitle: 'Advice is based on the live forecast for the selected location.',
+    chatPlaceholder: 'E.g. Should I take an umbrella?',
+    chatSend: 'Send',
+    chatGreeting: 'Hi! I am Bobby. Ask me how to prepare for the weather.',
+    chatSuggestions: ['Should I take an umbrella?', 'What should I wear?', 'Is it good for a walk?'],
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     highTemp: 'Extreme high temperatures! (Above 35°C)',
@@ -336,12 +348,11 @@ const WeatherApp = () => {
   const [detailTab, setDetailTab] = useState('main')
   
   const [aiAdvice, setAiAdvice] = useState<string | null>(null)
+  const [chatInput, setChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'bot', text: string }>>([])
   
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
-
-  // Взимаме сигурния ключ от Vercel
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
@@ -351,6 +362,55 @@ const WeatherApp = () => {
       } catch (e) {}
     }
   }, [])
+
+  useEffect(() => {
+    setChatMessages([{ role: 'bot', text: t.chatGreeting }])
+  }, [lang, city])
+
+  const getChatAnswer = (question: string) => {
+    if (!weather) return t.loading
+    const q = question.toLocaleLowerCase(lang === 'bg' ? 'bg-BG' : 'en-US')
+    const nextRain = hourly.find(h => h.rain > 0)
+    const rainy = weather.precipProb >= 35 || Number(weather.precipSum) > 0 || Boolean(nextRain)
+    const cold = weather.feelsLike <= 10
+    const hot = weather.feelsLike >= 28
+    const windy = weather.windSpeed >= 25 || weather.maxWindSpeedDaily >= 35
+    const highUv = weather.uvIndex >= 6
+    const badAir = weather.aqi != null && weather.aqi >= 80
+
+    if (/чадър|дъжд|вали|umbrella|rain/.test(q)) {
+      if (rainy) return lang === 'bg'
+        ? `Да — вземи чадър за ${city}. Вероятността за валеж днес е ${weather.precipProb}%${nextRain ? `, а следващият валеж е около ${nextRain.hour} ч.` : '.'}`
+        : `Yes—take an umbrella in ${city}. Today's rain chance is ${weather.precipProb}%${nextRain ? `, with the next rain around ${nextRain.hour}.` : '.'}`
+      return lang === 'bg' ? `Не изглежда задължително — за ${city} прогнозата е с ${weather.precipProb}% вероятност за валеж. Все пак провери отново преди тръгване.` : `It does not look essential—the rain chance for ${city} is ${weather.precipProb}%. Check again before leaving.`
+    }
+    if (/облека|дрех|яке|wear|dress|jacket/.test(q)) {
+      const parts = lang === 'bg' ? [`Усеща се като ${weather.feelsLike}°C.`] : [`It feels like ${weather.feelsLike}°C.`]
+      if (cold) parts.push(lang === 'bg' ? 'Избери топли слоеве и яке.' : 'Wear warm layers and a jacket.')
+      else if (hot) parts.push(lang === 'bg' ? 'Избери леки, светли дрехи и носи вода.' : 'Choose light clothes and carry water.')
+      else parts.push(lang === 'bg' ? 'Леко яке или връхна дреха е достатъчна.' : 'A light jacket or outer layer should be enough.')
+      if (rainy) parts.push(lang === 'bg' ? 'Добави непромокаема връхна дреха.' : 'Add a waterproof outer layer.')
+      if (windy) parts.push(lang === 'bg' ? 'Избягвай свободни шапки заради вятъра.' : 'Avoid loose hats because of the wind.')
+      return parts.join(' ')
+    }
+    if (/разход|навън|спорт|тич|walk|outside|sport|run/.test(q)) {
+      if ([95, 96, 99].includes(weather.code) || weather.windSpeed >= 65) return lang === 'bg' ? `Не препоръчвам излизане в момента в ${city} заради опасните условия. Изчакай прогнозата да се подобри.` : `I do not recommend going out in ${city} right now because of hazardous conditions. Wait for the forecast to improve.`
+      const best = hourly.filter(h => h.rain === 0 && h.wind < 30).sort((a, b) => Math.abs(a.temp - 20) - Math.abs(b.temp - 20))[0]
+      return lang === 'bg' ? `Да${rainy ? ', но между валежите' : ''}. Най-подходящият от следващите часове изглежда около ${best?.hour || 'по-късно'} ч. (${best?.temp ?? weather.temp}°C).${highUv ? ' Ползвай слънцезащита.' : ''}${badAir ? ' Заради качеството на въздуха избери по-лека активност.' : ''}` : `Yes${rainy ? ', between showers' : ''}. The best upcoming time looks close to ${best?.hour || 'later'} (${best?.temp ?? weather.temp}°C).${highUv ? ' Use sun protection.' : ''}${badAir ? ' Keep activity light because of the air quality.' : ''}`
+    }
+    if (/утре|tomorrow/.test(q) && forecast[0]) {
+      const day = forecast[0]
+      return lang === 'bg' ? `Утре в ${city}: ${day.min}°–${day.max}°C, валежи ${day.rain} мм и вятър до ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Подготви чадър или дъждобран.' : 'Условията изглеждат сравнително сухи.'}` : `Tomorrow in ${city}: ${day.min}°–${day.max}°C, ${day.rain} mm of rain and wind up to ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Pack an umbrella or raincoat.' : 'Conditions look relatively dry.'}`
+    }
+    return lang === 'bg' ? `В ${city} сега е ${weather.temp}°C (усеща се ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, с вятър ${weather.windSpeed} ${t.windUnit}. ${rainy ? 'Възможни са валежи — носи чадър.' : 'Не се очертават значителни валежи.'} Попитай ме за дрехи, разходка, чадър или утрешната прогноза.` : `In ${city} it is ${weather.temp}°C (feels like ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, with ${weather.windSpeed} ${t.windUnit} wind. ${rainy ? 'Rain is possible—carry an umbrella.' : 'No significant rain is expected.'} Ask me about clothes, a walk, an umbrella, or tomorrow.`
+  }
+
+  const sendChatMessage = (message = chatInput) => {
+    const clean = message.trim()
+    if (!clean) return
+    setChatMessages(previous => [...previous, { role: 'user', text: clean }, { role: 'bot', text: getChatAnswer(clean) }])
+    setChatInput('')
+  }
 
   const toggleFavorite = () => {
     if (favoriteCity && favoriteCity.name === city) {
@@ -966,6 +1026,35 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
             </div>
           </div>
+
+          <section className="card weather-chat" aria-labelledby="weather-chat-title">
+            <div className="chat-heading">
+              <div className="chat-avatar" aria-hidden="true">🤖</div>
+              <div>
+                <h3 id="weather-chat-title">{t.chatTitle}</h3>
+                <p>{t.chatSubtitle}</p>
+              </div>
+              <span className="chat-location">📍 {city}</span>
+            </div>
+            <div className="chat-messages" aria-live="polite">
+              {chatMessages.map((message, index) => (
+                <div key={index} className={`chat-message ${message.role}`}>
+                  {message.role === 'bot' && <span aria-hidden="true">🌤️</span>}
+                  <p>{message.text}</p>
+                </div>
+              ))}
+            </div>
+            <div className="chat-suggestions">
+              {t.chatSuggestions.map(suggestion => (
+                <button key={suggestion} type="button" onClick={() => sendChatMessage(suggestion)}>{suggestion}</button>
+              ))}
+            </div>
+            <form className="chat-form" onSubmit={event => { event.preventDefault(); sendChatMessage() }}>
+              <input value={chatInput} onChange={event => setChatInput(event.target.value)} placeholder={t.chatPlaceholder} aria-label={t.chatPlaceholder} />
+              <button type="submit" disabled={!chatInput.trim()}>{t.chatSend} <span aria-hidden="true">➤</span></button>
+            </form>
+            <p className="chat-disclaimer">{lang === 'bg' ? 'Съветите са информативни. При опасно време следвай указанията на местните власти.' : 'Advice is informational. During severe weather, follow local authority guidance.'}</p>
+          </section>
 
           <div className="card">
             <h3>{t.hours24}</h3>
