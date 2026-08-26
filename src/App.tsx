@@ -355,6 +355,7 @@ const WeatherApp = () => {
   const searchController = useRef<AbortController | null>(null)
   const weatherController = useRef<AbortController | null>(null)
   const t = translations[lang as keyof typeof translations]
+  const backgroundImageUrl = `https://picsum.photos/seed/bobbyweather-${coords.lat.toFixed(3)}-${coords.lon.toFixed(3)}/1200/800`
 
   useEffect(() => {
     document.documentElement.lang = lang
@@ -920,7 +921,14 @@ const fetchAiAdvice = async (dataForAi: any) => {
           )}
 
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
-            
+            <img
+              className="main-card-image"
+              src={backgroundImageUrl}
+              alt=""
+              aria-hidden="true"
+              fetchPriority="high"
+            />
+
             <div style={{
               position: 'absolute',
               top: 0,
