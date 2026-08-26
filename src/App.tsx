@@ -3,7 +3,7 @@ import './App.css'
 
 const translations = {
   bg: {
-    title: '🌤️ Доброто време с Боби',
+    title: '🌤️ Метео Пулс',
     subtitle: 'Твоят метео гид',
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
@@ -34,6 +34,7 @@ const translations = {
     weatherLabel: 'Време',
     upTo: 'до',
     advisoryNote: 'Автоматично изчислено по прогнозни данни. При опасно време проверете официалните предупреждения.',
+    copyright: '© 2026 Метео Пулс. Всички права запазени.',
     error: 'Неуспешно зареждане. Моля, опитайте отново.',
     chart: '📊 Графики за 24 часа',
     temp: 'Температура',
@@ -86,7 +87,7 @@ const translations = {
     ]
   },
   en: {
-    title: '🌤️ Great Weather with Bobby',
+    title: '🌤️ Meteo Pulse',
     subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
@@ -117,6 +118,7 @@ const translations = {
     weatherLabel: 'Weather',
     upTo: 'up to',
     advisoryNote: 'Automatically calculated from forecast data. Check official warnings during severe weather.',
+    copyright: '© 2026 Meteo Pulse. All rights reserved.',
     error: 'Failed to load weather data. Please try again.',
     chart: '📊 24-Hour Charts',
     temp: 'Temperature',
@@ -326,14 +328,14 @@ const Chart = ({ hourly, darkMode, t }: any) => {
 }
 
 const WeatherApp = () => {
-  const [lang, setLang] = useState(() => localStorage.getItem('bobbyWeatherLang') === 'en' ? 'en' : 'bg')
+  const [lang, setLang] = useState(() => (localStorage.getItem('meteoPulseLang') ?? localStorage.getItem('bobbyWeatherLang')) === 'en' ? 'en' : 'bg')
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('bobbyWeatherTheme')
+    const saved = localStorage.getItem('meteoPulseTheme') ?? localStorage.getItem('bobbyWeatherTheme')
     return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
   })
   const [loading, setLoading] = useState(true)
@@ -355,15 +357,16 @@ const WeatherApp = () => {
   const searchController = useRef<AbortController | null>(null)
   const weatherController = useRef<AbortController | null>(null)
   const t = translations[lang as keyof typeof translations]
-  const backgroundImageUrl = `https://picsum.photos/seed/bobbyweather-${coords.lat.toFixed(3)}-${coords.lon.toFixed(3)}/1200/800`
+  const backgroundImageUrl = `https://picsum.photos/seed/meteopulse-${coords.lat.toFixed(3)}-${coords.lon.toFixed(3)}/1200/800`
 
   useEffect(() => {
     document.documentElement.lang = lang
-    localStorage.setItem('bobbyWeatherLang', lang)
+    document.title = lang === 'bg' ? 'Метео Пулс' : 'Meteo Pulse'
+    localStorage.setItem('meteoPulseLang', lang)
   }, [lang])
 
   useEffect(() => {
-    localStorage.setItem('bobbyWeatherTheme', darkMode ? 'dark' : 'light')
+    localStorage.setItem('meteoPulseTheme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
   useEffect(() => {
@@ -379,7 +382,7 @@ const WeatherApp = () => {
   }, [])
 
   useEffect(() => {
-    const savedFav = localStorage.getItem('bobbyWeatherFav')
+    const savedFav = localStorage.getItem('meteoPulseFav') ?? localStorage.getItem('bobbyWeatherFav')
     if (savedFav) {
       try {
         setFavoriteCity(JSON.parse(savedFav))
@@ -390,11 +393,12 @@ const WeatherApp = () => {
   const toggleFavorite = () => {
     if (favoriteCity && favoriteCity.name === city) {
       setFavoriteCity(null)
+      localStorage.removeItem('meteoPulseFav')
       localStorage.removeItem('bobbyWeatherFav')
     } else {
       const newFav = { name: city, lat: coords.lat, lon: coords.lon }
       setFavoriteCity(newFav)
-      localStorage.setItem('bobbyWeatherFav', JSON.stringify(newFav))
+      localStorage.setItem('meteoPulseFav', JSON.stringify(newFav))
     }
   }
 
@@ -1149,7 +1153,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       <div className="footer">
         <p>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo API</a></p>
-        <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
+        <p>{t.copyright}</p>
       </div>
     </div>
   )
