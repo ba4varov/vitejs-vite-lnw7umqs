@@ -910,7 +910,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
               zIndex: 1
             }}></div>
 
-            <div style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
+            <div className="main-card-content" style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
               
               <div className="main-top" style={{ padding: 0, marginBottom: '24px' }}>
                 <div className="main-info-left">
