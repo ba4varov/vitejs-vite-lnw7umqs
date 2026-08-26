@@ -413,6 +413,20 @@ const WeatherApp = () => {
         : `Yes—take an umbrella in ${city}. Today's rain chance is ${weather.precipProb}%${nextRain ? `, with the next rain around ${nextRain.hour}.` : '.'}`
       return lang === 'bg' ? `Не изглежда задължително — за ${city} прогнозата е с ${weather.precipProb}% вероятност за валеж. Все пак провери отново преди тръгване.` : `It does not look essential—the rain chance for ${city} is ${weather.precipProb}%. Check again before leaving.`
     }
+    if (/гръм|гърм|гръмотев|светкав|thunder|lightning/.test(q)) {
+      const stormCodes = [95, 96, 99]
+      const today = hourly[0]?.time?.slice(0, 10)
+      const stormHour = today ? hourly.find(h => h.time?.startsWith(today) && stormCodes.includes(h.code)) : undefined
+      const hasThunderstorm = stormCodes.includes(weather.code) || Boolean(stormHour)
+      if (hasThunderstorm) {
+        return lang === 'bg'
+          ? `Да, за ${city} има вероятност за гръмотевична буря${stormHour ? ` около ${stormHour.hour} ч.` : ' в момента'}. Стой на закрито и остави геройствата на гръмоотвода!`
+          : `Yes, a thunderstorm is possible in ${city}${stormHour ? ` around ${stormHour.hour}` : ' right now'}. Stay indoors and leave the heroics to the lightning rod!`
+      }
+      return lang === 'bg'
+        ? `Не, в днешната прогноза за ${city} не се очакват гръмотевици. Небето засега е свалило барабаните!`
+        : `No thunderstorms are expected in today's forecast for ${city}. The sky has put its drums away for now!`
+    }
     if (/облека|дрех|яке|wear|dress|jacket/.test(q)) {
       const parts = lang === 'bg' ? [`Усеща се като ${weather.feelsLike}°C.`] : [`It feels like ${weather.feelsLike}°C.`]
       if (cold) parts.push(lang === 'bg' ? 'Избери топли слоеве и яке.' : 'Wear warm layers and a jacket.')
@@ -432,7 +446,7 @@ const WeatherApp = () => {
       return lang === 'bg' ? `Утре в ${city}: ${day.min}°–${day.max}°C, валежи ${day.rain} мм и вятър до ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Подготви чадър или дъждобран.' : 'Условията изглеждат сравнително сухи.'}` : `Tomorrow in ${city}: ${day.min}°–${day.max}°C, ${day.rain} mm of rain and wind up to ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Pack an umbrella or raincoat.' : 'Conditions look relatively dry.'}`
     }
 
-    const isWeatherQuestion = /врем|прогноз|температур|градус|слън|облак|сняг|студ|топл|жег|вятър|бур|мъгл|влаж|uv|weather|forecast|temperature|degree|sun|cloud|snow|cold|warm|hot|wind|storm|fog|humid/.test(q)
+    const isWeatherQuestion = /врем|прогноз|температур|градус|слън|облак|сняг|студ|топл|жег|вятър|бур|гръм|гърм|светкав|мъгл|влаж|uv|weather|forecast|temperature|degree|sun|cloud|snow|cold|warm|hot|wind|storm|thunder|lightning|fog|humid/.test(q)
     if (!isWeatherQuestion) {
       const humorousReplies = lang === 'bg'
         ? [
@@ -731,6 +745,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
         const aqiVal = hourlyAqi.length > idx ? hourlyAqi[idx] : null
         
         hr.push({
+          time: data.hourly.time[idx],
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
           feelsLike: Math.round(data.hourly.apparent_temperature[idx]),
@@ -743,6 +758,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           cloudCover: Math.round(data.hourly.cloud_cover[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
           aqi: aqiVal !== null ? Math.round(aqiVal) : 0,
+          code: data.hourly.weather_code[idx],
           icon: code.icon
         })
       }
