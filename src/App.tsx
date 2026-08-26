@@ -340,6 +340,30 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
 
+  useEffect(() => {
+    const isBulgarian = lang === 'bg'
+    const title = isBulgarian
+      ? `Времето в ${city} | 14-дневна прогноза с Боби`
+      : `Weather in ${city} | 14-day forecast with Bobby`
+    const description = isBulgarian
+      ? `Актуално време в ${city}, почасова прогноза, валежи, вятър, качество на въздуха и подробна прогноза за следващите 14 дни.`
+      : `Current weather in ${city}, hourly conditions, rain, wind, air quality and a detailed 14-day forecast.`
+
+    document.title = title
+    document.documentElement.lang = lang
+
+    const updateMeta = (selector: string, content: string) => {
+      document.querySelector<HTMLMetaElement>(selector)?.setAttribute('content', content)
+    }
+
+    updateMeta('meta[name="description"]', description)
+    updateMeta('meta[property="og:title"]', title)
+    updateMeta('meta[property="og:description"]', description)
+    updateMeta('meta[property="og:locale"]', isBulgarian ? 'bg_BG' : 'en_US')
+    updateMeta('meta[name="twitter:title"]', title)
+    updateMeta('meta[name="twitter:description"]', description)
+  }, [city, lang])
+
   // Взимаме сигурния ключ от Vercel
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
