@@ -3,7 +3,7 @@ import './App.css'
 
 const translations = {
   bg: {
-    title: '🌤️ Доброто време с Боби',
+    title: '🌤️ Метео Пулс',
     subtitle: 'Твоят метео гид',
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
@@ -86,7 +86,7 @@ const translations = {
     ]
   },
   en: {
-    title: '🌤️ Great Weather with Bobby',
+    title: '🌤️ Meteo Pulse',
     subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
@@ -370,8 +370,8 @@ const WeatherApp = () => {
   useEffect(() => {
     document.documentElement.lang = lang
     const title = lang === 'bg'
-      ? `Времето в ${city} | Доброто време с Боби`
-      : `Weather in ${city} | Great Weather with Bobby`
+      ? `Времето в ${city} | Метео Пулс`
+      : `Weather in ${city} | Meteo Pulse`
     const description = weather
       ? (lang === 'bg'
           ? `Актуално време в ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Почасова и 14-дневна прогноза с персонални метео съвети.`
@@ -1229,7 +1229,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       <div className="footer">
         <p>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo API</a></p>
-        <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
+        <p>© 2026 Метео Пулс. Всички права запазени.</p>
       </div>
     </div>
   )
