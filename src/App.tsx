@@ -444,11 +444,61 @@ const WeatherApp = () => {
     return lang === 'bg' ? `В ${city} сега е ${weather.temp}°C (усеща се ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, с вятър ${weather.windSpeed} ${t.windUnit}. ${rainy ? 'Възможни са валежи — носи чадър.' : 'Не се очертават значителни валежи.'} Попитай ме за дрехи, разходка, чадър или утрешната прогноза.` : `In ${city} it is ${weather.temp}°C (feels like ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, with ${weather.windSpeed} ${t.windUnit} wind. ${rainy ? 'Rain is possible—carry an umbrella.' : 'No significant rain is expected.'} Ask me about clothes, a walk, an umbrella, or tomorrow.`
   }
 
-  const sendChatMessage = (message = chatInput) => {
+  const getOtherLocationAnswer = async (question: string) => {
+    const locationMatch = question.match(/(?:\bвъв|\bв|\bза|\bin|\bfor)\s+([\p{L}][\p{L}\s.'’-]{1,60})/iu)
+    if (!locationMatch) return null
+
+    const locationQuery = locationMatch[1]
+      .replace(/\b(?:днес|утре|сега|довечера|тази седмица|today|tomorrow|now|tonight|this week)\b.*$/iu, '')
+      .replace(/\b(?:ще ли|дали|какво|какъв|каква|какви|is it|will it)\b.*$/iu, '')
+      .replace(/[?!,.]+$/g, '')
+      .trim()
+    if (!locationQuery || city.toLocaleLowerCase().includes(locationQuery.toLocaleLowerCase())) return null
+
+    try {
+      const geoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1&language=${lang}&format=json`)
+      if (!geoResponse.ok) throw new Error('Location search failed')
+      const place = (await geoResponse.json()).results?.[0]
+      if (!place) {
+        return lang === 'bg'
+          ? `Радарът ми не успя да намери „${locationQuery}“. Провери името на мястото и опитай пак.`
+          : `My radar could not find “${locationQuery}”. Check the place name and try again.`
+      }
+
+      const forecastResponse = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=2`
+      )
+      if (!forecastResponse.ok) throw new Error('Forecast failed')
+      const placeWeather = await forecastResponse.json()
+      const asksTomorrow = /утре|tomorrow/iu.test(question)
+      const dayIndex = asksTomorrow ? 1 : 0
+      const placeName = `${place.name}${place.country ? `, ${place.country}` : ''}`
+      const weatherDescription = decodeWeatherCode(placeWeather.current.weather_code).desc.toLowerCase()
+      const rainChance = placeWeather.daily.precipitation_probability_max[dayIndex] || 0
+
+      if (asksTomorrow) {
+        return lang === 'bg'
+          ? `Утре в ${placeName}: ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C и ${rainChance}% вероятност за валеж. ${rainChance >= 35 ? 'Чадърът ще е добра компания!' : 'Чадърът май може да си почива.'}`
+          : `Tomorrow in ${placeName}: ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C with a ${rainChance}% rain chance. ${rainChance >= 35 ? 'An umbrella will be good company!' : 'The umbrella can probably rest.'}`
+      }
+
+      return lang === 'bg'
+        ? `В ${placeName} сега е ${Math.round(placeWeather.current.temperature_2m)}°C, усеща се като ${Math.round(placeWeather.current.apparent_temperature)}°C и е ${weatherDescription}. Вероятността за валеж днес е ${rainChance}%.`
+        : `In ${placeName} it is ${Math.round(placeWeather.current.temperature_2m)}°C, feels like ${Math.round(placeWeather.current.apparent_temperature)}°C, with ${weatherDescription}. Today's rain chance is ${rainChance}%.`
+    } catch {
+      return lang === 'bg'
+        ? `Не успях да взема прогнозата за ${locationQuery} — явно облаците пазят данните. Опитай отново след малко.`
+        : `I could not fetch the forecast for ${locationQuery}—the clouds must be guarding the data. Try again shortly.`
+    }
+  }
+
+  const sendChatMessage = async (message = chatInput) => {
     const clean = message.trim()
     if (!clean) return
-    setChatMessages(previous => [...previous, { role: 'user', text: clean }, { role: 'bot', text: getChatAnswer(clean) }])
     setChatInput('')
+    setChatMessages(previous => [...previous, { role: 'user', text: clean }])
+    const otherLocationAnswer = await getOtherLocationAnswer(clean)
+    setChatMessages(previous => [...previous, { role: 'bot', text: otherLocationAnswer || getChatAnswer(clean) }])
   }
 
   const toggleFavorite = () => {
