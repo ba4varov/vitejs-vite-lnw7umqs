@@ -423,6 +423,24 @@ const WeatherApp = () => {
       const day = forecast[0]
       return lang === 'bg' ? `Утре в ${city}: ${day.min}°–${day.max}°C, валежи ${day.rain} мм и вятър до ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Подготви чадър или дъждобран.' : 'Условията изглеждат сравнително сухи.'}` : `Tomorrow in ${city}: ${day.min}°–${day.max}°C, ${day.rain} mm of rain and wind up to ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Pack an umbrella or raincoat.' : 'Conditions look relatively dry.'}`
     }
+
+    const isWeatherQuestion = /врем|прогноз|температур|градус|слън|облак|сняг|студ|топл|жег|вятър|бур|мъгл|влаж|uv|weather|forecast|temperature|degree|sun|cloud|snow|cold|warm|hot|wind|storm|fog|humid/.test(q)
+    if (!isWeatherQuestion) {
+      const humorousReplies = lang === 'bg'
+        ? [
+            'Хм, метео радарът ми не засича тази тема. Попитай ме за времето — там облаците ми говорят!',
+            'По този въпрос съм в гъста мъгла. За прогнози, чадъри и якета обаче съм насреща!',
+            'Това май е извън моя климатичен пояс. Дай ми въпрос за времето и ще развихря прогнозата!'
+          ]
+        : [
+            'Hmm, my weather radar cannot detect that topic. Ask me about the weather—the clouds talk to me!',
+            'I am in thick fog on that one. Forecasts, umbrellas and jackets are more my climate!',
+            'That seems outside my climate zone. Ask me about the weather and I will whip up a forecast!'
+          ]
+      const replyIndex = [...q].reduce((sum, character) => sum + character.charCodeAt(0), 0) % humorousReplies.length
+      return humorousReplies[replyIndex]
+    }
+
     return lang === 'bg' ? `В ${city} сега е ${weather.temp}°C (усеща се ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, с вятър ${weather.windSpeed} ${t.windUnit}. ${rainy ? 'Възможни са валежи — носи чадър.' : 'Не се очертават значителни валежи.'} Попитай ме за дрехи, разходка, чадър или утрешната прогноза.` : `In ${city} it is ${weather.temp}°C (feels like ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, with ${weather.windSpeed} ${t.windUnit} wind. ${rainy ? 'Rain is possible—carry an umbrella.' : 'No significant rain is expected.'} Ask me about clothes, a walk, an umbrella, or tomorrow.`
   }
 
