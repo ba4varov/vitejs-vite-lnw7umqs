@@ -529,7 +529,7 @@ const WeatherApp = () => {
       .replace(/(?:^|\s)(?:ще|дали|какво|какъв|каква|какви|през|около|is it|will it|during|around)(?:\s|[?!,.]|$).*$/iu, '')
       .replace(/[?!,.]+$/g, '')
       .trim()
-    const nonLocationPhrases = /^(?:разходка|спорт|тичане|бягане|плаж|излизане|навън|работа|училище|walk|walking|sport|running|run|beach|going out|outside|work|school)(?:\s|$)/iu
+    const nonLocationPhrases = /^(?:(?:a|the)\s+)?(?:разходка|спорт|тичане|бягане|плаж|излизане|навън|работа|училище|walk|walking|sport|running|run|beach|going out|outside|work|school)(?:\s|$)/iu
     if (nonLocationPhrases.test(locationQuery)) return null
     if (!locationQuery || city.toLocaleLowerCase().includes(locationQuery.toLocaleLowerCase())) return null
 
@@ -647,6 +647,42 @@ const WeatherApp = () => {
     setSelectedDay(null)
     setSelectedHour(null)
     setExactLocation(null) 
+  }
+
+  const getLocalizedLocationName = async (lat: number, lon: number, targetLang: 'bg' | 'en', fallback: string) => {
+    const localizedQuickCity = translations[targetLang].quickCities.find(candidate =>
+      Math.abs(candidate.lat - lat) < 0.01 && Math.abs(candidate.lon - lon) < 0.01
+    )
+    if (localizedQuickCity) return localizedQuickCity.name
+
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${targetLang}&zoom=10`)
+      if (!response.ok) return fallback
+      const data = await response.json()
+      const address = data.address || {}
+      const locality = address.city || address.town || address.village || address.county
+      return locality ? `${locality}${address.country ? `, ${address.country}` : ''}` : fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  const changeLanguage = async () => {
+    const targetLang: 'bg' | 'en' = lang === 'bg' ? 'en' : 'bg'
+    const [localizedCity, localizedFavoriteName] = await Promise.all([
+      getLocalizedLocationName(coords.lat, coords.lon, targetLang, city),
+      favoriteCity
+        ? getLocalizedLocationName(favoriteCity.lat, favoriteCity.lon, targetLang, favoriteCity.name)
+        : Promise.resolve(null)
+    ])
+
+    setCity(localizedCity)
+    if (favoriteCity && localizedFavoriteName) {
+      const localizedFavorite = { ...favoriteCity, name: localizedFavoriteName }
+      setFavoriteCity(localizedFavorite)
+      localStorage.setItem('bobbyWeatherFav', JSON.stringify(localizedFavorite))
+    }
+    setLang(targetLang)
   }
 
   const formatTime = (isoString: string) => {
@@ -987,7 +1023,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
-          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
+          <button className="lang-btn" onClick={changeLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
           <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
