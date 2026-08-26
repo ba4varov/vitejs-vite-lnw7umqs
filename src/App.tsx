@@ -1,5 +1,41 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import heroBackground from './assets/hero.png'
+
+const WEATHER_CACHE_PREFIX = 'bobbyWeather:v1:'
+const WEATHER_CACHE_TTL = 15 * 60 * 1000
+
+type WeatherCache = {
+  timestamp: number
+  weather: any
+  hourly: any[]
+  forecast: any[]
+}
+
+const getWeatherCacheKey = (lat: number, lon: number, lang: string) =>
+  `${WEATHER_CACHE_PREFIX}${lat.toFixed(3)}:${lon.toFixed(3)}:${lang}`
+
+const readWeatherCache = (key: string): WeatherCache | null => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || 'null') as WeatherCache | null
+    if (!cached || Date.now() - cached.timestamp >= WEATHER_CACHE_TTL) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return cached
+  } catch {
+    localStorage.removeItem(key)
+    return null
+  }
+}
+
+const writeWeatherCache = (key: string, value: WeatherCache) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // The forecast still works when storage is unavailable or full.
+  }
+}
 
 const translations = {
   bg: {
@@ -328,7 +364,6 @@ const WeatherApp = () => {
   const [forecast, setForecast] = useState<any[]>([])
   const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
-  const [bgImageUrl, setBgImageUrl] = useState<string>('')
   
   const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedHour, setSelectedHour] = useState<any>(null)
@@ -523,6 +558,24 @@ const fetchAiAdvice = async (dataForAi: any) => {
     setAiAdvice(advice);
   }
   const fetchWeather = async (lat: number, lon: number) => {
+    const cacheKey = getWeatherCacheKey(lat, lon, lang)
+    const cached = readWeatherCache(cacheKey)
+    if (cached) {
+      setWeather(cached.weather)
+      setHourly(cached.hourly)
+      setForecast(cached.forecast)
+      setLastUpdated(new Date(cached.timestamp))
+      fetchAiAdvice({
+        city,
+        temp: cached.weather.temp,
+        wind: cached.weather.windSpeed,
+        precipitation: cached.weather.precipSum
+      })
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -579,7 +632,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       const cur = decodeWeatherCode(data.current.weather_code)
       
-      setWeather({
+      const currentWeather = {
         temp: Math.round(data.current.temperature_2m),
         minTemp: Math.round(data.daily.temperature_2m_min[0]),
         maxTemp: Math.round(data.daily.temperature_2m_max[0]),
@@ -602,7 +655,8 @@ const fetchAiAdvice = async (dataForAi: any) => {
         aqi: currentAqi,
         pm10: currentPm10,
         pm25: currentPm25
-      })
+      }
+      setWeather(currentWeather)
 
       // Извикване на AI функцията с реални данни
       fetchAiAdvice({
@@ -694,10 +748,14 @@ const fetchAiAdvice = async (dataForAi: any) => {
       }
       setForecast(days)
       setLoading(false)
-      setLastUpdated(new Date())
-
-      const randomId = Math.floor(Math.random() * 1000) + 1;
-      setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
+      const updatedAt = Date.now()
+      setLastUpdated(new Date(updatedAt))
+      writeWeatherCache(cacheKey, {
+        timestamp: updatedAt,
+        weather: currentWeather,
+        hourly: hr,
+        forecast: days
+      })
 
     } catch (e: any) {
       console.error(e);
@@ -884,10 +942,13 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             
-            {bgImageUrl && (
-              <img 
-                src={bgImageUrl} 
+            <img
+                src={heroBackground}
                 alt="" 
+                width="1200"
+                height="800"
+                fetchPriority="high"
+                decoding="async"
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -898,7 +959,6 @@ const fetchAiAdvice = async (dataForAi: any) => {
                   zIndex: 0
                 }} 
               />
-            )}
 
             <div style={{
               position: 'absolute',
@@ -1015,6 +1075,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
                 height="450"
                 src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`}
                 frameBorder="0"
+                loading="lazy"
                 title="Windy Map"
                 style={{ display: 'block' }}
               ></iframe>
