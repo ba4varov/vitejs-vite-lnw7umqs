@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="#0f172a"/><stop offset=".6" stop-color="#334155"/><stop offset="1" stop-color="#64748b"/></linearGradient><linearGradient id="g" x2="0" y2="1"><stop stop-color="#1e293b"/><stop offset="1" stop-color="#020617"/></linearGradient></defs>
+  <rect width="1200" height="800" fill="url(#s)"/><g fill="#94a3b8"><ellipse cx="250" cy="170" rx="210" ry="78"/><ellipse cx="80" cy="205" rx="145" ry="62"/><ellipse cx="450" cy="205" rx="165" ry="65"/><ellipse cx="900" cy="125" rx="230" ry="85"/><ellipse cx="1100" cy="170" rx="170" ry="68"/><ellipse cx="700" cy="175" rx="160" ry="65"/></g>
+  <g stroke="#7dd3fc" stroke-width="8" stroke-linecap="round" opacity=".65"><path d="m100 310-35 90m170-115-38 100m170-65-40 110m180-145-42 115m185-90-42 115m185-135-42 112m190-100-40 108m185-135-40 110"/></g>
+  <path d="M0 650 220 485l150 105 205-185 235 190 170-125 220 170v160H0Z" fill="url(#g)"/><path d="M0 725c260-80 430-65 620 5 205 75 365 40 580-20v90H0Z" fill="#020617"/>
+</svg>

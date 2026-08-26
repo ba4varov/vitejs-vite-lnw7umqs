@@ -190,6 +190,15 @@ const getDynamicOverlay = (temp: number) => {
   return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%)`;
 }
 
+const getWeatherBackground = (code: number) => {
+  if ([45, 48].includes(code)) return '/weather/fog.svg'
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return '/weather/rain.svg'
+  if ([71, 73, 75].includes(code)) return '/weather/snow.svg'
+  if ([95, 96, 99].includes(code)) return '/weather/storm.svg'
+  if ([2, 3].includes(code)) return '/weather/cloudy.svg'
+  return '/weather/clear.svg'
+}
+
 const getIconAnimation = (icon: string) => {
   if (icon === '☀️') return 'spin-slow'
   if (icon === '🌤️' || icon === '⛅') return 'float'
@@ -357,7 +366,6 @@ const WeatherApp = () => {
   const searchController = useRef<AbortController | null>(null)
   const weatherController = useRef<AbortController | null>(null)
   const t = translations[lang as keyof typeof translations]
-  const backgroundImageUrl = `https://picsum.photos/seed/meteopulse-${coords.lat.toFixed(3)}-${coords.lon.toFixed(3)}/1200/800`
 
   useEffect(() => {
     document.documentElement.lang = lang
@@ -927,7 +935,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             <img
               className="main-card-image"
-              src={backgroundImageUrl}
+              src={getWeatherBackground(weather.code)}
               alt=""
               aria-hidden="true"
               fetchPriority="high"
