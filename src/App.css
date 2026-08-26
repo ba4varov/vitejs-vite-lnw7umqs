@@ -59,8 +59,13 @@ html, body, #root {
   border-radius: 16px; margin-top: 8px; overflow: hidden;
   box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100;
 }
-.suggestion-item { padding: 12px 24px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); }
-.suggestion-item:hover { background: #ade3ff; }
+.suggestion-item {
+  width: 100%; padding: 12px 24px; cursor: pointer; display: flex;
+  justify-content: space-between; gap: 16px; border: 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05); background: white;
+  color: #1e293b; font: inherit; text-align: left;
+}
+.suggestion-item:hover, .suggestion-item.active { background: #ade3ff; }
 .info-line { text-align: center; font-size: 0.85rem; opacity: 0.6; margin-bottom: 24px; }
 
 .city-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px; }
@@ -197,6 +202,7 @@ html, body, #root {
   min-width: 100px; padding: 16px; border-radius: 20px;
   text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
   display: flex; flex-direction: column; gap: 8px; align-items: center;
+  border: 0; color: inherit; font: inherit; cursor: pointer;
 }
 .hour-time { font-weight: bold; color: #1e293b; }
 .hour-temp { font-size: 1.3rem; font-weight: bold; color: #1e293b; }
@@ -210,6 +216,7 @@ html, body, #root {
   transition: transform 0.2s;
   flex-shrink: 0;
   color: #1e293b;
+  border: 0; font: inherit; cursor: pointer;
 }
 .day-box:hover { transform: translateY(-3px); }
 .day-name { font-weight: bold; font-size: 1.1rem; }
@@ -237,6 +244,13 @@ canvas {
 }
 
 /* --- ИЗСКАЧАЩИ ПРОЗОРЦИ (ПОПЪПИ) --- */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
 .popup-card {
   position: fixed !important;
   top: 50% !important;
@@ -248,7 +262,11 @@ canvas {
   border-radius: 24px !important;
   margin: 0 !important;
   z-index: 9999;
+  max-height: min(720px, calc(100dvh - 32px));
+  overflow-y: auto;
+  box-shadow: 0 15px 50px rgba(0,0,0,0.2);
 }
+.dialog-close { font-size: 1.1rem; padding: 8px 12px; min-width: 44px; min-height: 44px; }
 .chart-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
 .chart-tab {
   padding: 8px 16px; border-radius: 20px; border: none; background: #f1f5f9;
@@ -271,6 +289,8 @@ canvas {
 .weather-app.dark .main-card { background: rgba(30,41,55,0.8); } /* Защита за Dark Mode */
 .weather-app.dark .mini-chart { background: rgba(255,255,255,0.05); }
 .weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
+.weather-app.dark .suggestion-item { background: #1e293b; color: #f8fafc; }
+.weather-app.dark .suggestion-item.active { background: #334155; }
 .weather-app.dark .alert-item { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
 .weather-app.dark .hour-box, .weather-app.dark .day-box { background: rgba(255,255,255,0.1); color: #f8fafc; }
 .weather-app.dark .hour-time, .weather-app.dark .hour-temp, .weather-app.dark .day-wind, .weather-app.dark .day-rain, .weather-app.dark .hour-wind, .weather-app.dark .hour-sea { color: #f8fafc; }
@@ -324,4 +344,46 @@ canvas {
   .main-info-left { text-align: center; width: 100%; }
   .big-temp { font-size: 4rem; text-align: center; }
   .big-icon { margin-right: 0; margin-top: 16px; }
+  .dialog-backdrop { display: flex; align-items: flex-end; }
+  .popup-card {
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: min(82dvh, 720px);
+    margin: 0 !important;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom)) !important;
+    border-radius: 28px 28px 0 0 !important;
+    animation: sheet-in 180ms ease-out;
+  }
+  .popup-card::before {
+    content: '';
+    display: block;
+    width: 44px;
+    height: 5px;
+    margin: -8px auto 14px;
+    border-radius: 99px;
+    background: currentColor;
+    opacity: 0.2;
+  }
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(32px); opacity: 0; }
+}
+
+:where(button, input, a):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+.main-card :where(button):focus-visible { outline-color: #fef08a; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
