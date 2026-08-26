@@ -3,7 +3,7 @@ import './App.css'
 
 const translations = {
   bg: {
-    title: '🌤️ Доброто време с Боби',
+    title: '🌤️ Метое Пулс',
     subtitle: 'Твоят метео гид',
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
@@ -80,7 +80,7 @@ const translations = {
     ]
   },
   en: {
-    title: '🌤️ Great Weather with Bobby',
+    title: '🌤️ Meteo Pulse',
     subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
@@ -339,6 +339,11 @@ const WeatherApp = () => {
   
   const searchTimer = useRef<any>(null)
   const t = translations[lang as keyof typeof translations]
+
+  useEffect(() => {
+    document.title = lang === 'bg' ? 'Метое Пулс' : 'Meteo Pulse'
+    document.documentElement.lang = lang
+  }, [lang])
 
   // Взимаме сигурния ключ от Vercel
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
