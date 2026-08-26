@@ -3,7 +3,7 @@ import './App.css'
 
 const translations = {
   bg: {
-    title: '🌤️ Доброто време с Боби',
+    title: '🌤️ Метео Пулс',
     subtitle: 'Твоят метео гид',
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
@@ -50,6 +50,12 @@ const translations = {
     pm10: 'ФПЧ 10 (PM10)',
     pm25: 'ФПЧ 2.5 (PM2.5)',
     aqiChart: 'AQI Индекс (24 часа)',
+    chatTitle: 'Попитай Боби за времето',
+    chatSubtitle: 'Съветите се съобразяват с актуалната прогноза за избраното място.',
+    chatPlaceholder: 'Напр. Да взема ли чадър?',
+    chatSend: 'Изпрати',
+    chatGreeting: 'Здравей! Аз съм Боби. Попитай ме как да се подготвиш за времето.',
+    chatSuggestions: ['Да взема ли чадър?', 'Как да се облека?', 'Подходящо ли е за разходка?'],
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
     highTemp: 'Опасно високи температури! (Над 35°C)',
@@ -80,7 +86,7 @@ const translations = {
     ]
   },
   en: {
-    title: '🌤️ Great Weather with Bobby',
+    title: '🌤️ Meteo Pulse',
     subtitle: 'Your meteo guide',
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
@@ -127,6 +133,12 @@ const translations = {
     pm10: 'PM10',
     pm25: 'PM2.5',
     aqiChart: 'AQI (24 Hours)',
+    chatTitle: 'Ask Bobby about the weather',
+    chatSubtitle: 'Advice is based on the live forecast for the selected location.',
+    chatPlaceholder: 'E.g. Should I take an umbrella?',
+    chatSend: 'Send',
+    chatGreeting: 'Hi! I am Bobby. Ask me how to prepare for the weather.',
+    chatSuggestions: ['Should I take an umbrella?', 'What should I wear?', 'Is it good for a walk?'],
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     highTemp: 'Extreme high temperatures! (Above 35°C)',
@@ -336,12 +348,12 @@ const WeatherApp = () => {
   const [detailTab, setDetailTab] = useState('main')
   
   const [aiAdvice, setAiAdvice] = useState<string | null>(null)
+  const [chatInput, setChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'bot', text: string }>>([])
   
   const searchTimer = useRef<any>(null)
+  const chatMessagesRef = useRef<HTMLDivElement>(null)
   const t = translations[lang as keyof typeof translations]
-
-  // Взимаме сигурния ключ от Vercel
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
   useEffect(() => {
     const savedFav = localStorage.getItem('bobbyWeatherFav')
@@ -351,6 +363,183 @@ const WeatherApp = () => {
       } catch (e) {}
     }
   }, [])
+
+  useEffect(() => {
+    setChatMessages([{ role: 'bot', text: t.chatGreeting }])
+  }, [lang, city])
+
+  useEffect(() => {
+    const messagesContainer = chatMessagesRef.current
+    if (messagesContainer) {
+      messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' })
+    }
+  }, [chatMessages])
+
+  useEffect(() => {
+    document.documentElement.lang = lang
+    const title = lang === 'bg'
+      ? `Времето в ${city} | Метео Пулс`
+      : `Weather in ${city} | Meteo Pulse`
+    const description = weather
+      ? (lang === 'bg'
+          ? `Актуално време в ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Почасова и 14-дневна прогноза с персонални метео съвети.`
+          : `Current weather in ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Hourly and 14-day forecast with personalized weather advice.`)
+      : (lang === 'bg'
+          ? `Актуална почасова и 14-дневна прогноза за времето в ${city} с персонални метео съвети.`
+          : `Current hourly and 14-day weather forecast for ${city} with personalized weather advice.`)
+
+    document.title = title
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description)
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title)
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description)
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', title)
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', description)
+  }, [city, lang, weather])
+
+  const getChatAnswer = (question: string) => {
+    if (!weather) return t.loading
+    const q = question.toLocaleLowerCase(lang === 'bg' ? 'bg-BG' : 'en-US')
+    const nextRain = hourly.find(h => h.rain > 0)
+    const rainy = weather.precipProb >= 35 || Number(weather.precipSum) > 0 || Boolean(nextRain)
+    const cold = weather.feelsLike <= 10
+    const hot = weather.feelsLike >= 28
+    const windy = weather.windSpeed >= 25 || weather.maxWindSpeedDaily >= 35
+    const highUv = weather.uvIndex >= 6
+    const badAir = weather.aqi != null && weather.aqi >= 80
+
+    if (/чадър|дъжд|вали|umbrella|rain/.test(q)) {
+      if (rainy) return lang === 'bg'
+        ? `Да — вземи чадър за ${city}. Вероятността за валеж днес е ${weather.precipProb}%${nextRain ? `, а следващият валеж е около ${nextRain.hour} ч.` : '.'}`
+        : `Yes—take an umbrella in ${city}. Today's rain chance is ${weather.precipProb}%${nextRain ? `, with the next rain around ${nextRain.hour}.` : '.'}`
+      return lang === 'bg' ? `Не изглежда задължително — за ${city} прогнозата е с ${weather.precipProb}% вероятност за валеж. Все пак провери отново преди тръгване.` : `It does not look essential—the rain chance for ${city} is ${weather.precipProb}%. Check again before leaving.`
+    }
+    if (/гръм|гърм|гръмотев|светкав|thunder|lightning/.test(q)) {
+      const stormCodes = [95, 96, 99]
+      const today = hourly[0]?.time?.slice(0, 10)
+      const stormHour = today ? hourly.find(h => h.time?.startsWith(today) && stormCodes.includes(h.code)) : undefined
+      const hasThunderstorm = stormCodes.includes(weather.code) || Boolean(stormHour)
+      if (hasThunderstorm) {
+        return lang === 'bg'
+          ? `Да, за ${city} има вероятност за гръмотевична буря${stormHour ? ` около ${stormHour.hour} ч.` : ' в момента'}. Стой на закрито и остави геройствата на гръмоотвода!`
+          : `Yes, a thunderstorm is possible in ${city}${stormHour ? ` around ${stormHour.hour}` : ' right now'}. Stay indoors and leave the heroics to the lightning rod!`
+      }
+      return lang === 'bg'
+        ? `Не, в днешната прогноза за ${city} не се очакват гръмотевици. Небето засега е свалило барабаните!`
+        : `No thunderstorms are expected in today's forecast for ${city}. The sky has put its drums away for now!`
+    }
+    if (/облека|дрех|яке|wear|dress|jacket/.test(q)) {
+      const parts = lang === 'bg' ? [`Усеща се като ${weather.feelsLike}°C.`] : [`It feels like ${weather.feelsLike}°C.`]
+      if (cold) parts.push(lang === 'bg' ? 'Избери топли слоеве и яке.' : 'Wear warm layers and a jacket.')
+      else if (hot) parts.push(lang === 'bg' ? 'Избери леки, светли дрехи и носи вода.' : 'Choose light clothes and carry water.')
+      else parts.push(lang === 'bg' ? 'Леко яке или връхна дреха е достатъчна.' : 'A light jacket or outer layer should be enough.')
+      if (rainy) parts.push(lang === 'bg' ? 'Добави непромокаема връхна дреха.' : 'Add a waterproof outer layer.')
+      if (windy) parts.push(lang === 'bg' ? 'Избягвай свободни шапки заради вятъра.' : 'Avoid loose hats because of the wind.')
+      return parts.join(' ')
+    }
+    if (/разход|навън|спорт|тич|walk|outside|sport|run/.test(q)) {
+      if ([95, 96, 99].includes(weather.code) || weather.windSpeed >= 65) return lang === 'bg' ? `Не препоръчвам излизане в момента в ${city} заради опасните условия. Изчакай прогнозата да се подобри.` : `I do not recommend going out in ${city} right now because of hazardous conditions. Wait for the forecast to improve.`
+      const best = hourly.filter(h => h.rain === 0 && h.wind < 30).sort((a, b) => Math.abs(a.temp - 20) - Math.abs(b.temp - 20))[0]
+      return lang === 'bg' ? `Да${rainy ? ', но между валежите' : ''}. Най-подходящият от следващите часове изглежда около ${best?.hour || 'по-късно'} ч. (${best?.temp ?? weather.temp}°C).${highUv ? ' Ползвай слънцезащита.' : ''}${badAir ? ' Заради качеството на въздуха избери по-лека активност.' : ''}` : `Yes${rainy ? ', between showers' : ''}. The best upcoming time looks close to ${best?.hour || 'later'} (${best?.temp ?? weather.temp}°C).${highUv ? ' Use sun protection.' : ''}${badAir ? ' Keep activity light because of the air quality.' : ''}`
+    }
+    if (/утре|tomorrow/.test(q) && forecast[0]) {
+      const day = forecast[0]
+      return lang === 'bg' ? `Утре в ${city}: ${day.min}°–${day.max}°C, валежи ${day.rain} мм и вятър до ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Подготви чадър или дъждобран.' : 'Условията изглеждат сравнително сухи.'}` : `Tomorrow in ${city}: ${day.min}°–${day.max}°C, ${day.rain} mm of rain and wind up to ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Pack an umbrella or raincoat.' : 'Conditions look relatively dry.'}`
+    }
+
+    const isWeatherQuestion = /врем|прогноз|температур|градус|слън|облак|сняг|студ|топл|жег|вятър|бур|гръм|гърм|светкав|мъгл|влаж|uv|weather|forecast|temperature|degree|sun|cloud|snow|cold|warm|hot|wind|storm|thunder|lightning|fog|humid/.test(q)
+    if (!isWeatherQuestion) {
+      const humorousReplies = lang === 'bg'
+        ? [
+            'Хм, метео радарът ми не засича тази тема. Попитай ме за времето — там облаците ми говорят!',
+            'По този въпрос съм в гъста мъгла. За прогнози, чадъри и якета обаче съм насреща!',
+            'Това май е извън моя климатичен пояс. Дай ми въпрос за времето и ще развихря прогнозата!'
+          ]
+        : [
+            'Hmm, my weather radar cannot detect that topic. Ask me about the weather—the clouds talk to me!',
+            'I am in thick fog on that one. Forecasts, umbrellas and jackets are more my climate!',
+            'That seems outside my climate zone. Ask me about the weather and I will whip up a forecast!'
+          ]
+      const replyIndex = [...q].reduce((sum, character) => sum + character.charCodeAt(0), 0) % humorousReplies.length
+      return humorousReplies[replyIndex]
+    }
+
+    return lang === 'bg' ? `В ${city} сега е ${weather.temp}°C (усеща се ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, с вятър ${weather.windSpeed} ${t.windUnit}. ${rainy ? 'Възможни са валежи — носи чадър.' : 'Не се очертават значителни валежи.'} Попитай ме за дрехи, разходка, чадър или утрешната прогноза.` : `In ${city} it is ${weather.temp}°C (feels like ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, with ${weather.windSpeed} ${t.windUnit} wind. ${rainy ? 'Rain is possible—carry an umbrella.' : 'No significant rain is expected.'} Ask me about clothes, a walk, an umbrella, or tomorrow.`
+  }
+
+  const getOtherLocationAnswer = async (question: string) => {
+    const locationMarkers = [...question.matchAll(/(?:^|\s)(?:във|в|за|in|for)\s+/giu)]
+    const locationMarker = locationMarkers.at(-1)
+    if (!locationMarker || locationMarker.index === undefined) return null
+
+    const locationQuery = question.slice(locationMarker.index + locationMarker[0].length)
+      .replace(/(?:^|\s)(?:днес|утре|сега|довечера|тази седмица|today|tomorrow|now|tonight|this week)(?:\s|[?!,.]|$).*$/iu, '')
+      .replace(/(?:^|\s)(?:ще|дали|какво|какъв|каква|какви|през|около|is it|will it|during|around)(?:\s|[?!,.]|$).*$/iu, '')
+      .replace(/[?!,.]+$/g, '')
+      .trim()
+    const nonLocationPhrases = /^(?:разходка|спорт|тичане|бягане|плаж|излизане|навън|работа|училище|walk|walking|sport|running|run|beach|going out|outside|work|school)(?:\s|$)/iu
+    if (nonLocationPhrases.test(locationQuery)) return null
+    if (!locationQuery || city.toLocaleLowerCase().includes(locationQuery.toLocaleLowerCase())) return null
+
+    try {
+      const geoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1&language=${lang}&format=json`)
+      if (!geoResponse.ok) throw new Error('Location search failed')
+      const place = (await geoResponse.json()).results?.[0]
+      if (!place) {
+        return lang === 'bg'
+          ? `Радарът ми не успя да намери „${locationQuery}“. Провери името на мястото и опитай пак.`
+          : `My radar could not find “${locationQuery}”. Check the place name and try again.`
+      }
+
+      const forecastResponse = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=2`
+      )
+      if (!forecastResponse.ok) throw new Error('Forecast failed')
+      const placeWeather = await forecastResponse.json()
+      const asksTomorrow = /утре|tomorrow/iu.test(question)
+      const dayIndex = asksTomorrow ? 1 : 0
+      const placeName = `${place.name}${place.country ? `, ${place.country}` : ''}`
+      const weatherDescription = decodeWeatherCode(placeWeather.current.weather_code).desc.toLowerCase()
+      const rainChance = placeWeather.daily.precipitation_probability_max[dayIndex] || 0
+      const feelsLike = Math.round(placeWeather.current.apparent_temperature)
+
+      if (/облека|дрех|яке|wear|dress|jacket/iu.test(question)) {
+        const clothingAdvice = feelsLike >= 28
+          ? (lang === 'bg' ? 'Избери леки дрехи, шапка, слънцезащита и носи вода.' : 'Choose light clothes, a hat, sunscreen and carry water.')
+          : feelsLike <= 10
+            ? (lang === 'bg' ? 'Облечи се на топли слоеве и вземи яке.' : 'Wear warm layers and take a jacket.')
+            : (lang === 'bg' ? 'Леки слоеве и тънка връхна дреха ще са добър избор.' : 'Light layers and a thin outer layer are a good choice.')
+        const rainAdvice = rainChance >= 35
+          ? (lang === 'bg' ? ' Добави и нещо непромокаемо.' : ' Add something waterproof too.')
+          : ''
+        return lang === 'bg'
+          ? `За разходка в ${placeName} се усеща като ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
+          : `For a walk in ${placeName}, it feels like ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
+      }
+
+      if (asksTomorrow) {
+        return lang === 'bg'
+          ? `Утре в ${placeName}: ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C и ${rainChance}% вероятност за валеж. ${rainChance >= 35 ? 'Чадърът ще е добра компания!' : 'Чадърът май може да си почива.'}`
+          : `Tomorrow in ${placeName}: ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C with a ${rainChance}% rain chance. ${rainChance >= 35 ? 'An umbrella will be good company!' : 'The umbrella can probably rest.'}`
+      }
+
+      return lang === 'bg'
+        ? `В ${placeName} сега е ${Math.round(placeWeather.current.temperature_2m)}°C, усеща се като ${Math.round(placeWeather.current.apparent_temperature)}°C и е ${weatherDescription}. Вероятността за валеж днес е ${rainChance}%.`
+        : `In ${placeName} it is ${Math.round(placeWeather.current.temperature_2m)}°C, feels like ${Math.round(placeWeather.current.apparent_temperature)}°C, with ${weatherDescription}. Today's rain chance is ${rainChance}%.`
+    } catch {
+      return lang === 'bg'
+        ? `Не успях да взема прогнозата за ${locationQuery} — явно облаците пазят данните. Опитай отново след малко.`
+        : `I could not fetch the forecast for ${locationQuery}—the clouds must be guarding the data. Try again shortly.`
+    }
+  }
+
+  const sendChatMessage = async (message = chatInput) => {
+    const clean = message.trim()
+    if (!clean) return
+    setChatInput('')
+    setChatMessages(previous => [...previous, { role: 'user', text: clean }])
+    const otherLocationAnswer = await getOtherLocationAnswer(clean)
+    setChatMessages(previous => [...previous, { role: 'bot', text: otherLocationAnswer || getChatAnswer(clean) }])
+  }
 
   const toggleFavorite = () => {
     if (favoriteCity && favoriteCity.name === city) {
@@ -406,121 +595,43 @@ const WeatherApp = () => {
   }
 
 const fetchAiAdvice = async (dataForAi: any) => {
-    if (!dataForAi) return;
+    if (!dataForAi) return
 
-    const temp = parseFloat(dataForAi.temp);
-    const wind = parseFloat(dataForAi.wind);
-    const rain = parseFloat(dataForAi.rain || dataForAi.precipitation) || 0;
-    const snow = parseFloat(dataForAi.snow) || 0; // Добавен параметър за сняг
-    const currentCity = dataForAi.city;
-    let advice = "";
+    const fallbackAdvice = () => {
+      const temp = Number(dataForAi.temp)
+      const rain = Number(dataForAi.rain) || 0
+      const wind = Number(dataForAi.wind) || 0
+      const isSnow = [71, 73, 75, 77, 85, 86].includes(dataForAi.code)
 
-    const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
-
-    // Варианти за СНЯГ (Най-висок приоритет)
-    const snowBg = [
-      `Сняг се сипе на парцали в град ${currentCity}! Вадете шейните, правете снежни човеци и помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Време е за битки със снежни топки, защото в ${currentCity} вали сняг! Облечете се топло и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Зимна приказка в ${currentCity}! Снегът трупа, затова си направете горещ шоколад и се наслаждавайте, защото Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const snowEn = [
-      `Snow is falling heavily in ${currentCity}! Get your sleds out, build snowmen, and remember - Everything is LAUGHTER and LOVE!`,
-      `It's time for snowball fights because it's snowing in ${currentCity}! Dress warmly and remember that Everything is LAUGHTER and LOVE!`,
-      `A winter wonderland in ${currentCity}! The snow is piling up, so make some hot chocolate and enjoy, because Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за ДЪЖД
-    const rainBg = [
-      `Вземайте чадърите, че в град ${currentCity} се очертава мокро време! Но нека локвите не ви плашат, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Днес в ${currentCity} ще ви трябва лодка или поне здрав дъждобран. Скачайте смело в локвите, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Идеално време за гушкане на топло с чаша кафе, защото в ${currentCity} си вали. Усмихнете се на дъжда и помнете - Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const rainEn = [
-      `Grab your umbrellas, it looks wet in ${currentCity}! But don't let the puddles scare you, because Everything is LAUGHTER and LOVE!`,
-      `Today in ${currentCity} you'll need a boat or at least a good raincoat. Jump boldly into the puddles, because Everything is LAUGHTER and LOVE!`,
-      `Perfect weather for cuddling up warm with a cup of coffee, because it's raining in ${currentCity}. Smile at the rain and remember - Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за ЖЕГА
-    const hotBg = [
-      `С тези тропически ${temp}°C, грабвайте банските и бягайте към плажа, защото в град ${currentCity} днес работата е забранена! И не забравяйте - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Време е за сладолед и студени напитки! В ${currentCity} жегата е сериозна (${temp}°C), затова се пазете от слънцето, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Слагайте слънчевите очила! При ${temp}°C в ${currentCity} асфалтът се топи, но настроението е на макс. Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const hotEn = [
-      `With these tropical ${temp}°C, grab your swimsuits and head to the beach, because work is forbidden in ${currentCity} today! And remember - Everything is LAUGHTER and LOVE!`,
-      `Time for ice cream and cold drinks! The heat in ${currentCity} is serious (${temp}°C), so stay out of the sun, because Everything is LAUGHTER and LOVE!`,
-      `Put on your sunglasses! At ${temp}°C in ${currentCity} the asphalt is melting, but the mood is great. Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за СТУД
-    const coldBg = [
-      `Бррр, в град ${currentCity} си е направо хладилник с тези ${temp}°C! Обличайте дебелите якета, пийте топъл чай и помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Време е да извадите плетените чорапи! Навън в ${currentCity} е едва ${temp}°C. Стоплете се с усмивка, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Пингвините в ${currentCity} днес празнуват при тези ${temp}°C! Завийте се добре и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const coldEn = [
-      `Brrr, ${currentCity} is a literal fridge with these ${temp}°C! Put on your thick jackets, drink some hot tea, and remember - Everything is LAUGHTER and LOVE!`,
-      `Time to get those knitted socks out! It's only ${temp}°C outside in ${currentCity}. Warm up with a smile, because Everything is LAUGHTER and LOVE!`,
-      `The penguins in ${currentCity} are celebrating today at these ${temp}°C! Bundle up and remember that Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за СИЛЕН ВЯТЪР
-    const windyBg = [
-      `Дръжте си здраво шапките, че в ${currentCity} духа с цели ${wind} км/ч! Но дори и да ви отвее вятърът, Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Вятърът в ${currentCity} днес е ${wind} км/ч. Идеално време за пускане на хвърчила! И помнете - Всичко Е СМЯХ и ЛЮБОВ!`,
-      `С този вятър от ${wind} км/ч в ${currentCity}, прическата ви няма шанс! Радвайте се на рошавия ден, защото Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const windyEn = [
-      `Hold onto your hats, the wind in ${currentCity} is blowing at ${wind} km/h! But even if you get blown away, Everything is LAUGHTER and LOVE!`,
-      `The wind in ${currentCity} today is at ${wind} km/h. Perfect weather for flying kites! And remember - Everything is LAUGHTER and LOVE!`,
-      `With this ${wind} km/h wind in ${currentCity}, your hairstyle doesn't stand a chance! Enjoy the messy hair day, because Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Варианти за ПЕРФЕКТНО ВРЕМЕ
-    const niceBg = [
-      `Времето в град ${currentCity} е направо приказка с тези приятни ${temp}°C. Излизайте навън да се радвате на живота, защото Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Нито топло, нито студено - идеалните ${temp}°C в ${currentCity}! Перфектният ден за дълга разходка. Всичко Е СМЯХ и ЛЮБОВ!`,
-      `Град ${currentCity} ви очаква с прекрасни ${temp}°C! Усмихнете се на деня и не забравяйте, че Всичко Е СМЯХ и ЛЮБОВ!`
-    ];
-    const niceEn = [
-      `The weather in ${currentCity} is an absolute dream with these pleasant ${temp}°C. Go outside and enjoy life, because Everything is LAUGHTER and LOVE!`,
-      `Neither hot nor cold - the perfect ${temp}°C in ${currentCity}! A perfect day for a long walk. Everything is LAUGHTER and LOVE!`,
-      `${currentCity} awaits you with a wonderful ${temp}°C! Smile at the day and remember that Everything is LAUGHTER and LOVE!`
-    ];
-
-    // Логика с приоритет на сняг, дъжд и вятър
-    if (lang === 'bg') {
-      if (snow > 0) {
-        advice = getRandom(snowBg);
-      } else if (rain > 0) {
-        advice = getRandom(rainBg);
-      } else if (wind >= 20) {
-        advice = getRandom(windyBg);
-      } else if (temp >= 28) {
-        advice = getRandom(hotBg);
-      } else if (temp <= 10) {
-        advice = getRandom(coldBg);
-      } else {
-        advice = getRandom(niceBg);
+      if (lang === 'bg') {
+        if (isSnow) return `В ${dataForAi.city} небето раздава безплатни снежинки. Облечи се топло и стъпвай внимателно!`
+        if (rain > 0) return `Облаците в ${dataForAi.city} днес са на режим „автомивка“. Вземи чадър и запази усмивката суха!`
+        if (wind >= 20) return `Вятърът в ${dataForAi.city} предлага безплатна прическа. Закопчай якето и дръж шапката здраво!`
+        if (temp >= 28) return `В ${dataForAi.city} слънцето работи извънредно. Вземи вода, сянка и слънцезащита!`
+        if (temp <= 10) return `В ${dataForAi.city} времето е включило хладилника. Облечи се на слоеве и се стопли с нещо вкусно!`
+        return `Времето в ${dataForAi.city} кани на разходка. Вземи доброто настроение — то не тежи в раницата!`
       }
-    } else {
-      if (snow > 0) {
-        advice = getRandom(snowEn);
-      } else if (rain > 0) {
-        advice = getRandom(rainEn);
-      } else if (wind >= 20) {
-        advice = getRandom(windyEn);
-      } else if (temp >= 28) {
-        advice = getRandom(hotEn);
-      } else if (temp <= 10) {
-        advice = getRandom(coldEn);
-      } else {
-        advice = getRandom(niceEn);
-      }
+
+      if (isSnow) return `${dataForAi.city} is handing out free snowflakes today. Dress warmly and watch your step!`
+      if (rain > 0) return `The clouds over ${dataForAi.city} are running a free car wash. Take an umbrella and keep your smile dry!`
+      if (wind >= 20) return `The wind in ${dataForAi.city} is offering free hairstyles. Zip your jacket and hold onto your hat!`
+      if (temp >= 28) return `The sun is working overtime in ${dataForAi.city}. Bring water, shade and sunscreen!`
+      if (temp <= 10) return `${dataForAi.city} has switched the fridge on. Dress in layers and warm up with something tasty!`
+      return `${dataForAi.city} is inviting you out for a walk. Pack a good mood—it weighs nothing!`
     }
 
-    setAiAdvice(advice);
+    try {
+      const response = await fetch('/api/weather-advice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...dataForAi, lang })
+      })
+      if (!response.ok) throw new Error('AI advice unavailable')
+      const data = await response.json()
+      setAiAdvice(data.advice || fallbackAdvice())
+    } catch {
+      setAiAdvice(fallbackAdvice())
+    }
   }
   const fetchWeather = async (lat: number, lon: number) => {
     setLoading(true)
@@ -608,8 +719,13 @@ const fetchAiAdvice = async (dataForAi: any) => {
       fetchAiAdvice({
         city: city,
         temp: Math.round(data.current.temperature_2m),
+        feelsLike: Math.round(data.current.apparent_temperature),
         wind: Math.round(data.current.wind_speed_10m),
-        humidity: data.current.relative_humidity_2m
+        rain: Number(data.daily.precipitation_sum[0] || 0).toFixed(1),
+        precipProb: data.daily.precipitation_probability_max[0] || 0,
+        uvIndex: Math.round(data.current.uv_index),
+        code: data.current.weather_code,
+        description: cur.desc
       });
 
       const now = new Date()
@@ -629,6 +745,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
         const aqiVal = hourlyAqi.length > idx ? hourlyAqi[idx] : null
         
         hr.push({
+          time: data.hourly.time[idx],
           hour: data.hourly.time[idx].slice(11, 16),
           temp: Math.round(data.hourly.temperature_2m[idx]),
           feelsLike: Math.round(data.hourly.apparent_temperature[idx]),
@@ -641,6 +758,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           cloudCover: Math.round(data.hourly.cloud_cover[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
           aqi: aqiVal !== null ? Math.round(aqiVal) : 0,
+          code: data.hourly.weather_code[idx],
           icon: code.icon
         })
       }
@@ -967,6 +1085,35 @@ const fetchAiAdvice = async (dataForAi: any) => {
             </div>
           </div>
 
+          <section className="card weather-chat" aria-labelledby="weather-chat-title">
+            <div className="chat-heading">
+              <div className="chat-avatar" aria-hidden="true">🤖</div>
+              <div>
+                <h3 id="weather-chat-title">{t.chatTitle}</h3>
+                <p>{t.chatSubtitle}</p>
+              </div>
+              <span className="chat-location">📍 {city}</span>
+            </div>
+            <div className="chat-messages" aria-live="polite" ref={chatMessagesRef}>
+              {chatMessages.map((message, index) => (
+                <div key={index} className={`chat-message ${message.role}`}>
+                  {message.role === 'bot' && <span aria-hidden="true">🌤️</span>}
+                  <p>{message.text}</p>
+                </div>
+              ))}
+            </div>
+            <div className="chat-suggestions">
+              {t.chatSuggestions.map(suggestion => (
+                <button key={suggestion} type="button" onClick={() => sendChatMessage(suggestion)}>{suggestion}</button>
+              ))}
+            </div>
+            <form className="chat-form" onSubmit={event => { event.preventDefault(); sendChatMessage() }}>
+              <input value={chatInput} onChange={event => setChatInput(event.target.value)} placeholder={t.chatPlaceholder} aria-label={t.chatPlaceholder} />
+              <button type="submit" disabled={!chatInput.trim()}>{t.chatSend} <span aria-hidden="true">➤</span></button>
+            </form>
+            <p className="chat-disclaimer">{lang === 'bg' ? 'Съветите са информативни. При опасно време следвай указанията на местните власти.' : 'Advice is informational. During severe weather, follow local authority guidance.'}</p>
+          </section>
+
           <div className="card">
             <h3>{t.hours24}</h3>
             <div className="hourly-row">
@@ -1013,7 +1160,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
               <iframe
                 width="100%"
                 height="450"
-                src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`}
+                src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&metricRain=mm&radarRange=-1`}
                 frameBorder="0"
                 title="Windy Map"
                 style={{ display: 'block' }}
@@ -1119,7 +1266,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       <div className="footer">
         <p>Данните за времето се предоставят от <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo API</a></p>
-        <p>© 2026 Доброто време с Боби. Всички права запазени.</p>
+        <p>© 2026 Метео Пулс. Всички права запазени.</p>
       </div>
     </div>
   )

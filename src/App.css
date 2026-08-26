@@ -180,6 +180,28 @@ html, body, #root {
 .stat-box .label { font-size: 0.85rem; opacity: 0.8; margin: 8px 0 4px; }
 .stat-box .value { font-weight: bold; font-size: 1.2rem; }
 
+/* --- МЕТЕО ЧАТ С БОБИ --- */
+.weather-chat { border: 1px solid rgba(59, 130, 246, 0.15); }
+.chat-heading { display: flex; align-items: center; gap: 14px; text-align: left; }
+.chat-heading h3 { margin-bottom: 3px; }
+.chat-heading p { color: #64748b; font-size: 0.92rem; }
+.chat-avatar { display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 52px; border-radius: 17px; font-size: 1.7rem; background: linear-gradient(135deg, #dbeafe, #bae6fd); }
+.chat-location { margin-left: auto; padding: 8px 12px; border-radius: 999px; color: #1d4ed8; background: #eff6ff; font-size: 0.85rem; font-weight: 700; }
+.chat-messages { display: flex; flex-direction: column; gap: 12px; max-height: 320px; overflow-y: auto; margin: 24px 0 16px; padding: 18px; border-radius: 22px; background: rgba(239, 246, 255, 0.7); }
+.chat-message { display: flex; align-items: flex-end; gap: 8px; max-width: 82%; text-align: left; }
+.chat-message p { padding: 12px 15px; border-radius: 18px 18px 18px 5px; color: #1e293b; background: white; box-shadow: 0 3px 10px rgba(30, 64, 175, 0.06); line-height: 1.5; }
+.chat-message.user { align-self: flex-end; }
+.chat-message.user p { color: white; background: #2563eb; border-radius: 18px 18px 5px 18px; }
+.chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.chat-suggestions button { padding: 9px 13px; border: 1px solid #bfdbfe; border-radius: 999px; color: #1d4ed8; background: #eff6ff; cursor: pointer; font-weight: 600; }
+.chat-suggestions button:hover { background: #dbeafe; }
+.chat-form { display: flex; gap: 10px; }
+.chat-form input { flex: 1; min-width: 0; padding: 14px 17px; border: 1px solid #cbd5e1; border-radius: 16px; color: #1e293b; background: white; font: inherit; outline: none; }
+.chat-form input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14); }
+.chat-form button { padding: 12px 18px; border: 0; border-radius: 16px; color: white; background: #2563eb; cursor: pointer; font-weight: 700; }
+.chat-form button:disabled { cursor: not-allowed; opacity: 0.45; }
+.chat-disclaimer { margin-top: 12px; color: #64748b; font-size: 0.76rem; text-align: left; }
+
 /* --- ХОРИЗОНТАЛНИ СПИСЪЦИ (ЧАСОВЕ И ДНИ) --- */
 .hourly-row, .daily-grid { 
   display: flex !important; 
@@ -274,6 +296,12 @@ canvas {
 .weather-app.dark .alert-item { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
 .weather-app.dark .hour-box, .weather-app.dark .day-box { background: rgba(255,255,255,0.1); color: #f8fafc; }
 .weather-app.dark .hour-time, .weather-app.dark .hour-temp, .weather-app.dark .day-wind, .weather-app.dark .day-rain, .weather-app.dark .hour-wind, .weather-app.dark .hour-sea { color: #f8fafc; }
+.weather-app.dark .chat-heading p, .weather-app.dark .chat-disclaimer { color: #94a3b8; }
+.weather-app.dark .chat-avatar, .weather-app.dark .chat-location, .weather-app.dark .chat-suggestions button { background: rgba(59,130,246,0.18); color: #bfdbfe; border-color: rgba(147,197,253,0.25); }
+.weather-app.dark .chat-messages { background: rgba(15,23,42,0.55); }
+.weather-app.dark .chat-message p { color: #e2e8f0; background: #334155; }
+.weather-app.dark .chat-message.user p { background: #2563eb; color: white; }
+.weather-app.dark .chat-form input { color: #f8fafc; background: #0f172a; border-color: #475569; }
 
 /* --- АНИМАЦИИ --- */
 .float { animation: float-soft 4s ease-in-out infinite; }
@@ -324,4 +352,9 @@ canvas {
   .main-info-left { text-align: center; width: 100%; }
   .big-temp { font-size: 4rem; text-align: center; }
   .big-icon { margin-right: 0; margin-top: 16px; }
+  .chat-heading { align-items: flex-start; }
+  .chat-location { display: none; }
+  .chat-message { max-width: 95%; }
+  .chat-form { flex-direction: column; }
+  .chat-form button { width: 100%; }
 }
