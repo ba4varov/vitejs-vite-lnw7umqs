@@ -445,12 +445,13 @@ const WeatherApp = () => {
   }
 
   const getOtherLocationAnswer = async (question: string) => {
-    const locationMatch = question.match(/(?:\bвъв|\bв|\bза|\bin|\bfor)\s+([\p{L}][\p{L}\s.'’-]{1,60})/iu)
-    if (!locationMatch) return null
+    const locationMarkers = [...question.matchAll(/(?:^|\s)(?:във|в|за|in|for)\s+/giu)]
+    const locationMarker = locationMarkers.at(-1)
+    if (!locationMarker || locationMarker.index === undefined) return null
 
-    const locationQuery = locationMatch[1]
-      .replace(/\b(?:днес|утре|сега|довечера|тази седмица|today|tomorrow|now|tonight|this week)\b.*$/iu, '')
-      .replace(/\b(?:ще ли|дали|какво|какъв|каква|какви|is it|will it)\b.*$/iu, '')
+    const locationQuery = question.slice(locationMarker.index + locationMarker[0].length)
+      .replace(/(?:^|\s)(?:днес|утре|сега|довечера|тази седмица|today|tomorrow|now|tonight|this week)(?:\s|[?!,.]|$).*$/iu, '')
+      .replace(/(?:^|\s)(?:ще|дали|какво|какъв|каква|какви|през|около|is it|will it|during|around)(?:\s|[?!,.]|$).*$/iu, '')
       .replace(/[?!,.]+$/g, '')
       .trim()
     if (!locationQuery || city.toLocaleLowerCase().includes(locationQuery.toLocaleLowerCase())) return null
@@ -475,6 +476,21 @@ const WeatherApp = () => {
       const placeName = `${place.name}${place.country ? `, ${place.country}` : ''}`
       const weatherDescription = decodeWeatherCode(placeWeather.current.weather_code).desc.toLowerCase()
       const rainChance = placeWeather.daily.precipitation_probability_max[dayIndex] || 0
+      const feelsLike = Math.round(placeWeather.current.apparent_temperature)
+
+      if (/облека|дрех|яке|wear|dress|jacket/iu.test(question)) {
+        const clothingAdvice = feelsLike >= 28
+          ? (lang === 'bg' ? 'Избери леки дрехи, шапка, слънцезащита и носи вода.' : 'Choose light clothes, a hat, sunscreen and carry water.')
+          : feelsLike <= 10
+            ? (lang === 'bg' ? 'Облечи се на топли слоеве и вземи яке.' : 'Wear warm layers and take a jacket.')
+            : (lang === 'bg' ? 'Леки слоеве и тънка връхна дреха ще са добър избор.' : 'Light layers and a thin outer layer are a good choice.')
+        const rainAdvice = rainChance >= 35
+          ? (lang === 'bg' ? ' Добави и нещо непромокаемо.' : ' Add something waterproof too.')
+          : ''
+        return lang === 'bg'
+          ? `За разходка в ${placeName} се усеща като ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
+          : `For a walk in ${placeName}, it feels like ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
+      }
 
       if (asksTomorrow) {
         return lang === 'bg'
