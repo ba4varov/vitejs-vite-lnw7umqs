@@ -229,8 +229,15 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color, height = 400 
     )
     const labels = hourly.map((h: any) => h.hour)
 
-    let minVal = type === 'rain' || type === 'aqi' ? 0 : Math.min(...data)
-    let maxVal = type === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
+    // Wind speed, just like precipitation and AQI, has a meaningful zero.
+    // Keeping the lowest observed wind speed as the baseline exaggerates small
+    // changes and makes the third chart misleading.
+    let minVal = type === 'rain' || type === 'wind' || type === 'aqi' ? 0 : Math.min(...data)
+    let maxVal = type === 'rain'
+      ? Math.max(1, Math.max(...data))
+      : type === 'wind'
+        ? Math.max(10, Math.ceil(Math.max(...data) / 5) * 5)
+        : Math.max(...data)
     if (minVal === maxVal) { maxVal += 1; minVal -= 1; }
     const range = maxVal - minVal
 
