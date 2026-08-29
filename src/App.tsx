@@ -441,9 +441,18 @@ const WeatherApp = () => {
       const best = hourly.filter(h => h.rain === 0 && h.wind < 30).sort((a, b) => Math.abs(a.temp - 20) - Math.abs(b.temp - 20))[0]
       return lang === 'bg' ? `Да${rainy ? ', но между валежите' : ''}. Най-подходящият от следващите часове изглежда около ${best?.hour || 'по-късно'} ч. (${best?.temp ?? weather.temp}°C).${highUv ? ' Ползвай слънцезащита.' : ''}${badAir ? ' Заради качеството на въздуха избери по-лека активност.' : ''}` : `Yes${rainy ? ', between showers' : ''}. The best upcoming time looks close to ${best?.hour || 'later'} (${best?.temp ?? weather.temp}°C).${highUv ? ' Use sun protection.' : ''}${badAir ? ' Keep activity light because of the air quality.' : ''}`
     }
-    if (/утре|tomorrow/.test(q) && forecast[0]) {
-      const day = forecast[0]
-      return lang === 'bg' ? `Утре в ${city}: ${day.min}°–${day.max}°C, валежи ${day.rain} мм и вятър до ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Подготви чадър или дъждобран.' : 'Условията изглеждат сравнително сухи.'}` : `Tomorrow in ${city}: ${day.min}°–${day.max}°C, ${day.rain} mm of rain and wind up to ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Pack an umbrella or raincoat.' : 'Conditions look relatively dry.'}`
+    const futureDayOffset = getFutureDayOffset(question)
+    if (futureDayOffset === -1) {
+      return lang === 'bg' ? 'Мога да надникна най-много 14 дни напред — след това и облаците още не са си направили планове!' : 'I can look up to 14 days ahead—after that, even the clouds have not made plans yet!'
+    }
+    if (futureDayOffset && forecast[futureDayOffset - 1]) {
+      const day = forecast[futureDayOffset - 1]
+      const dayLabel = futureDayOffset === 1
+        ? (lang === 'bg' ? 'Утре' : 'Tomorrow')
+        : `${day.dayName}, ${day.dateFormatted}`
+      return lang === 'bg'
+        ? `${dayLabel} в ${city}: ${day.min}°–${day.max}°C, валежи ${day.rain} мм и вятър до ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Подготви чадър или дъждобран.' : 'Условията изглеждат сравнително сухи.'}`
+        : `${dayLabel} in ${city}: ${day.min}°–${day.max}°C, ${day.rain} mm of rain and wind up to ${day.wind} ${t.windUnit}. ${Number(day.rain) > 0 ? 'Pack an umbrella or raincoat.' : 'Conditions look relatively dry.'}`
     }
 
     const isWeatherQuestion = /врем|прогноз|температур|градус|слън|облак|сняг|студ|топл|жег|вятър|бур|гръм|гърм|светкав|мъгл|влаж|uv|weather|forecast|temperature|degree|sun|cloud|snow|cold|warm|hot|wind|storm|thunder|lightning|fog|humid/.test(q)
@@ -466,6 +475,47 @@ const WeatherApp = () => {
     return lang === 'bg' ? `В ${city} сега е ${weather.temp}°C (усеща се ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, с вятър ${weather.windSpeed} ${t.windUnit}. ${rainy ? 'Възможни са валежи — носи чадър.' : 'Не се очертават значителни валежи.'} Попитай ме за дрехи, разходка, чадър или утрешната прогноза.` : `In ${city} it is ${weather.temp}°C (feels like ${weather.feelsLike}°C), ${weather.description.toLowerCase()}, with ${weather.windSpeed} ${t.windUnit} wind. ${rainy ? 'Rain is possible—carry an umbrella.' : 'No significant rain is expected.'} Ask me about clothes, a walk, an umbrella, or tomorrow.`
   }
 
+  const getFutureDayOffset = (question: string) => {
+    const normalized = question.toLocaleLowerCase(lang === 'bg' ? 'bg-BG' : 'en-US')
+    if (/вдругиден|day after tomorrow/iu.test(normalized)) return 2
+    if (/утре|tomorrow/iu.test(normalized)) return 1
+
+    const relativeMatch = normalized.match(/(?:след|in)\s+(\d{1,2})\s+(?:дни?|days?)/iu)
+    if (relativeMatch) {
+      const days = Number(relativeMatch[1])
+      return days >= 1 && days <= 14 ? days : -1
+    }
+
+    const now = new Date()
+    const numericDate = normalized.match(/(?:^|\s)(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}))?/)
+    const bgMonths = ['януари', 'февруари', 'март', 'април', 'май', 'юни', 'юли', 'август', 'септември', 'октомври', 'ноември', 'декември']
+    const enMonths = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+    const namedDate = normalized.match(new RegExp(`(?:на\\s+)?(\\d{1,2})\\s+(${bgMonths.join('|')})|(${enMonths.join('|')})\\s+(\\d{1,2})`, 'iu'))
+    let requestedDate: Date | null = null
+
+    if (numericDate) {
+      requestedDate = new Date(Number(numericDate[3]) || now.getFullYear(), Number(numericDate[2]) - 1, Number(numericDate[1]))
+    } else if (namedDate) {
+      const monthName = (namedDate[2] || namedDate[3]).toLocaleLowerCase()
+      const monthIndex = namedDate[2] ? bgMonths.indexOf(monthName) : enMonths.indexOf(monthName)
+      requestedDate = new Date(now.getFullYear(), monthIndex, Number(namedDate[1] || namedDate[4]))
+    }
+
+    if (requestedDate) {
+      if (requestedDate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) requestedDate.setFullYear(requestedDate.getFullYear() + 1)
+      const daysAhead = Math.round((requestedDate.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000)
+      return daysAhead >= 1 && daysAhead <= 14 ? daysAhead : -1
+    }
+
+    const weekdayNames = lang === 'bg'
+      ? ['неделя', 'понеделник', 'вторник', 'сряда', 'четвъртък', 'петък', 'събота']
+      : ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const requestedWeekday = weekdayNames.findIndex(day => normalized.includes(day))
+    if (requestedWeekday === -1) return null
+    const daysAhead = (requestedWeekday - new Date().getDay() + 7) % 7
+    return daysAhead === 0 ? 7 : daysAhead
+  }
+
   const getOtherLocationAnswer = async (question: string) => {
     const locationMarkers = [...question.matchAll(/(?:^|\s)(?:във|в|за|in|for)\s+/giu)]
     const locationMarker = locationMarkers.at(-1)
@@ -473,10 +523,13 @@ const WeatherApp = () => {
 
     const locationQuery = question.slice(locationMarker.index + locationMarker[0].length)
       .replace(/(?:^|\s)(?:днес|утре|сега|довечера|тази седмица|today|tomorrow|now|tonight|this week)(?:\s|[?!,.]|$).*$/iu, '')
+      .replace(/(?:^|\s)(?:вдругиден|след\s+\d{1,2}\s+дни?|понеделник|вторник|сряда|четвъртък|петък|събота|неделя|day after tomorrow|in\s+\d{1,2}\s+days?|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s|[?!,.]|$).*$/iu, '')
+      .replace(/\s+(?:на\s+)?\d{1,2}(?:[./-]\d{1,2}(?:[./-]\d{4})?|\s+(?:януари|февруари|март|април|май|юни|юли|август|септември|октомври|ноември|декември)).*$/iu, '')
+      .replace(/\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}.*$/iu, '')
       .replace(/(?:^|\s)(?:ще|дали|какво|какъв|каква|какви|през|около|is it|will it|during|around)(?:\s|[?!,.]|$).*$/iu, '')
       .replace(/[?!,.]+$/g, '')
       .trim()
-    const nonLocationPhrases = /^(?:разходка|спорт|тичане|бягане|плаж|излизане|навън|работа|училище|walk|walking|sport|running|run|beach|going out|outside|work|school)(?:\s|$)/iu
+    const nonLocationPhrases = /^(?:(?:a|the)\s+)?(?:разходка|спорт|тичане|бягане|плаж|излизане|навън|работа|училище|walk|walking|sport|running|run|beach|going out|outside|work|school)(?:\s|$)/iu
     if (nonLocationPhrases.test(locationQuery)) return null
     if (!locationQuery || city.toLocaleLowerCase().includes(locationQuery.toLocaleLowerCase())) return null
 
@@ -491,16 +544,21 @@ const WeatherApp = () => {
       }
 
       const forecastResponse = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=2`
+        `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=15`
       )
       if (!forecastResponse.ok) throw new Error('Forecast failed')
       const placeWeather = await forecastResponse.json()
-      const asksTomorrow = /утре|tomorrow/iu.test(question)
-      const dayIndex = asksTomorrow ? 1 : 0
+      const futureDayOffset = getFutureDayOffset(question)
+      if (futureDayOffset === -1) {
+        return lang === 'bg' ? 'Мога да проверя това място най-много 14 дни напред.' : 'I can check this location up to 14 days ahead.'
+      }
+      const dayIndex = futureDayOffset || 0
       const placeName = `${place.name}${place.country ? `, ${place.country}` : ''}`
       const weatherDescription = decodeWeatherCode(placeWeather.current.weather_code).desc.toLowerCase()
       const rainChance = placeWeather.daily.precipitation_probability_max[dayIndex] || 0
-      const feelsLike = Math.round(placeWeather.current.apparent_temperature)
+      const feelsLike = futureDayOffset
+        ? Math.round((placeWeather.daily.temperature_2m_min[dayIndex] + placeWeather.daily.temperature_2m_max[dayIndex]) / 2)
+        : Math.round(placeWeather.current.apparent_temperature)
 
       if (/облека|дрех|яке|wear|dress|jacket/iu.test(question)) {
         const clothingAdvice = feelsLike >= 28
@@ -512,14 +570,17 @@ const WeatherApp = () => {
           ? (lang === 'bg' ? ' Добави и нещо непромокаемо.' : ' Add something waterproof too.')
           : ''
         return lang === 'bg'
-          ? `За разходка в ${placeName} се усеща като ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
-          : `For a walk in ${placeName}, it feels like ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
+          ? `За разходка в ${placeName}${futureDayOffset ? ` след ${futureDayOffset} дни` : ''} ориентирът е около ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
+          : `For a walk in ${placeName}${futureDayOffset ? ` in ${futureDayOffset} days` : ''}, expect around ${feelsLike}°C. ${clothingAdvice}${rainAdvice}`
       }
 
-      if (asksTomorrow) {
+      if (futureDayOffset) {
+        const forecastDate = new Date(`${placeWeather.daily.time[dayIndex]}T12:00:00`)
+        const dateLabel = forecastDate.toLocaleDateString(lang === 'bg' ? 'bg-BG' : 'en-US', { weekday: 'long', day: 'numeric', month: 'short' })
+        const futureDescription = decodeWeatherCode(placeWeather.daily.weather_code[dayIndex]).desc.toLowerCase()
         return lang === 'bg'
-          ? `Утре в ${placeName}: ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C и ${rainChance}% вероятност за валеж. ${rainChance >= 35 ? 'Чадърът ще е добра компания!' : 'Чадърът май може да си почива.'}`
-          : `Tomorrow in ${placeName}: ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C with a ${rainChance}% rain chance. ${rainChance >= 35 ? 'An umbrella will be good company!' : 'The umbrella can probably rest.'}`
+          ? `${dateLabel} в ${placeName}: ${futureDescription}, ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C и ${rainChance}% вероятност за валеж. ${rainChance >= 35 ? 'Чадърът ще е добра компания!' : 'Чадърът май може да си почива.'}`
+          : `${dateLabel} in ${placeName}: ${futureDescription}, ${Math.round(placeWeather.daily.temperature_2m_min[dayIndex])}°–${Math.round(placeWeather.daily.temperature_2m_max[dayIndex])}°C with a ${rainChance}% rain chance. ${rainChance >= 35 ? 'An umbrella will be good company!' : 'The umbrella can probably rest.'}`
       }
 
       return lang === 'bg'
@@ -586,6 +647,62 @@ const WeatherApp = () => {
     setSelectedDay(null)
     setSelectedHour(null)
     setExactLocation(null) 
+  }
+
+  const getLocalizedLocationName = async (lat: number, lon: number, targetLang: 'bg' | 'en', fallback: string) => {
+    const localizedQuickCity = translations[targetLang].quickCities.find(candidate =>
+      Math.abs(candidate.lat - lat) < 0.01 && Math.abs(candidate.lon - lon) < 0.01
+    )
+    if (localizedQuickCity) return localizedQuickCity.name
+
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${targetLang}&zoom=10`)
+      if (!response.ok) return fallback
+      const data = await response.json()
+      const address = data.address || {}
+      const locality = address.city || address.town || address.village || address.county
+      return locality ? `${locality}${address.country ? `, ${address.country}` : ''}` : fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  const getLocalizedExactLocation = async (lat: number, lon: number, targetLang: 'bg' | 'en', fallback: string) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${targetLang}&zoom=18`)
+      if (!response.ok) return fallback
+      const data = await response.json()
+      const address = data.address || {}
+      const street = address.road || address.pedestrian || address.street
+      const exactDetails = street
+        ? [street, address.house_number].filter(Boolean)
+        : [address.suburb || address.neighbourhood || address.city_district].filter(Boolean)
+      return exactDetails.length > 0 ? exactDetails.join(' ') : fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  const changeLanguage = async () => {
+    const targetLang: 'bg' | 'en' = lang === 'bg' ? 'en' : 'bg'
+    const [localizedCity, localizedFavoriteName, localizedExactLocation] = await Promise.all([
+      getLocalizedLocationName(coords.lat, coords.lon, targetLang, city),
+      favoriteCity
+        ? getLocalizedLocationName(favoriteCity.lat, favoriteCity.lon, targetLang, favoriteCity.name)
+        : Promise.resolve(null),
+      exactLocation
+        ? getLocalizedExactLocation(coords.lat, coords.lon, targetLang, exactLocation)
+        : Promise.resolve(null)
+    ])
+
+    setCity(localizedCity)
+    if (localizedExactLocation) setExactLocation(localizedExactLocation)
+    if (favoriteCity && localizedFavoriteName) {
+      const localizedFavorite = { ...favoriteCity, name: localizedFavoriteName }
+      setFavoriteCity(localizedFavorite)
+      localStorage.setItem('bobbyWeatherFav', JSON.stringify(localizedFavorite))
+    }
+    setLang(targetLang)
   }
 
   const formatTime = (isoString: string) => {
@@ -926,7 +1043,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
-          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
+          <button className="lang-btn" onClick={changeLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
           <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
