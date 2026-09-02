@@ -2,14 +2,11 @@ type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
 import { ALLOWED_INTENTS, findDailyForecast, geminiUnderstandingError, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
+import { GeminiServiceError, geminiClient } from './gemini-client.js'
 
 type Intent = typeof ALLOWED_INTENTS[number]
 type ChatInput = { message: string; city: string; latitude: number; longitude: number; lang: 'bg' | 'en' }
 type Understanding = { intent: Intent; requestedCity: string | null; timeScope: string; targetDate: string | null; needsClarification: boolean; clarificationQuestion: string | null }
-
-const jsonHeaders = { 'Content-Type': 'application/json' }
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
-
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeout = 8000) {
   const controller = new AbortController()
@@ -24,28 +21,21 @@ function extractGeminiJson(payload: any): unknown {
 }
 
 class ServiceError extends Error {
-  constructor(public stage: string, public code: string, public httpStatus?: number) { super(code) }
+  constructor(public stage: string, public code: string, public httpStatus?: number, public model?: string) { super(code) }
 }
 
 function logFailure(error: ServiceError) {
   console.error('[weather-chat]', { stage: error.stage, status: error.httpStatus ?? null, code: error.code })
 }
 
-async function callGemini(apiKey: string, system: string, user: string, maxOutputTokens: number, stage: string, responseSchema?: Record<string, unknown>) {
-  let response: Response
-  try {
-    response = await fetchWithTimeout(GEMINI_URL, {
-      method: 'POST', headers: { ...jsonHeaders, 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
+async function callGemini(system: string, user: string, maxOutputTokens: number, stage: string, responseSchema?: Record<string, unknown>) {
+  const { payload, model } = await geminiClient.generate({ endpoint: 'weather-chat', stage, body: {
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: user }] }],
         generationConfig: { temperature: 0.2, maxOutputTokens, responseMimeType: 'application/json', ...(responseSchema ? { responseSchema } : {}) }
-      })
-    }, 9000)
-  } catch { throw new ServiceError(stage, 'network-error') }
-  if (!response.ok) throw new ServiceError(stage, 'upstream-http', response.status)
-  const parsed = extractGeminiJson(await response.json())
-  if (!parsed) throw new ServiceError(stage, 'invalid-json', response.status)
+  } })
+  const parsed = extractGeminiJson(payload)
+  if (!parsed) throw new ServiceError(stage, 'invalid-json', 200, model)
   return parsed
 }
 
@@ -131,7 +121,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
   try {
     const currentDate = new Date().toISOString().slice(0, 10)
-    const understood = parseUnderstanding(await callGemini(apiKey, understandSystem, JSON.stringify({ currentDate, selectedCity: input.city, language: input.lang, message: input.message }), 220, 'gemini-understanding', understandingSchema), input.lang) as Understanding | null
+    const understood = parseUnderstanding(await callGemini(understandSystem, JSON.stringify({ currentDate, selectedCity: input.city, language: input.lang, message: input.message }), 220, 'gemini-understanding', understandingSchema), input.lang) as Understanding | null
     if (!understood) {
       logFailure(new ServiceError('gemini-understanding', 'invalid-structure', 200))
       return response.status(502).json({ error: geminiUnderstandingError('invalid-structure', input.lang) })
@@ -150,18 +140,18 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
     let answer = ''
     try {
-      const generated = await callGemini(apiKey, answerSystem, JSON.stringify({ language: input.lang, question: input.message, intent: understood.intent, timeScope: understood.timeScope, targetDate: understood.targetDate, openMeteo: summary }), 320, 'gemini-answer') as any
+      const generated = await callGemini(answerSystem, JSON.stringify({ language: input.lang, question: input.message, intent: understood.intent, timeScope: understood.timeScope, targetDate: understood.targetDate, openMeteo: summary }), 320, 'gemini-answer') as any
       answer = typeof generated?.answer === 'string' ? generated.answer.trim().slice(0, 900) : ''
       if (!answer) throw new ServiceError('gemini-answer', 'invalid-structure', 200)
     } catch (error) {
-      const serviceError = error instanceof ServiceError ? error : new ServiceError('gemini-answer', 'unexpected-error')
-      logFailure(serviceError)
+      const serviceError = error instanceof ServiceError || error instanceof GeminiServiceError ? error : new ServiceError('gemini-answer', 'unexpected-error')
+      if (!(serviceError instanceof GeminiServiceError)) logFailure(serviceError)
       answer = fallbackAnswer(summary, understood, input.lang)
     }
     return response.status(200).json({ answer, intent: understood.intent, requestedCity: understood.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false })
   } catch (error) {
-    const serviceError = error instanceof ServiceError ? error : new ServiceError('open-meteo', 'unexpected-error')
-    logFailure(serviceError)
+    const serviceError = error instanceof ServiceError || error instanceof GeminiServiceError ? error : new ServiceError('open-meteo', 'unexpected-error')
+    if (!(serviceError instanceof GeminiServiceError)) logFailure(serviceError)
     if (serviceError.stage === 'gemini-understanding') {
       const message = geminiUnderstandingError(serviceError.code, input.lang)
       return response.status(502).json({ error: message })
