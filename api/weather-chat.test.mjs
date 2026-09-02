@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ALLOWED_INTENTS, findDailyForecast, geminiUnderstandingError, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, findDailyForecast, geminiUnderstandingError, parseDeterministicQuestion, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
 
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 
@@ -58,4 +58,26 @@ test('reports a date outside the available 15-day forecast by exact ISO lookup',
 test('distinguishes invalid and unavailable Gemini responses', () => {
   assert.match(geminiUnderstandingError('invalid-json'), /невалиден отговор/)
   assert.match(geminiUnderstandingError('upstream-http'), /временно не е достъпен/)
+})
+
+test('three quick questions are parsed deterministically', () => {
+  assert.equal(parseDeterministicQuestion('Да взема ли чадър?').intent, 'rain')
+  assert.equal(parseDeterministicQuestion('Как да се облека?').intent, 'clothing')
+  assert.equal(parseDeterministicQuestion('Подходящо ли е за разходка?').intent, 'walk')
+  for (const question of ['Да взема ли чадър?', 'Как да се облека?', 'Подходящо ли е за разходка?']) assert.equal(parseDeterministicQuestion(question).isQuick, true)
+})
+
+const wetSummary = { location: 'София', current: { temperature_2m: 12, apparent_temperature: 9, wind_speed_10m: 28, uv_index: 2 }, nextHours: [
+  { time: '2026-09-02T12:00', tempC: 12, feelsC: 9, rainMm: 1.2, rainChancePct: 80, windKmh: 28, uv: 2, code: 61 }
+] }
+
+test('quick answers use Open-Meteo precipitation, clothing, wind and UV values', () => {
+  assert.match(deterministicWeatherAnswer(wetSummary, parseDeterministicQuestion('Да взема ли чадър?')), /Да, вземи чадър.*80%.*1\.2 мм/)
+  assert.match(deterministicWeatherAnswer(wetSummary, parseDeterministicQuestion('Как да се облека?')), /леко яке.*непромокаем.*28 км\/ч/)
+  assert.match(deterministicWeatherAnswer(wetSummary, parseDeterministicQuestion('Подходящо ли е за разходка?')), /повишено внимание.*UV/)
+})
+
+test('common Bulgarian city and date question is parsed without Gemini', () => {
+  const parsed = parseDeterministicQuestion('Какво е времето във Варна на 2026-09-06?')
+  assert.deepEqual([parsed.intent, parsed.requestedCity, parsed.timeScope, parsed.targetDate], ['general_weather', 'варна', 'specific_date', '2026-09-06'])
 })

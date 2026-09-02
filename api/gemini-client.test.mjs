@@ -63,10 +63,11 @@ test('returns a controlled error when discovery has no compatible model', async 
   await assert.rejects(client.resolveModel('test'), error => error.code === 'no-compatible-model')
 })
 
-test('weather endpoints import the same shared resolver', async () => {
+test('Gemini remains optional and weather advice is deterministic', async () => {
   const [chat, advice] = await Promise.all([readFile(new URL('./weather-chat.ts', import.meta.url), 'utf8'), readFile(new URL('./weather-advice.ts', import.meta.url), 'utf8')])
-  assert.match(chat, /import \{ GeminiServiceError, geminiClient \} from '\.\/gemini-client\.js'/)
-  assert.match(advice, /import \{ GeminiServiceError, geminiClient \} from '\.\/gemini-client\.js'/)
+  assert.match(chat, /import \{ geminiClient \} from '\.\/gemini-client\.js'/)
+  assert.doesNotMatch(advice, /gemini|generativelanguage/i)
+  assert.match(chat, /parseDeterministicQuestion\(input\.message.*\)[\s\S]+if \(!understood\) understood = await optionalGeminiUnderstanding/)
   assert.doesNotMatch(`${chat}\n${advice}`, /models\/gemini-[^'"`]+:generateContent/)
 })
 

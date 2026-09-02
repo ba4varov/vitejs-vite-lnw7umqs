@@ -1,51 +1,32 @@
-type ApiRequest = {
-  method?: string
-  body?: Record<string, unknown>
-}
+type ApiRequest = { method?: string; body?: Record<string, unknown> }
+type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-type ApiResponse = {
-  status: (code: number) => ApiResponse
-  json: (body: Record<string, unknown>) => void
-}
+const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null
 
-import { GeminiServiceError, geminiClient } from './gemini-client.js'
+function advice(weather: Record<string, unknown>) {
+  const bg = weather.lang !== 'en'
+  const temp = finite(weather.temp)
+  const feels = finite(weather.feelsLike) ?? temp
+  const rain = finite(weather.rain) ?? 0
+  const chance = finite(weather.precipProb) ?? 0
+  const wind = finite(weather.wind) ?? 0
+  const uv = finite(weather.uvIndex) ?? 0
+  const code = finite(weather.code) ?? 0
+  if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return bg ? 'Облечи се топло и обуй стабилни обувки — очаква се сняг.' : 'Dress warmly and wear sturdy shoes—snow is expected.'
+  if (rain > 0 || chance >= 35 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return bg ? `Вземи чадър или непромокаемо яке — вероятността за валеж е ${chance}%.` : `Take an umbrella or waterproof jacket—the rain chance is ${chance}%.`
+  if (wind >= 25) return bg ? `Закопчай якето — вятърът е около ${wind} км/ч.` : `Zip up your jacket—wind is around ${wind} km/h.`
+  if (uv >= 6) return bg ? `UV индексът е ${uv}: ползвай слънцезащита и търси сянка.` : `UV index is ${uv}: use sunscreen and seek shade.`
+  if ((feels ?? 15) <= 10) return bg ? 'Хладно е — облечи се на слоеве и вземи яке.' : 'It is chilly—wear layers and take a jacket.'
+  if ((temp ?? 15) >= 28) return bg ? 'Топло е — вземи вода, леки дрехи и слънцезащита.' : 'It is hot—take water, light clothing, and sunscreen.'
+  return bg ? 'Времето е спокойно — подходящо е за излизане с обичайните сезонни дрехи.' : 'Conditions are calm—regular seasonal clothing should be comfortable.'
+}
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
-  if (request.method !== 'POST') {
-    return response.status(405).json({ error: 'Method not allowed' })
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return response.status(503).json({ error: 'AI service is not configured' })
-  }
-
-  const weather = request.body ?? {}
-  const language = weather.lang === 'en' ? 'English' : 'Bulgarian'
-  const prompt = `Write a playful, humorous, but practical weather tip in ${language} using only the data below.
-Keep it to one or two short sentences and under 220 characters. Do not use markdown, greetings, warnings not supported by the data, or mention AI.
-Location: ${weather.city}
-Temperature: ${weather.temp}°C; feels like: ${weather.feelsLike}°C
-Conditions: ${weather.description}; weather code: ${weather.code}
-Rain today: ${weather.rain} mm; rain probability: ${weather.precipProb}%
-Wind: ${weather.wind} km/h; UV index: ${weather.uvIndex}`
-
   try {
-    const { payload: result } = await geminiClient.generate({
-      endpoint: 'weather-advice', stage: 'gemini-advice', body: {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 1, maxOutputTokens: 100 }
-      }
-    })
-    const advice = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 220)
-    if (!advice) return response.status(502).json({ error: 'AI returned no advice' })
-
-    return response.status(200).json({ advice })
-  } catch (error) {
-    const configurationError = error instanceof GeminiServiceError &&
-      ['models-list-failed', 'no-compatible-model', 'configured-model-unavailable'].includes(error.code)
-    return response.status(configurationError ? 503 : 502).json({
-      error: configurationError ? 'AI service model is unavailable' : 'AI service is unavailable'
-    })
+    if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' })
+    if (!request.body || typeof request.body !== 'object') return response.status(400).json({ error: 'Невалидни метеорологични данни.' })
+    return response.status(200).json({ advice: advice(request.body) })
+  } catch {
+    return response.status(200).json({ advice: 'Провери актуалната прогноза преди да излезеш.' })
   }
 }
