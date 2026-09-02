@@ -8,6 +8,8 @@ type ApiResponse = {
   json: (body: Record<string, unknown>) => void
 }
 
+import { GeminiServiceError, geminiClient } from './gemini-client.js'
+
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method not allowed' })
@@ -29,28 +31,21 @@ Rain today: ${weather.rain} mm; rain probability: ${weather.precipProb}%
 Wind: ${weather.wind} km/h; UV index: ${weather.uvIndex}`
 
   try {
-    const geminiResponse = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({
+    const { payload: result } = await geminiClient.generate({
+      endpoint: 'weather-advice', stage: 'gemini-advice', body: {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 1, maxOutputTokens: 100 }
-        })
       }
-    )
-
-    if (!geminiResponse.ok) {
-      return response.status(502).json({ error: 'AI service did not respond' })
-    }
-
-    const result = await geminiResponse.json()
+    })
     const advice = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 220)
     if (!advice) return response.status(502).json({ error: 'AI returned no advice' })
 
     return response.status(200).json({ advice })
-  } catch {
-    return response.status(502).json({ error: 'AI service is unavailable' })
+  } catch (error) {
+    const configurationError = error instanceof GeminiServiceError &&
+      ['models-list-failed', 'no-compatible-model', 'configured-model-unavailable'].includes(error.code)
+    return response.status(configurationError ? 503 : 502).json({
+      error: configurationError ? 'AI service model is unavailable' : 'AI service is unavailable'
+    })
   }
 }
