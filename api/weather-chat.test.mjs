@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, parseDeterministicQuestion, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput } from './weather-chat-core.js'
 
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 
@@ -129,4 +129,45 @@ test('dated answer names city/date and all required daily measurements, never cu
   const answer = deterministicWeatherAnswer({ location: 'Априлци', current: { temperature_2m: 99 }, targetDay: { date: '2026-09-06', minC: 11, maxC: 23, rainChancePct: 40, rainMm: 1.5, maxWindKmh: 18 } }, understood)
   assert.match(answer, /Априлци.*6 септември 2026 г\..*минимална температура 11°C.*максимална 23°C.*40%.*1\.5 мм.*18 км\/ч.*дъжд/s)
   assert.doesNotMatch(answer, /Варна|В момента|99/)
+})
+
+const dayAfterTomorrowVariants = ['вдругиден', 'вдруги ден', 'вдруги-ден', 'след два дни', 'след 2 дни', 'ден след утре']
+
+test('all common day-after-tomorrow forms normalize deterministically', () => {
+  for (const phrase of dayAfterTomorrowVariants) {
+    const parsed = parseDeterministicQuestion(`Какво ще е времето ${phrase} в Ню Йорк?`)
+    assert.deepEqual([parsed.requestedCity, parsed.timeScope], ['Ню Йорк', 'day_after_tomorrow'], phrase)
+    assert.equal(relativeForecastDate(parsed.timeScope, fixedNow, 'America/New_York'), '2026-09-04', phrase)
+  }
+})
+
+test('day-after-tomorrow supports different Bulgarian word orders', () => {
+  for (const question of [
+    'Какво ще е времето вдруги ден в Ню Йорк?',
+    'В Ню Йорк вдруги ден какво ще е времето?',
+    'Вдругиден ще вали ли в Ню Йорк?',
+    'Каква е прогнозата за Ню Йорк след два дни?',
+    'След 2 дни какво ще е времето в Ню Йорк?'
+  ]) {
+    const parsed = parseDeterministicQuestion(question)
+    assert.deepEqual([parsed.requestedCity, parsed.timeScope], ['Ню Йорк', 'day_after_tomorrow'], question)
+  }
+})
+
+test('New York local date determines the exact day-after-tomorrow ISO row', () => {
+  const nearMidnight = new Date('2026-09-03T02:00:00Z')
+  assert.equal(localIsoDate(nearMidnight, 'America/New_York'), '2026-09-02')
+  const parsed = parseDeterministicQuestion('Какво ще е времето вдруги ден в Ню Йорк?')
+  const exact = relativeForecastDate(parsed.timeScope, nearMidnight, 'America/New_York')
+  assert.equal(exact, '2026-09-04')
+  const day = findDailyForecast([{ date: '2026-09-03' }, { date: exact, minC: 17, maxC: 25, rainChancePct: 20, rainMm: 0, maxWindKmh: 16 }], exact)
+  const answer = deterministicWeatherAnswer({ location: 'New York', current: { temperature_2m: 99 }, targetDay: day }, parsed)
+  assert.match(answer, /New York.*4 септември 2026 г\. \(вдругиден\).*минимална температура 17°C.*максимална 25°C.*20%.*0 мм.*16 км\/ч/s)
+  assert.doesNotMatch(answer, /В момента|99°C/)
+})
+
+test('unresolved future periods ask for clarification instead of current weather', () => {
+  const parsed = parseDeterministicQuestion('Какво ще е времето след три дни в Ню Йорк?')
+  assert.equal(parsed.needsClarification, true)
+  assert.match(parsed.clarificationQuestion, /кой точно ден/i)
 })

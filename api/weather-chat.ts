@@ -1,7 +1,7 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput } from './weather-chat-core.js'
 import { geminiClient } from './gemini-client.js'
 
 type Intent = typeof ALLOWED_INTENTS[number]
@@ -151,8 +151,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     let summary = await getWeather(place, understood.targetDate)
     if (!understood.targetDate && ['today', 'tomorrow', 'day_after_tomorrow', 'tomorrow_morning', 'tomorrow_afternoon', 'tomorrow_evening', 'tomorrow_night'].includes(understood.timeScope)) {
       const today = localIsoDate(new Date(), summary.timezone || place.timezone || 'UTC')
-      const offset = understood.timeScope === 'today' ? 0 : understood.timeScope === 'day_after_tomorrow' ? 2 : 1
-      understood = { ...understood, targetDate: addIsoDays(today, offset) }
+      const relativeScope = understood.timeScope.startsWith('tomorrow_') ? 'tomorrow' : understood.timeScope
+      understood = { ...understood, targetDate: relativeForecastDate(relativeScope, new Date(), summary.timezone || place.timezone || 'UTC') ?? addIsoDays(today, 1) }
       summary = { ...summary, requestedDate: understood.targetDate, targetDay: findDailyForecast(summary.daily, understood.targetDate) }
     }
     if (understood.targetDate && !summary.targetDay) return response.status(200).json({ answer: input.lang === 'bg' ? `За ${understood.targetDate} все още няма надеждна прогноза в наличния прогнозен период.` : `A reliable forecast for ${understood.targetDate} is not available yet.`, intent: understood.intent, needsClarification: false })
