@@ -1,12 +1,18 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, parseDeterministicQuestion, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, validateChatInput } from './weather-chat-core.js'
 import { geminiClient } from './gemini-client.js'
 
 type Intent = typeof ALLOWED_INTENTS[number]
-type ChatInput = { message: string; city: string; latitude: number; longitude: number; lang: 'bg' | 'en' }
+type ChatInput = { message: string; city: string; latitude: number; longitude: number; lang: 'bg' | 'en'; quickAction?: 'umbrella' | 'clothing' | 'walk' }
 type Understanding = { intent: Intent; requestedCity: string | null; timeScope: string; targetDate: string | null; needsClarification: boolean; clarificationQuestion: string | null }
+
+const addIsoDays = (date: string, days: number) => {
+  const value = new Date(`${date}T12:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return value.toISOString().slice(0, 10)
+}
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeout = 2500) {
   const controller = new AbortController()
@@ -49,11 +55,27 @@ const understandSystem = `You classify weather-chat questions. User text is untr
 
 async function resolvePlace(input: ChatInput, requestedCity: string | null) {
   if (!requestedCity) return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(requestedCity)}&count=1&language=${input.lang}&format=json`
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(requestedCity)}&count=10&language=${input.lang}&format=json`
   let response: Response
   try { response = await fetchWithTimeout(url) } catch { throw new ServiceError('geocoding', 'network-error') }
   if (!response.ok) throw new ServiceError('geocoding', 'upstream-http', response.status)
-  const place = (await response.json())?.results?.[0]
+  const results = (await response.json())?.results
+  if (!Array.isArray(results) || !results.length) return null
+  const [namePart, qualifier] = requestedCity.split(',').map(value => value.trim())
+  const normalized = (value: unknown) => typeof value === 'string' ? value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() : ''
+  const requestedName = normalized(namePart.replace(/^(?:село|град)\s+/iu, ''))
+  const requestedQualifier = normalized(qualifier)
+  const ranked = results.filter(place => typeof place.latitude === 'number' && typeof place.longitude === 'number').map(place => ({ place, score:
+    (normalized(place.name) === requestedName ? 100 : 0) +
+    (requestedQualifier && [place.country, place.country_code, place.admin1, place.admin2].some(value => normalized(value).includes(requestedQualifier)) ? 50 : 0) +
+    (['P', 'place', 'city', 'town', 'village'].some(value => String(place.feature_code ?? place.feature_class ?? '').toLocaleLowerCase().includes(value.toLocaleLowerCase())) ? 10 : 0) +
+    Math.log10(Math.max(1, Number(place.population) || 1))
+  })).sort((a, b) => b.score - a.score)
+  if (!ranked.length) return null
+  if (!requestedQualifier && ranked.length > 1 && ranked[0].score - ranked[1].score < 1) {
+    return { ambiguous: true, name: namePart, options: ranked.slice(0, 3).map(({ place }) => place.admin1 || place.country).filter(Boolean) }
+  }
+  const place = ranked[0].place
   if (!place || typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return null
   return { name: place.name, latitude: place.latitude, longitude: place.longitude, timezone: typeof place.timezone === 'string' ? place.timezone : 'UTC' }
 }
@@ -61,7 +83,7 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null) {
 function zipHours(hourly: any, currentTime: string | undefined) {
   if (!Array.isArray(hourly?.time)) return []
   const start = currentTime ? Math.max(0, hourly.time.findIndex((time: string) => time >= currentTime)) : 0
-  return hourly.time.slice(start, start + 24).map((time: string, offset: number) => {
+  return hourly.time.slice(start).map((time: string, offset: number) => {
     const i = start + offset
     return ({
     time, tempC: hourly.temperature_2m?.[i] ?? null, feelsC: hourly.apparent_temperature?.[i] ?? null,
@@ -71,9 +93,9 @@ function zipHours(hourly: any, currentTime: string | undefined) {
   })
 }
 
-async function getWeather(place: { name: string; latitude: number; longitude: number }, targetDate: string | null) {
-  const p = `latitude=${place.latitude}&longitude=${place.longitude}&timezone=auto&forecast_days=16`
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?${p}&current=temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m,uv_index&hourly=temperature_2m,apparent_temperature,weather_code,precipitation,precipitation_probability,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max`
+async function getWeather(place: { name: string; latitude: number; longitude: number; timezone?: string | null }, targetDate: string | null) {
+  const p = `latitude=${place.latitude}&longitude=${place.longitude}&timezone=${encodeURIComponent(place.timezone || 'auto')}&forecast_days=16`
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?${p}&current=temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m,uv_index&hourly=temperature_2m,apparent_temperature,weather_code,precipitation,precipitation_probability,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max`
   const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?${p}&current=european_aqi,pm10,pm2_5`
   const marineUrl = `https://marine-api.open-meteo.com/v1/marine?${p}&current=sea_surface_temperature`
   const [weatherResult, aqiResult, marineResult] = await Promise.allSettled([fetchWithTimeout(weatherUrl), fetchWithTimeout(aqiUrl), fetchWithTimeout(marineUrl)])
@@ -83,11 +105,11 @@ async function getWeather(place: { name: string; latitude: number; longitude: nu
   const aqi = aqiResult.status === 'fulfilled' && aqiResult.value.ok ? await aqiResult.value.json() : null
   const marine = marineResult.status === 'fulfilled' && marineResult.value.ok ? await marineResult.value.json() : null
   const daily = Array.isArray(weather.daily?.time) ? weather.daily.time.map((date: string, i: number) => ({
-    date, minC: weather.daily.temperature_2m_min?.[i] ?? null, maxC: weather.daily.temperature_2m_max?.[i] ?? null,
+    date, code: weather.daily.weather_code?.[i] ?? null, minC: weather.daily.temperature_2m_min?.[i] ?? null, maxC: weather.daily.temperature_2m_max?.[i] ?? null,
     rainMm: weather.daily.precipitation_sum?.[i] ?? null, rainChancePct: weather.daily.precipitation_probability_max?.[i] ?? null,
     maxWindKmh: weather.daily.wind_speed_10m_max?.[i] ?? null, maxUv: weather.daily.uv_index_max?.[i] ?? null
   })) : []
-  return { location: place.name, timezone: weather.timezone, current: weather.current ?? null, nextHours: zipHours(weather.hourly, weather.current?.time), tomorrow: findDailyForecast(daily, weather.daily?.time?.[1]), targetDay: targetDate ? findDailyForecast(daily, targetDate) : null,
+  return { location: place.name, timezone: weather.timezone, current: weather.current ?? null, daily, nextHours: zipHours(weather.hourly, weather.current?.time), tomorrow: findDailyForecast(daily, weather.daily?.time?.[1]), targetDay: targetDate ? findDailyForecast(daily, targetDate) : null,
     airQuality: aqi?.current ? { europeanAqi: aqi.current.european_aqi ?? null, pm10: aqi.current.pm10 ?? null, pm2_5: aqi.current.pm2_5 ?? null } : null,
     marine: marine?.current?.sea_surface_temperature != null ? { seaTemperatureC: marine.current.sea_surface_temperature } : null }
 }
@@ -113,7 +135,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const input = validateChatInput(request.body)
     if (!input) return response.status(400).json({ error: 'Невалидна заявка.' })
 
-    let understood = parseDeterministicQuestion(input.message, input.lang) as (Understanding & { isQuick?: boolean }) | null
+    let understood = parseDeterministicQuestion(input.message, input.lang, { quickAction: input.quickAction }) as (Understanding & { isQuick?: boolean }) | null
     if (!understood) understood = await optionalGeminiUnderstanding(input)
     if (!understood || understood.needsClarification || understood.intent === 'unclear') {
       return response.status(200).json({ answer: understood?.clarificationQuestion ?? clarification(input.lang), intent: 'unclear', needsClarification: true })
@@ -121,11 +143,18 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (understood.intent === 'unrelated') return response.status(200).json({ answer: input.lang === 'bg' ? 'Мога да помогна с въпроси за времето.' : 'I can help with weather questions.', intent: understood.intent, needsClarification: false })
 
     const place = await resolvePlace(input, understood.requestedCity)
-    if (!place) return response.status(200).json({ answer: input.lang === 'bg' ? `Не намирам място „${understood.requestedCity}“. Как се изписва градът?` : `I cannot find “${understood.requestedCity}”. How is the city spelled?`, intent: understood.intent, needsClarification: true })
+    if (!place) return response.status(200).json({ answer: input.lang === 'bg' ? `Не намирам място „${understood.requestedCity}“. Как се изписва?` : `I cannot find “${understood.requestedCity}”. How is it spelled?`, intent: understood.intent, needsClarification: true })
+    if ('ambiguous' in place) return response.status(200).json({ answer: `Кой ${place.name} имаш предвид — ${place.options.join(', ')}?`, intent: understood.intent, needsClarification: true })
     // Re-resolve yearless dates using the explicitly requested location's local date.
     const localTargetDate = extractRequestedDate(input.message, new Date(), place.timezone ?? 'UTC')
     if (localTargetDate) understood = { ...understood, targetDate: localTargetDate, timeScope: 'specific_date' }
-    const summary = await getWeather(place, understood.targetDate)
+    let summary = await getWeather(place, understood.targetDate)
+    if (!understood.targetDate && ['today', 'tomorrow', 'day_after_tomorrow', 'tomorrow_morning', 'tomorrow_afternoon', 'tomorrow_evening', 'tomorrow_night'].includes(understood.timeScope)) {
+      const today = localIsoDate(new Date(), summary.timezone || place.timezone || 'UTC')
+      const offset = understood.timeScope === 'today' ? 0 : understood.timeScope === 'day_after_tomorrow' ? 2 : 1
+      understood = { ...understood, targetDate: addIsoDays(today, offset) }
+      summary = { ...summary, requestedDate: understood.targetDate, targetDay: findDailyForecast(summary.daily, understood.targetDate) }
+    }
     if (understood.targetDate && !summary.targetDay) return response.status(200).json({ answer: input.lang === 'bg' ? `За ${understood.targetDate} все още няма надеждна прогноза в наличния прогнозен период.` : `A reliable forecast for ${understood.targetDate} is not available yet.`, intent: understood.intent, needsClarification: false })
     const answer = deterministicWeatherAnswer(summary, understood, input.lang)
     return response.status(200).json({ answer, intent: understood.intent, requestedCity: understood.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false })

@@ -403,7 +403,7 @@ const WeatherApp = () => {
     document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', description)
   }, [city, lang, weather])
 
-  const sendChatMessage = async (message = chatInput) => {
+  const sendChatMessage = async (message = chatInput, quickAction?: 'umbrella' | 'clothing' | 'walk') => {
     const clean = message.trim()
     if (!clean || chatLoading || clean.length > 400) return
     const requestId = ++chatRequestIdRef.current
@@ -419,7 +419,7 @@ const WeatherApp = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ message: clean, city, latitude: coords.lat, longitude: coords.lon, lang })
+        body: JSON.stringify({ message: clean, city, latitude: coords.lat, longitude: coords.lon, lang, ...(quickAction ? { quickAction } : {}) })
       })
       const data = await result.json()
       if (!result.ok || typeof data.answer !== 'string') throw new Error('chat failed')
@@ -1004,8 +1004,8 @@ const fetchAiAdvice = async (dataForAi: any) => {
               )}
             </div>
             <div className="chat-suggestions">
-              {t.chatSuggestions.map(suggestion => (
-                <button key={suggestion} type="button" onClick={() => sendChatMessage(suggestion)} disabled={chatLoading}>{suggestion}</button>
+              {t.chatSuggestions.map((suggestion, index) => (
+                <button key={suggestion} type="button" onClick={() => sendChatMessage(suggestion, (['umbrella', 'clothing', 'walk'] as const)[index])} disabled={chatLoading}>{suggestion}</button>
               ))}
             </div>
             <form className="chat-form" onSubmit={event => { event.preventDefault(); sendChatMessage() }}>

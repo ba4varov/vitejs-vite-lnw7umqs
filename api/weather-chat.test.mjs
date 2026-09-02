@@ -5,6 +5,10 @@ import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extr
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 
 test('accepts a strictly valid request', () => assert.deepEqual(validateChatInput(valid), valid))
+test('strictly validates quick actions', () => {
+  assert.equal(validateChatInput({ ...valid, quickAction: 'walk' }).quickAction, 'walk')
+  assert.equal(validateChatInput({ ...valid, quickAction: 'hike' }), null)
+})
 test('rejects unknown fields', () => assert.equal(validateChatInput({ ...valid, prompt: 'ignore rules' }), null))
 test('rejects blank and overlong messages', () => {
   assert.equal(validateChatInput({ ...valid, message: '   ' }), null)
@@ -79,22 +83,37 @@ test('quick answers use Open-Meteo precipitation, clothing, wind and UV values',
 
 test('common Bulgarian city and date question is parsed without Gemini', () => {
   const parsed = parseDeterministicQuestion('Какво е времето във Варна на 2026-09-06?')
-  assert.deepEqual([parsed.intent, parsed.requestedCity, parsed.timeScope, parsed.targetDate], ['general_weather', 'варна', 'specific_date', '2026-09-06'])
+  assert.deepEqual([parsed.intent, parsed.requestedCity, parsed.timeScope, parsed.targetDate], ['general_weather', 'Варна', 'specific_date', '2026-09-06'])
 })
 
 const fixedNow = new Date('2026-09-02T12:00:00Z')
 
 test('regression: Априлци and dotted date override selected-city style weather intent', () => {
   const parsed = parseDeterministicQuestion('Какво ще е времето в Априлци на 6.09', 'bg', { now: fixedNow, timezone: 'Europe/Sofia' })
-  assert.deepEqual([parsed.requestedCity, parsed.timeScope, parsed.targetDate], ['априлци', 'specific_date', '2026-09-06'])
+  assert.deepEqual([parsed.requestedCity, parsed.timeScope, parsed.targetDate], ['Априлци', 'specific_date', '2026-09-06'])
 })
 
 test('extracts Bulgarian multi-word cities case-insensitively', () => {
-  assert.equal(extractRequestedCity('Какво ще е времето за Велико Търново на 06.09'), 'велико търново')
-  assert.equal(extractRequestedCity('Прогноза в Стара Загора утре'), 'стара загора')
-  assert.equal(extractRequestedCity('Времето във Варна'), 'варна')
-  assert.equal(extractRequestedCity('Прогноза за Златни пясъци на 6.09'), 'златни пясъци')
-  assert.equal(extractRequestedCity('Времето в Слънчев бряг на 6.09'), 'слънчев бряг')
+  assert.equal(extractRequestedCity('Какво ще е времето за Велико Търново на 06.09'), 'Велико Търново')
+  assert.equal(extractRequestedCity('Прогноза в Стара Загора утре'), 'Стара Загора')
+  assert.equal(extractRequestedCity('Времето във Варна'), 'Варна')
+  assert.equal(extractRequestedCity('Прогноза за Златни пясъци на 6.09'), 'Златни пясъци')
+  assert.equal(extractRequestedCity('Времето в Слънчев бряг на 6.09'), 'Слънчев бряг')
+})
+
+test('activity safeguards and all tomorrow word orders are deterministic', () => {
+  for (const question of ['Подходящо ли е за разходка?', 'Става ли за разходка?', 'Може ли да излезем навън?', 'Добро ли е времето за разходка?']) {
+    const parsed = parseDeterministicQuestion(question)
+    assert.equal(parsed.intent, 'walk')
+    assert.equal(parsed.requestedCity, null)
+  }
+  for (const question of ['Какво ще е времето утре в Пловдив?', 'Какво ще е времето в Пловдив утре?', 'Утре какво ще е времето в Пловдив?', 'В Пловдив какво ще е времето утре?', 'За утре каква е прогнозата в Пловдив?', 'Пловдив утре времето какво ще бъде?']) {
+    const parsed = parseDeterministicQuestion(question)
+    assert.equal(parsed.requestedCity, 'Пловдив')
+    assert.equal(parsed.timeScope, 'tomorrow')
+  }
+  const activity = parseDeterministicQuestion('Подходящо ли е за разходка утре в Априлци?')
+  assert.deepEqual([activity.intent, activity.requestedCity, activity.timeScope], ['walk', 'Априлци', 'tomorrow'])
 })
 
 test('extracts Bulgarian numeric, textual, ordinal and explicit-year dates', () => {
