@@ -6,5 +6,9 @@ export function geminiUnderstandingError(code: string, lang?: 'bg' | 'en'): stri
 export type ValidChatInput = { message: string; city: string; latitude: number; longitude: number; lang: 'bg' | 'en' }
 export function validateChatInput(body: unknown): ValidChatInput | null
 export type DeterministicUnderstanding = { intent: string; requestedCity: string | null; timeScope: string; targetDate: string | null; needsClarification: boolean; clarificationQuestion: string | null; isQuick: boolean }
-export function parseDeterministicQuestion(message: string, lang?: 'bg' | 'en'): DeterministicUnderstanding | null
+export function normalizeQuestion(value: string): string
+export function localIsoDate(now?: Date, timezone?: string): string
+export function extractRequestedDate(message: string, now?: Date, timezone?: string): string | null
+export function extractRequestedCity(message: string): string | null
+export function parseDeterministicQuestion(message: string, lang?: 'bg' | 'en', options?: { now?: Date; timezone?: string }): DeterministicUnderstanding | null
 export function deterministicWeatherAnswer(summary: Record<string, any>, understood: DeterministicUnderstanding, lang?: 'bg' | 'en'): string
