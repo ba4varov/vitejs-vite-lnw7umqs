@@ -8,7 +8,9 @@ export type ValidChatInput = { message: string; city: string; latitude: number; 
 export function validateChatInput(body: unknown): ValidChatInput | null
 export type DeterministicUnderstanding = { intent: string; requestedCity: string | null; timeScope: string; targetDate: string | null; needsClarification: boolean; clarificationQuestion: string | null; isQuick: boolean }
 export function normalizeQuestion(value: string): string
+export function normalizeBulgarianTimeExpressions(value: string): string
 export function localIsoDate(now?: Date, timezone?: string): string
+export function relativeForecastDate(scope: 'today' | 'tomorrow' | 'day_after_tomorrow', now?: Date, timezone?: string): string | null
 export function extractRequestedDate(message: string, now?: Date, timezone?: string): string | null
 export function extractRequestedCity(message: string): string | null
 export function extractTimeScope(message: string): string | null
