@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
+import { ProjectShowcase } from './ProjectShowcase'
+import { AdSlot } from './AdSlot'
 
 const translations = {
   bg: {
@@ -1103,6 +1105,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
           )}
         </div>
       )}
+
+      <ProjectShowcase lang={lang} />
+      <AdSlot label={lang === 'bg' ? 'Рекламно пространство' : 'Advertising space'} />
 
       {selectedDay && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
