@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
 
 const translations = {
   bg: {
@@ -207,122 +208,140 @@ const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
   )
 }
 
-const SingleChart = ({ hourly, darkMode, type, label, unit, color, height = 400 }: any) => {
+type ChartType = 'temp' | 'rain' | 'wind' | 'pressure' | 'aqi'
+
+const formatChartValue = (value: number, type: ChartType) =>
+  type === 'rain' ? value.toLocaleString('bg-BG', { maximumFractionDigits: 2 }) : Math.round(value).toString()
+
+const SingleChart = ({ hourly, darkMode, type, label, unit, color, height }: any) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const metric = CHART_METRICS[type as ChartType] || { icon: '◌', color, kind: 'line' }
+  const chartColor = color || metric.color
+  const values = chartValues(hourly, type) as Array<number | null>
+  const summary = chartSummary(values) as { current: number, min: number, max: number } | null
+  const allZeroRain = type === 'rain' && values.some(Number.isFinite) && values.every(value => value === null || value === 0)
+  const mobile = width > 0 && width < 520
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const theme = chartTheme(darkMode, mobile, reducedMotion)
+  const chartHeight = height || (mobile ? 232 : 264)
+  const labels = hourly.slice(0, 24).map((item: any) => item?.hour || '--:--')
 
   useEffect(() => {
-    if (!canvasRef.current || !hourly.length) return
+    const frame = frameRef.current
+    if (!frame) return
+    const observer = new ResizeObserver(entries => setWidth(Math.round(entries[0].contentRect.width)))
+    observer.observe(frame)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
     const canvas = canvasRef.current
+    if (!canvas || !width || allZeroRain) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const W = canvas.width, H = canvas.height
-    const padL = 40, padR = 15, padT = 30, padB = 60 
-    const chartW = W - padL - padR, chartH = H - padT - padB
-    ctx.clearRect(0, 0, W, H)
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.round(width * dpr)
+    canvas.height = Math.round(chartHeight * dpr)
+    canvas.style.width = `${width}px`; canvas.style.height = `${chartHeight}px`
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, width, chartHeight)
 
-    const data = hourly.map((h: any) =>
-      type === 'temp' ? h.temp :
-      type === 'rain' ? (h.rain <= 0 ? 0 : h.rain) :
-      type === 'pressure' ? h.pressure :
-      type === 'aqi' ? h.aqi :
-      h.wind
-    )
-    const labels = hourly.map((h: any) => h.hour)
+    const pad = { left: mobile ? 35 : 42, right: 12, top: 12, bottom: 30 }
+    const plotW = width - pad.left - pad.right, plotH = chartHeight - pad.top - pad.bottom
+    const range = valueRange(values, type)
+    const x = (index: number) => pad.left + (values.length <= 1 ? plotW / 2 : index * plotW / (values.length - 1))
+    const y = (value: number) => pad.top + plotH - ((value - range.min) / (range.max - range.min)) * plotH
 
-    let minVal = type === 'rain' || type === 'aqi' ? 0 : Math.min(...data)
-    let maxVal = type === 'rain' ? Math.max(1, Math.max(...data)) : Math.max(...data)
-    if (minVal === maxVal) { maxVal += 1; minVal -= 1; }
-    const range = maxVal - minVal
-
-    const xStep = chartW / (data.length - 1)
-    const yScale = (val: number) => padT + chartH - ((val - minVal) / range) * chartH
-    const xScale = (i: number) => padL + i * xStep
-
-    const textColor = darkMode ? '#e2e8f0' : '#1e293b'
-    const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
-
-    ctx.strokeStyle = gridColor
-    ctx.lineWidth = 1
-    
-    for (let i = 0; i <= 4; i++) {
-      const y = padT + (chartH / 4) * i
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke()
-      
-      ctx.fillStyle = textColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'right'
-      ctx.fillText(Math.round(maxVal - (range / 4) * i).toString(), padL - 8, y + 4)
+    ctx.font = `11px ${getComputedStyle(document.body).fontFamily}`
+    ctx.fillStyle = theme.text; ctx.strokeStyle = theme.grid; ctx.lineWidth = 1
+    const tickValues: number[] = []
+    if (type === 'pressure') {
+      const bottom = Math.floor(range.min), top = Math.ceil(range.max)
+      for (let value = bottom; value <= top; value += range.step) tickValues.push(value)
+      if (tickValues.length < 2) tickValues.push(bottom + range.step)
+    } else {
+      for (let i = 0; i <= 4; i++) tickValues.push(range.min + (range.max - range.min) * i / 4)
     }
-    
-    ctx.fillStyle = textColor; 
-    ctx.font = 'bold 12px Arial'; 
-    ctx.textAlign = 'right'; 
-    ctx.textBaseline = 'middle'; 
-
-    data.forEach((_: any, i: number) => { 
-      const x = xScale(i);
-      const y = padT + chartH + 18; 
-      
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(-Math.PI / 4);
-      ctx.fillText(labels[i], 0, 0);
-      ctx.restore();
+    ;[...new Set(tickValues.map(value => type === 'rain' ? Number(value.toFixed(1)) : Math.round(value)))].forEach(value => {
+      const yy = y(value)
+      if (yy < pad.top - 1 || yy > pad.top + plotH + 1) return
+      ctx.beginPath(); ctx.moveTo(pad.left, yy); ctx.lineTo(width - pad.right, yy); ctx.stroke()
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(value), pad.left - 7, yy)
     })
 
-    const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH)
-    grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00')
-    
-    ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]))
-    data.forEach((val: number, i: number) => {
-      if (i === 0) return
-      const cpx = (xScale(i - 1) + xScale(i)) / 2
-      ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
-    })
-    ctx.lineTo(xScale(data.length - 1), padT + chartH); ctx.lineTo(xScale(0), padT + chartH)
-    ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
-    
-    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5
-    data.forEach((val: number, i: number) => {
-      if (i === 0) { ctx.moveTo(xScale(0), yScale(val)); return }
-      const cpx = (xScale(i - 1) + xScale(i)) / 2
-      ctx.bezierCurveTo(cpx, yScale(data[i - 1]), cpx, yScale(val), xScale(i), yScale(val))
-    })
-    ctx.stroke()
-    
-    data.forEach((val: number, i: number) => {
-      ctx.beginPath(); ctx.arc(xScale(i), yScale(val), 3, 0, Math.PI * 2)
-      ctx.fillStyle = color; ctx.fill()
-      ctx.strokeStyle = darkMode ? '#1e293b' : 'white'; ctx.lineWidth = 1.5; ctx.stroke()
-    })
-  }, [hourly, type, darkMode, color])
+    ctx.textBaseline = 'bottom'; ctx.textAlign = 'center'
+    visibleTimeIndexes(values.length, mobile).forEach(index => ctx.fillText(index === 0 ? 'Сега' : labels[index], x(index), chartHeight - 3))
 
-  return (
-    <div className="mini-chart">
-      <h4 style={{ color: color, marginBottom: '16px', textAlign: 'center', fontSize: '1.1rem' }}>
-        {label} <span style={{ opacity: 0.7, fontSize: '0.8em' }}>({unit})</span>
-      </h4>
-      <canvas ref={canvasRef} width={800} height={height} style={{ width: '100%', height: 'auto', display: 'block' }} />
+    const drawSegment = (fill: boolean) => {
+      let drawing = false
+      values.forEach((value, index) => {
+        if (value === null) { drawing = false; return }
+        if (!drawing) { ctx.moveTo(x(index), y(value)); drawing = true } else ctx.lineTo(x(index), y(value))
+      })
+      if (fill) {
+        const last = values.findLastIndex(Number.isFinite), first = values.findIndex(Number.isFinite)
+        if (first >= 0) { ctx.lineTo(x(last), pad.top + plotH); ctx.lineTo(x(first), pad.top + plotH); ctx.closePath() }
+      }
+    }
+
+    if (metric.kind === 'bar') {
+      const slot = plotW / Math.max(values.length, 1), barWidth = Math.min(18, Math.max(4, slot * .58))
+      values.forEach((value, index) => {
+        if (value === null) return
+        const top = y(value), bottom = y(0), h = Math.max(value > 0 ? 2 : 0, bottom - top)
+        ctx.fillStyle = chartColor; ctx.beginPath(); ctx.roundRect(x(index) - barWidth / 2, bottom - h, barWidth, h, [4, 4, 0, 0]); ctx.fill()
+      })
+    } else {
+      if (type !== 'pressure') {
+        const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH)
+        gradient.addColorStop(0, `${chartColor}24`); gradient.addColorStop(1, `${chartColor}00`)
+        ctx.beginPath(); drawSegment(true); ctx.fillStyle = gradient; ctx.fill()
+      }
+      ctx.beginPath(); drawSegment(false); ctx.strokeStyle = chartColor; ctx.lineWidth = 2.25; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke()
+    }
+    if (activeIndex !== null && values[activeIndex] !== null) {
+      ctx.beginPath(); ctx.arc(x(activeIndex), y(values[activeIndex]!), 4, 0, Math.PI * 2)
+      ctx.fillStyle = chartColor; ctx.fill(); ctx.strokeStyle = darkMode ? '#0f172a' : '#fff'; ctx.lineWidth = 2; ctx.stroke()
+    }
+  }, [activeIndex, allZeroRain, chartColor, chartHeight, darkMode, hourly, metric.kind, mobile, theme.grid, theme.text, type, values, width])
+
+  const choosePoint = (clientX: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect || !values.length) return
+    setActiveIndex(Math.max(0, Math.min(values.length - 1, Math.round((clientX - rect.left - (mobile ? 35 : 42)) / Math.max(1, rect.width - (mobile ? 47 : 54)) * (values.length - 1)))))
+  }
+  const currentValue = activeIndex === null ? null : values[activeIndex]
+  const summaryText = !summary ? 'Няма налични данни за периода' : type === 'wind'
+    ? `Сега ${formatChartValue(summary.current, type)} ${unit} · Макс. ${formatChartValue(summary.max, type)} ${unit}`
+    : type === 'rain' ? `Общо ${formatChartValue(values.reduce((sum: number, value) => sum + (value || 0), 0), type)} ${unit} · Макс. ${formatChartValue(summary.max, type)} ${unit}`
+    : `Сега ${formatChartValue(summary.current, type)}${type === 'temp' ? '°' : ` ${unit}`} · Мин. ${formatChartValue(summary.min, type)}${type === 'temp' ? '°' : ` ${unit}`} · Макс. ${formatChartValue(summary.max, type)}${type === 'temp' ? '°' : ` ${unit}`}`
+  const accessible = `${label}. ${summaryText}. Период: следващите 24 часа.`
+
+  return <article className="mini-chart" aria-label={accessible}>
+    <header className="chart-header"><span className="chart-icon" style={{ color: chartColor }} aria-hidden="true">{metric.icon}</span><div><h4>{label}</h4><p>{summaryText}</p></div></header>
+    <p className="sr-only">{accessible} Използвайте стрелките наляво и надясно върху графиката за почасовите стойности.</p>
+    <div className="chart-frame" ref={frameRef} style={{ height: chartHeight }}>
+      {allZeroRain ? <div className="no-rain" role="status"><span aria-hidden="true">🌧️</span><p>Не се очакват валежи през следващите 24 часа.</p></div> : <>
+        <canvas ref={canvasRef} tabIndex={0} role="img" aria-label={accessible}
+          onMouseMove={event => choosePoint(event.clientX)} onMouseLeave={() => setActiveIndex(null)}
+          onTouchStart={event => choosePoint(event.touches[0].clientX)}
+          onFocus={() => setActiveIndex(index => index ?? 0)} onBlur={() => setActiveIndex(null)}
+          onKeyDown={event => { if (event.key === 'ArrowRight') setActiveIndex(i => Math.min(values.length - 1, (i ?? -1) + 1)); if (event.key === 'ArrowLeft') setActiveIndex(i => Math.max(0, (i ?? 1) - 1)) }} />
+        {activeIndex !== null && currentValue !== null && <div className="chart-tooltip" role="status" style={{ left: `${Math.min(82, Math.max(18, activeIndex / Math.max(1, values.length - 1) * 100))}%`, background: theme.tooltipBackground, color: theme.tooltipText }}>{labels[activeIndex]} — {formatChartValue(currentValue, type)}{type === 'temp' ? '°C' : ` ${unit}`}</div>}
+      </>}
     </div>
-  )
+  </article>
 }
 
 const Chart = ({ hourly, darkMode, t }: any) => {
   const chartsData = [
-    { key: 'temp', label: t.temp, unit: '°C', color: '#f97316' },
-    { key: 'rain', label: t.rain, unit: t.mm, color: '#3b82f6' },
-    { key: 'wind', label: t.windChart, unit: t.windUnit, color: '#10b981' },
-    { key: 'pressure', label: t.pressureChart, unit: t.hpa, color: '#a855f7' }
+    { key: 'temp', label: t.temp, unit: '°C' }, { key: 'rain', label: t.rain, unit: t.mm },
+    { key: 'wind', label: t.windChart, unit: t.windUnit }, { key: 'pressure', label: t.pressureChart, unit: t.hpa }
   ]
-
-  return (
-    <div className="card">
-      <h3>{t.chart}</h3>
-      <div className="charts-grid">
-        {chartsData.map(c => (
-          <SingleChart key={c.key} hourly={hourly} darkMode={darkMode} type={c.key} label={c.label} unit={c.unit} color={c.color} />
-        ))}
-      </div>
-    </div>
-  )
+  return <section className="card charts-section" aria-labelledby="charts-title"><h3 id="charts-title">{t.chart}</h3><div className="charts-grid">{chartsData.map(chart => <SingleChart key={chart.key} hourly={hourly} darkMode={darkMode} type={chart.key} label={chart.label} unit={chart.unit} />)}</div></section>
 }
 
 const WeatherApp = () => {

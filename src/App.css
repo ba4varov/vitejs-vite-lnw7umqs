@@ -244,13 +244,36 @@ html, body, #root {
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  gap: 18px;
 }
 
+.charts-section { padding: 24px; }
+.charts-section > h3 { margin-bottom: 16px; }
 .mini-chart {
-  background: rgba(0,0,0,0.02);
+  min-width: 0;
+  overflow: hidden;
+  background: rgba(255,255,255,.42);
   padding: 16px;
-  border-radius: 20px;
+  border: 1px solid rgba(100,116,139,.15);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(15,23,42,.035);
+}
+.chart-header { display: flex; align-items: flex-start; gap: 10px; min-height: 46px; }
+.chart-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: currentColor; font-size: 0; }
+.chart-icon::after { content: '●'; color: white; font-size: 12px; }
+.chart-header h4 { color: inherit; font-size: 1rem; line-height: 1.25; margin: 0 0 4px; }
+.chart-header p { color: #64748b; font-size: .78rem; line-height: 1.35; }
+.chart-frame { position: relative; width: 100%; min-width: 0; margin-top: 5px; }
+.chart-frame canvas { width: 100% !important; max-width: 100%; height: 100% !important; display: block; outline: none; touch-action: pan-y; animation: chart-in 350ms ease-out; }
+@keyframes chart-in { from { opacity: .35; } to { opacity: 1; } }
+.chart-frame canvas:focus-visible { border-radius: 8px; box-shadow: inset 0 0 0 2px rgba(59,130,246,.65); }
+.chart-tooltip { position: absolute; top: 9px; z-index: 2; transform: translateX(-50%); max-width: 170px; padding: 7px 9px; border-radius: 8px; box-shadow: 0 4px 12px rgba(15,23,42,.15); font-size: .75rem; font-weight: 650; white-space: nowrap; pointer-events: none; }
+.no-rain { height: 100%; display: grid; place-content: center; justify-items: center; gap: 10px; color: #64748b; text-align: center; padding: 24px; }
+.no-rain span { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: rgba(59,130,246,.1); filter: grayscale(.2); }
+.no-rain p { max-width: 310px; font-size: .88rem; line-height: 1.5; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .mini-chart, .chart-tooltip { animation: none !important; transition: none !important; }
 }
 canvas {
   max-width: 100%;
@@ -291,7 +314,8 @@ canvas {
 .weather-app.dark { background: #0f172a; color: #f8fafc; }
 .weather-app.dark .card { background: rgba(30,41,55,0.5); border: none; }
 .weather-app.dark .main-card { background: rgba(30,41,55,0.8); } /* Защита за Dark Mode */
-.weather-app.dark .mini-chart { background: rgba(255,255,255,0.05); }
+.weather-app.dark .mini-chart { background: rgba(15,23,42,.28); border-color: rgba(203,213,225,.12); box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+.weather-app.dark .chart-header p, .weather-app.dark .no-rain { color: #cbd5e1; }
 .weather-app.dark .suggestion-item:hover { background: rgba(255,255,255,0.1); }
 .weather-app.dark .alert-item { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
 .weather-app.dark .hour-box, .weather-app.dark .day-box { background: rgba(255,255,255,0.1); color: #f8fafc; }
@@ -340,7 +364,7 @@ canvas {
 }
 
 /* --- МОБИЛНА ОПТИМИЗАЦИЯ --- */
-@media (max-width: 850px) {
+@media (max-width: 1100px) {
   .charts-grid { grid-template-columns: 1fr; }
   .mini-chart { min-width: 100%; }
 }
@@ -357,4 +381,8 @@ canvas {
   .chat-message { max-width: 95%; }
   .chat-form { flex-direction: column; }
   .chat-form button { width: 100%; }
+  .charts-section { padding: 16px 12px; }
+  .charts-grid { gap: 16px; }
+  .mini-chart { padding: 13px 10px 10px; border-radius: 14px; }
+  .chart-header { padding: 0 4px; }
 }
