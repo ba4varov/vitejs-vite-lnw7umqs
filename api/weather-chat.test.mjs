@@ -285,6 +285,36 @@ test('on Sunday this weekend contains only the remaining local Sunday', () => {
   assert.deepEqual(weekendForecastDates('next_weekend', sunday, 'Europe/Sofia'), ['2026-10-10', '2026-10-11'])
 })
 
+test('Bulgarian and English extract intent, place and period independently from natural sentences', () => {
+  const cases = [
+    ['Как да се облека през уикенда, когато ще съм в Пампорово?', 'bg', 'clothing', 'Пампорово', 'this_weekend'],
+    ['Ще вали ли утре във Варна, докато сме на разходка?', 'bg', 'rain', 'Варна', 'tomorrow'],
+    ['Какъв ще е вятърът вдругиден във Велико Търново?', 'bg', 'wind', 'Велико Търново', 'day_after_tomorrow'],
+    ["What should I wear this weekend, when I’m in London?", 'en', 'clothing', 'London', 'this_weekend'],
+    ['Will it rain tomorrow in Paris?', 'en', 'rain', 'Paris', 'tomorrow'],
+    ['Can I take a walk next weekend in New York?', 'en', 'walk', 'New York', 'next_weekend'],
+    ['What was the temperature the day before yesterday in Tokyo?', 'en', 'temperature', 'Tokyo', 'day_before_yesterday'],
+    ['What is the weather today in Sydney?', 'en', 'general_weather', 'Sydney', 'today']
+  ]
+  for (const [question, lang, intent, city, scope] of cases) {
+    const parsed = parseDeterministicQuestion(question, lang)
+    assert.deepEqual([parsed.intent, parsed.requestedCity, parsed.timeScope], [intent, city, scope], question)
+  }
+})
+
+test('past and future relative days use the searched location timezone across date boundaries', () => {
+  const instant = new Date('2026-09-03T00:30:00Z')
+  assert.equal(relativeForecastDate('yesterday', instant, 'America/New_York'), '2026-09-01')
+  assert.equal(relativeForecastDate('day_before_yesterday', instant, 'Asia/Tokyo'), '2026-09-01')
+  assert.equal(relativeForecastDate('day_after_tomorrow', instant, 'Australia/Sydney'), '2026-09-05')
+})
+
+test('historical answers retain the requested intent and identify reanalysis data', () => {
+  const summary = { location: 'Tokyo', historical: true, targetDay: { date: '2026-09-01', minC: 20, maxC: 28, rainMm: 3, rainChancePct: null, maxWindKmh: 14 } }
+  const answer = deterministicWeatherAnswer(summary, { intent: 'temperature', timeScope: 'day_before_yesterday', targetDate: '2026-09-01' }, 'en')
+  assert.match(answer, /Tokyo.*day before yesterday.*20–28°C.*historical reanalysis data.*not a forecast/s)
+})
+
 test('weekend answer lists every exact date and never substitutes current conditions', () => {
   const understood = parseDeterministicQuestion('Ще вали ли през уикенда в Париж?')
   const answer = deterministicWeatherAnswer({
