@@ -13,6 +13,10 @@ export const ALLOWED_TIME_SCOPES = [
 
 export const QUICK_ACTIONS = ['umbrella', 'clothing', 'walk']
 
+export const unrelatedWeatherAnswer = (lang = 'bg') => lang === 'bg'
+  ? 'Мога да отговарям само на въпроси за времето. За всичко друго прогнозата ми е мъглива. 🌫️'
+  : 'I can only answer weather questions. For everything else, my forecast is foggy. 🌫️'
+
 export function parseUnderstanding(value, lang) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const allowedKeys = ['intent', 'requestedCity', 'timeScope', 'targetDate', 'needsClarification', 'clarificationQuestion']
@@ -218,9 +222,16 @@ export function parseDeterministicQuestion(message, _lang = 'bg', options = {}) 
   else if (!intent && /(плаж|море|морска вода)/i.test(text)) intent = 'marine'
   else if (!intent && /(въздух|замърсен|aqi)/i.test(text)) intent = 'air_quality'
   else if (!intent && /(uv|ултравиолет)/i.test(text)) intent = 'uv'
-  else if (!intent && /(време|прогноз|слънц|облач)/i.test(text)) intent = 'general_weather'
+  // Standalone "време" is ambiguous in Bulgarian. Common non-weather phrases
+  // such as "нямам време" must not be routed to the forecast service.
+  else if (!intent && /(прогноз|слънц|облач)/i.test(text)) intent = 'general_weather'
+  else if (!intent && /(?:^|\s)време(?:то)?(?=\s|$)/iu.test(text) && !/(?:нямам|нямаш|няма|имам|имаш|има|губя|губиш|губим)\s+(?:много\s+|никакво\s+)?време|време\s+за\s+(?:губене|почивка|работа|учене)/iu.test(text)) intent = 'general_weather'
   else if (!intent && (requestedCity || requestedDate)) intent = 'general_weather'
-  if (!intent) return null
+  if (!intent) return { intent: 'unrelated', requestedCity: null, timeScope: 'general', targetDate: null, needsClarification: false, clarificationQuestion: null, isQuick: false }
+
+  if (intent === 'general_weather' && /^(?:време(?:то)?|прогноза(?:та)?)$/u.test(text)) {
+    return { intent: 'unclear', requestedCity, timeScope: 'general', targetDate: null, needsClarification: true, clarificationQuestion: 'За кое място и период питаш?', isQuick: false }
+  }
 
   const requestedScope = extractTimeScope(normalizedMessage)
   // A relative-day construction we do not explicitly support is safer to
@@ -306,8 +317,8 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
     return `${needed ? 'Да, вземи чадър' : 'Не, не е нужен чадър'} ${period}: вероятността за валеж е до ${rainChance ?? 0}%, очакват се около ${rainMm.toFixed(1)} мм.`
   }
   if (understood.intent === 'clothing') {
-    const advice = (feels ?? temp ?? 15) <= 8 ? 'облечи топло яке и дрехи на слоеве' : (feels ?? temp ?? 15) <= 17 ? 'облечи леко яке и дрехи на слоеве' : 'избери леки дрехи'
-    const extras = `${(rainMm > 0.1 || (rainChance ?? 0) >= 35) ? ', с непромокаем слой' : ''}${(wind ?? 0) >= 25 ? ', и ветроустойчиво яке' : ''}`
+    const advice = (feels ?? temp ?? 15) <= 8 ? 'облечи по-топли дрехи' : (feels ?? temp ?? 15) <= 17 ? 'вземи леко яке' : 'избери леки дрехи'
+    const extras = `${(rainMm > 0.1 || (rainChance ?? 0) >= 35) ? '; заради дъжда вземи и непромокаемо яке' : ''}${(wind ?? 0) >= 25 ? '; заради вятъра избери ветроустойчиво яке' : ''}`
     return lang === 'en' ? `${period}, dress for ${temp ?? '?'}°C (feels like ${feels ?? '?'}°C), wind up to ${wind ?? '?'} km/h${rainMm > 0.1 ? ', with a waterproof layer' : ''}.` : `${period[0].toLocaleUpperCase('bg-BG') + period.slice(1)} ${advice}${extras}. Температурата е около ${temp ?? '?'}°C, усеща се като ${feels ?? '?'}°C, с вятър до ${wind ?? '?'} км/ч.`
   }
   if (understood.intent === 'walk') {
