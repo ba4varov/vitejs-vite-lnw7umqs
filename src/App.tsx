@@ -252,13 +252,13 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color, height }: any
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, width, chartHeight)
 
-    const pad = { left: mobile ? 35 : 42, right: 12, top: 12, bottom: 30 }
+    const pad = { left: mobile ? 42 : 48, right: 22, top: 16, bottom: 36 }
     const plotW = width - pad.left - pad.right, plotH = chartHeight - pad.top - pad.bottom
     const range = valueRange(values, type)
     const x = (index: number) => pad.left + (values.length <= 1 ? plotW / 2 : index * plotW / (values.length - 1))
     const y = (value: number) => pad.top + plotH - ((value - range.min) / (range.max - range.min)) * plotH
 
-    ctx.font = `11px ${getComputedStyle(document.body).fontFamily}`
+    ctx.font = `13px ${getComputedStyle(document.body).fontFamily}`
     ctx.fillStyle = theme.text; ctx.strokeStyle = theme.grid; ctx.lineWidth = 1
     const tickValues: number[] = []
     if (type === 'pressure') {
@@ -276,7 +276,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color, height }: any
     })
 
     ctx.textBaseline = 'bottom'; ctx.textAlign = 'center'
-    visibleTimeIndexes(values.length, mobile).forEach(index => ctx.fillText(index === 0 ? 'Сега' : labels[index], x(index), chartHeight - 3))
+    visibleTimeIndexes(values.length, mobile).forEach(index => ctx.fillText(index === 0 ? 'Сега' : labels[index], x(index), chartHeight - 5))
 
     const drawSegment = (fill: boolean) => {
       let drawing = false
@@ -314,7 +314,8 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color, height }: any
   const choosePoint = (clientX: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect || !values.length) return
-    setActiveIndex(Math.max(0, Math.min(values.length - 1, Math.round((clientX - rect.left - (mobile ? 35 : 42)) / Math.max(1, rect.width - (mobile ? 47 : 54)) * (values.length - 1)))))
+    const left = mobile ? 42 : 48
+    setActiveIndex(Math.max(0, Math.min(values.length - 1, Math.round((clientX - rect.left - left) / Math.max(1, rect.width - left - 22) * (values.length - 1)))))
   }
   const currentValue = activeIndex === null ? null : values[activeIndex]
   const summaryText = !summary ? 'Няма налични данни за периода' : type === 'wind'
@@ -333,7 +334,7 @@ const SingleChart = ({ hourly, darkMode, type, label, unit, color, height }: any
           onTouchStart={event => choosePoint(event.touches[0].clientX)}
           onFocus={() => setActiveIndex(index => index ?? 0)} onBlur={() => setActiveIndex(null)}
           onKeyDown={event => { if (event.key === 'ArrowRight') setActiveIndex(i => Math.min(values.length - 1, (i ?? -1) + 1)); if (event.key === 'ArrowLeft') setActiveIndex(i => Math.max(0, (i ?? 1) - 1)) }} />
-        {activeIndex !== null && currentValue !== null && <div className="chart-tooltip" role="status" style={{ left: `${Math.min(82, Math.max(18, activeIndex / Math.max(1, values.length - 1) * 100))}%`, background: theme.tooltipBackground, color: theme.tooltipText }}>{labels[activeIndex]} — {formatChartValue(currentValue, type)}{type === 'temp' ? '°C' : ` ${unit}`}</div>}
+        {activeIndex !== null && currentValue !== null && <div className="chart-tooltip" role="status" style={{ left: `${Math.min(Math.max(78, width - 78), Math.max(78, 48 + activeIndex / Math.max(1, values.length - 1) * (width - 62)))}px`, background: theme.tooltipBackground, color: theme.tooltipText }}>{labels[activeIndex]} — {formatChartValue(currentValue, type)}{type === 'temp' ? '°C' : ` ${unit}`}</div>}
       </>}
     </div>
   </article>
@@ -354,6 +355,7 @@ const WeatherApp = () => {
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
   const [darkMode, setDarkMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -482,19 +484,25 @@ const WeatherApp = () => {
     return { icon: icons[code] || '🌡️', desc: (t.weather as any)[code] || 'Unknown' }
   }
 
-  const searchCities = async (query: string, requestId: number) => {
+  const searchCities = async (query: string, requestId: number, selectFirst = false) => {
     if (query.trim().length < 2) { setSuggestions([]); return }
+    setSearchStatus('loading')
     try {
       const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
       if (!res.ok) throw new Error('Geocoding failed')
       const data = await res.json()
-      if (requestId === searchRequestIdRef.current) setSuggestions(data.results || [])
-    } catch { if (requestId === searchRequestIdRef.current) setSuggestions([]) }
+      if (requestId !== searchRequestIdRef.current) return
+      const results = Array.isArray(data.results) ? data.results : []
+      setSuggestions(results)
+      setSearchStatus(results.length ? 'idle' : 'empty')
+      if (selectFirst && results.length) selectCity(results[0])
+    } catch { if (requestId === searchRequestIdRef.current) { setSuggestions([]); setSearchStatus('error') } }
   }
 
   const handleSearchInput = (val: string) => {
     setSearchInput(val)
     setSuggestions([])
+    setSearchStatus('idle')
     const requestId = ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
     if (val.trim().length >= 2) searchTimer.current = setTimeout(() => searchCities(val.trim(), requestId), 300)
@@ -509,6 +517,7 @@ const WeatherApp = () => {
     setCoords({ lat: result.latitude, lon: result.longitude })
     setSearchInput('')
     setSuggestions([])
+    setSearchStatus('idle')
     setSelectedDay(null)
     setSelectedHour(null)
     setExactLocation(null) 
@@ -866,21 +875,36 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
       <div className="search-wrapper">
         <div className="search-row">
-          <input type="text" placeholder={t.search} value={searchInput}
+          <input type="search" placeholder={t.search} value={searchInput} aria-label={t.search}
             onChange={(e) => handleSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setSuggestions([])}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setSuggestions([]); setSearchStatus('idle') }
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (suggestions.length) selectCity(suggestions[0])
+                else if (searchInput.trim().length >= 2) {
+                  if (searchTimer.current) clearTimeout(searchTimer.current)
+                  searchCities(searchInput.trim(), ++searchRequestIdRef.current, true)
+                }
+              }
+            }}
             autoComplete="off" />
         </div>
         {suggestions.length > 0 && (
           <div className="suggestions">
             {suggestions.map((s, i) => (
-              <div key={i} className="suggestion-item" onClick={() => selectCity(s)}>
+              <button key={s.id ?? i} type="button" className="suggestion-item" onClick={() => selectCity(s)}>
                 <span className="sug-name">{s.name}</span>
                 <span className="sug-country">{s.admin1 ? s.admin1 + ', ' : ''}{s.country}</span>
-              </div>
+              </button>
             ))}
           </div>
         )}
+        {searchInput.trim().length >= 2 && searchStatus !== 'idle' && <p className="search-feedback" role="status">{
+          searchStatus === 'loading' ? (lang === 'bg' ? 'Търся населени места…' : 'Searching places…') :
+          searchStatus === 'empty' ? (lang === 'bg' ? 'Няма намерено място. Опитай друго изписване.' : 'No places found. Try another spelling.') :
+          (lang === 'bg' ? 'Търсенето не се зареди. Опитай пак.' : 'Search failed. Try again.')
+        }</p>}
       </div>
 
       <div className="info-line">{t.info}</div>
