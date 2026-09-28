@@ -1,32 +1,22 @@
-# React + TypeScript + Vite
+# Метео Пулс
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Уеб приложение за прогноза за времето с търсене на населени места по света, почасова и 14-дневна прогноза, качество на въздуха и чат на български и английски. Публичен адрес: https://ba4varov-wheater.vercel.app/
 
-Currently, two official plugins are available:
+## Разработка
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Проверки преди публикуване:
+
+```sh
+npm test
+npm run lint
+npm run build
+```
+
+Сайтът използва Open-Meteo за прогноза, местоположения, морски данни и качество на въздуха. Чатът извлича измерванията от прогнозата; Gemini може да помогне за разбирането на свободно формулирани въпроси, когато `GEMINI_API_KEY` е зададен като **сървърна** променлива във Vercel. Ключът не е нужен за основната прогноза и не бива да се добавя в клиентския код или в Git.
+
+При местна разработка `vite` обслужва интерфейса, а Vercel API маршрутите в `api/` изискват Vercel runtime (например `vercel dev`) за пълен тест на чата. Проверявайте прогнозата за градове в различни часови зони и въпросите за днес, утре сутрин и утре вечер след всяка промяна в обработката на времето.

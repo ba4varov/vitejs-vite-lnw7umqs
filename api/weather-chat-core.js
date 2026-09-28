@@ -33,6 +33,20 @@ export function findDailyForecast(daily, targetDate) {
   return Array.isArray(daily) ? daily.find(day => day?.date === targetDate) ?? null : null
 }
 
+export function zipForecastHours(hourly, currentTime) {
+  if (!Array.isArray(hourly?.time)) return []
+  const start = currentTime ? hourly.time.findIndex(time => String(time).slice(0, 13) >= currentTime.slice(0, 13)) : 0
+  if (start < 0) return []
+  return hourly.time.slice(start).map((time, offset) => {
+    const i = start + offset
+    return {
+      time, tempC: hourly.temperature_2m?.[i] ?? null, feelsC: hourly.apparent_temperature?.[i] ?? null,
+      rainMm: hourly.precipitation?.[i] ?? null, rainChancePct: hourly.precipitation_probability?.[i] ?? null,
+      windKmh: hourly.wind_speed_10m?.[i] ?? null, uv: hourly.uv_index?.[i] ?? null, code: hourly.weather_code?.[i] ?? null
+    }
+  })
+}
+
 export function geminiUnderstandingError(code, lang = 'bg') {
   if (lang === 'en') return code === 'invalid-json' || code === 'invalid-structure' ? 'Gemini returned an invalid response. Please try again.' : 'Gemini is temporarily unavailable. Please try again shortly.'
   return code === 'invalid-json' || code === 'invalid-structure' ? 'Получих невалиден отговор от Gemini. Опитай отново.' : 'Gemini временно не е достъпен. Опитай отново след малко.'
@@ -185,37 +199,57 @@ export function parseDeterministicQuestion(message, _lang = 'bg', options = {}) 
 
 const number = value => typeof value === 'number' && Number.isFinite(value) ? value : null
 const periodLabel = (scope, lang) => lang === 'en'
-  ? ({ evening: 'this evening', afternoon: 'this afternoon', night: 'tonight', tomorrow: 'tomorrow', tomorrow_morning: 'tomorrow morning', tomorrow_afternoon: 'tomorrow afternoon', tomorrow_evening: 'tomorrow evening', tomorrow_night: 'tomorrow night' }[scope] ?? 'in the next 12 hours')
-  : ({ evening: 'тази вечер', afternoon: 'този следобед', night: 'тази нощ', tomorrow: 'утре', tomorrow_morning: 'утре сутрин', tomorrow_afternoon: 'утре следобед', tomorrow_evening: 'утре вечер', tomorrow_night: 'утре през нощта' }[scope] ?? 'през следващите 12 часа')
+  ? ({ now: 'now', today: 'today', morning: 'this morning', evening: 'this evening', afternoon: 'this afternoon', night: 'tonight', tomorrow: 'tomorrow', tomorrow_morning: 'tomorrow morning', tomorrow_afternoon: 'tomorrow afternoon', tomorrow_evening: 'tomorrow evening', tomorrow_night: 'tomorrow night' }[scope] ?? 'in the next 12 hours')
+  : ({ now: 'сега', today: 'днес', morning: 'тази сутрин', evening: 'тази вечер', afternoon: 'този следобед', night: 'тази нощ', tomorrow: 'утре', tomorrow_morning: 'утре сутрин', tomorrow_afternoon: 'утре следобед', tomorrow_evening: 'утре вечер', tomorrow_night: 'утре през нощта' }[scope] ?? 'през следващите 12 часа')
+
+const PERIOD_HOURS = {
+  morning: [6, 12], afternoon: [12, 18], evening: [18, 23], night: [22, 30]
+}
 
 function selectedHours(summary, scope) {
   const hours = Array.isArray(summary.nextHours) ? summary.nextHours : []
-  if (['tomorrow', 'today', 'day_after_tomorrow'].includes(scope)) return []
-  const targetDate = scope.startsWith('tomorrow_') ? summary.requestedDate : null
-  const matching = hours.filter(hour => {
-    const h = Number(String(hour.time).slice(11, 13))
-    if (targetDate && !String(hour.time).startsWith(targetDate)) return false
-    return scope.endsWith('morning') ? h >= 6 && h < 12 : scope.endsWith('evening') ? h >= 18 && h < 23 : scope.endsWith('afternoon') ? h >= 12 && h < 18 : scope.endsWith('night') ? h >= 22 || h < 6 : true
+  if (['tomorrow', 'today', 'day_after_tomorrow', 'specific_date'].includes(scope)) return []
+  if (scope === 'now') return hours.slice(0, 1)
+  const period = scope.replace(/^tomorrow_/, '')
+  const window = PERIOD_HOURS[period]
+  if (!window) return hours.slice(0, scope === 'next_24h' ? 24 : 12)
+  const date = scope.startsWith('tomorrow_') ? summary.requestedDate : summary.current?.time?.slice(0, 10)
+  if (!date) return []
+  const nextDate = new Date(`${date}T12:00:00Z`)
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1)
+  const endDate = nextDate.toISOString().slice(0, 10)
+  return hours.filter(hour => {
+    const time = String(hour.time)
+    const day = time.slice(0, 10)
+    const hourOfDay = Number(time.slice(11, 13))
+    return (day === date && hourOfDay >= window[0] && hourOfDay < Math.min(24, window[1])) ||
+      (window[1] > 24 && day === endDate && hourOfDay < window[1] - 24)
   })
-  return (matching.length ? matching : hours).slice(0, scope === 'next_24h' ? 24 : 12)
 }
 
 export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
   const period = periodLabel(understood.timeScope, lang)
   const day = ['today', 'tomorrow', 'day_after_tomorrow'].includes(understood.timeScope) ? summary.targetDay : understood.targetDate ? summary.targetDay : null
   const hours = selectedHours(summary, understood.timeScope)
+  const hourlyPeriod = Boolean(PERIOD_HOURS[understood.timeScope.replace(/^tomorrow_/, '')])
+  if (hourlyPeriod && !hours.length) return lang === 'bg'
+    ? `Нямам налична почасова прогноза за ${summary.location} ${period}. Не искам да ти дам данни за друг период.`
+    : `I don't have an hourly forecast for ${summary.location} ${period}, so I can't give you figures from a different period.`
   const values = key => hours.map(item => number(item[key])).filter(value => value !== null)
+  if (hourlyPeriod && !values('tempC').length) return lang === 'bg'
+    ? `Нямам достатъчно почасови данни за ${summary.location} ${period}.`
+    : `I don't have enough hourly data for ${summary.location} ${period}.`
   const max = (key, fallback = null) => { const data = values(key); return data.length ? Math.max(...data) : fallback }
   const min = (key, fallback = null) => { const data = values(key); return data.length ? Math.min(...data) : fallback }
-  const rainChance = max('rainChancePct', number(day?.rainChancePct))
-  const rainMm = values('rainMm').reduce((sum, value) => sum + value, 0) || number(day?.rainMm) || 0
+  const rainChance = max('rainChancePct', hourlyPeriod ? null : number(day?.rainChancePct))
+  const rainMm = hours.length ? values('rainMm').reduce((sum, value) => sum + value, 0) : number(day?.rainMm) ?? 0
   const codes = hours.map(hour => number(hour.code)).filter(code => code !== null)
   const wetCode = codes.some(code => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95)
   const dangerous = codes.some(code => code >= 95 || code === 66 || code === 67)
-  const temp = number(summary.current?.temperature_2m) ?? min('tempC', number(day?.minC))
-  const feels = number(summary.current?.apparent_temperature) ?? min('feelsC', temp)
-  const wind = max('windKmh', number(day?.maxWindKmh) ?? number(summary.current?.wind_speed_10m))
-  const uv = max('uv', number(day?.maxUv) ?? number(summary.current?.uv_index))
+  const temp = hourlyPeriod ? min('tempC') : number(summary.current?.temperature_2m) ?? min('tempC', number(day?.minC))
+  const feels = hourlyPeriod ? min('feelsC') : number(summary.current?.apparent_temperature) ?? min('feelsC', temp)
+  const wind = max('windKmh', hourlyPeriod ? null : number(day?.maxWindKmh) ?? number(summary.current?.wind_speed_10m))
+  const uv = max('uv', hourlyPeriod ? null : number(day?.maxUv) ?? number(summary.current?.uv_index))
 
   // A calendar date always wins over activity/current-condition intents.
   if (day && ['specific_date', 'today', 'tomorrow', 'day_after_tomorrow'].includes(understood.timeScope)) return dailyForecastAnswer(summary, day, lang, understood.timeScope)

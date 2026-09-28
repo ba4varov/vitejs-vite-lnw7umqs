@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, zipForecastHours } from './weather-chat-core.js'
 
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 
@@ -170,4 +170,46 @@ test('unresolved future periods ask for clarification instead of current weather
   const parsed = parseDeterministicQuestion('Какво ще е времето след три дни в Ню Йорк?')
   assert.equal(parsed.needsClarification, true)
   assert.match(parsed.clarificationQuestion, /кой точно ден/i)
+})
+
+test('tomorrow evening uses only matching local hours, not current temperature or full-day rain', () => {
+  const today = '2026-09-02', tomorrow = '2026-09-03'
+  const hours = [
+    { time: `${today}T20:00`, tempC: 32, feelsC: 34, rainMm: 12, rainChancePct: 99, windKmh: 50, uv: 9, code: 95 },
+    { time: `${tomorrow}T12:00`, tempC: 28, feelsC: 30, rainMm: 8, rainChancePct: 90, windKmh: 40, uv: 8, code: 61 },
+    { time: `${tomorrow}T18:00`, tempC: 9, feelsC: 7, rainMm: 0, rainChancePct: 10, windKmh: 5, uv: 0, code: 1 },
+    { time: `${tomorrow}T19:00`, tempC: 8, feelsC: 6, rainMm: 0, rainChancePct: 15, windKmh: 4, uv: 0, code: 1 }
+  ]
+  const summary = { location: 'Варна', current: { time: `${today}T20:00`, temperature_2m: 32, apparent_temperature: 34 }, requestedDate: tomorrow, targetDay: { date: tomorrow, rainMm: 8, rainChancePct: 90 }, nextHours: hours }
+  const clothing = deterministicWeatherAnswer(summary, { intent: 'clothing', timeScope: 'tomorrow_evening' })
+  assert.match(clothing, /утре вечер.*топло яке.*8°C.*6°C.*до 5 км\/ч/i)
+  assert.doesNotMatch(clothing, /32°C|30°C|непромокаем/)
+  const rain = deterministicWeatherAnswer(summary, { intent: 'rain', timeScope: 'tomorrow_evening' })
+  assert.match(rain, /Не, не е нужен чадър утре вечер.*15%.*0\.0 мм/)
+  assert.doesNotMatch(rain, /8\.0 мм|90%/)
+})
+
+test('tomorrow night includes next local morning, excludes current night and following evening', () => {
+  const summary = { location: 'Варна', current: { time: '2026-09-02T22:00', temperature_2m: 30 }, requestedDate: '2026-09-03', nextHours: [
+    { time: '2026-09-02T23:00', tempC: 30, rainMm: 20, rainChancePct: 100 },
+    { time: '2026-09-03T22:00', tempC: 12, rainMm: 0, rainChancePct: 15 },
+    { time: '2026-09-04T02:00', tempC: 10, rainMm: 1, rainChancePct: 40 },
+    { time: '2026-09-04T18:00', tempC: 24, rainMm: 20, rainChancePct: 100 }
+  ] }
+  assert.match(deterministicWeatherAnswer(summary, { intent: 'rain', timeScope: 'tomorrow_night' }), /40%.*1\.0 мм/)
+})
+
+test('an elapsed period never silently falls back to the following day or current conditions', () => {
+  const summary = { location: 'София', current: { time: '2026-09-02T19:00', temperature_2m: 28 }, nextHours: [
+    { time: '2026-09-03T07:00', tempC: 8, rainChancePct: 60, rainMm: 2 }
+  ] }
+  const answer = deterministicWeatherAnswer(summary, { intent: 'temperature', timeScope: 'morning' })
+  assert.match(answer, /Нямам налична почасова прогноза.*тази сутрин/)
+  assert.doesNotMatch(answer, /28°C|8°C|60%/)
+})
+
+test('chat hourly values start at the location-local current hour', () => {
+  const hourly = { time: ['2026-09-02T09:00', '2026-09-02T10:00', '2026-09-02T11:00'], temperature_2m: [19, 20, 21] }
+  assert.deepEqual(zipForecastHours(hourly, '2026-09-02T10:15').map(hour => hour.tempC), [20, 21])
+  assert.deepEqual(zipForecastHours(hourly, '2026-09-03T10:00'), [])
 })
