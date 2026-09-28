@@ -1,7 +1,7 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, zipForecastHours } from './weather-chat-core.js'
 import { geminiClient } from './gemini-client.js'
 
 type Intent = typeof ALLOWED_INTENTS[number]
@@ -80,19 +80,6 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null) {
   return { name: place.name, latitude: place.latitude, longitude: place.longitude, timezone: typeof place.timezone === 'string' ? place.timezone : 'UTC' }
 }
 
-function zipHours(hourly: any, currentTime: string | undefined) {
-  if (!Array.isArray(hourly?.time)) return []
-  const start = currentTime ? Math.max(0, hourly.time.findIndex((time: string) => time >= currentTime)) : 0
-  return hourly.time.slice(start).map((time: string, offset: number) => {
-    const i = start + offset
-    return ({
-    time, tempC: hourly.temperature_2m?.[i] ?? null, feelsC: hourly.apparent_temperature?.[i] ?? null,
-    rainMm: hourly.precipitation?.[i] ?? null, rainChancePct: hourly.precipitation_probability?.[i] ?? null,
-    windKmh: hourly.wind_speed_10m?.[i] ?? null, uv: hourly.uv_index?.[i] ?? null, code: hourly.weather_code?.[i] ?? null
-    })
-  })
-}
-
 async function getWeather(place: { name: string; latitude: number; longitude: number; timezone?: string | null }, targetDate: string | null) {
   const p = `latitude=${place.latitude}&longitude=${place.longitude}&timezone=${encodeURIComponent(place.timezone || 'auto')}&forecast_days=16`
   const weatherUrl = `https://api.open-meteo.com/v1/forecast?${p}&current=temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m,uv_index&hourly=temperature_2m,apparent_temperature,weather_code,precipitation,precipitation_probability,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max`
@@ -109,7 +96,7 @@ async function getWeather(place: { name: string; latitude: number; longitude: nu
     rainMm: weather.daily.precipitation_sum?.[i] ?? null, rainChancePct: weather.daily.precipitation_probability_max?.[i] ?? null,
     maxWindKmh: weather.daily.wind_speed_10m_max?.[i] ?? null, maxUv: weather.daily.uv_index_max?.[i] ?? null
   })) : []
-  return { location: place.name, timezone: weather.timezone, current: weather.current ?? null, daily, nextHours: zipHours(weather.hourly, weather.current?.time), tomorrow: findDailyForecast(daily, weather.daily?.time?.[1]), targetDay: targetDate ? findDailyForecast(daily, targetDate) : null,
+  return { location: place.name, timezone: weather.timezone, current: weather.current ?? null, daily, nextHours: zipForecastHours(weather.hourly, weather.current?.time), tomorrow: findDailyForecast(daily, weather.daily?.time?.[1]), targetDay: targetDate ? findDailyForecast(daily, targetDate) : null,
     airQuality: aqi?.current ? { europeanAqi: aqi.current.european_aqi ?? null, pm10: aqi.current.pm10 ?? null, pm2_5: aqi.current.pm2_5 ?? null } : null,
     marine: marine?.current?.sea_surface_temperature != null ? { seaTemperatureC: marine.current.sea_surface_temperature } : null }
 }

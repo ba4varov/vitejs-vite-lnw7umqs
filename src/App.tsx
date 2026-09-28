@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
+import { findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 
@@ -374,6 +375,9 @@ const WeatherApp = () => {
   const [chatLoading, setChatLoading] = useState(false)
   
   const searchTimer = useRef<any>(null)
+  const searchRequestIdRef = useRef(0)
+  const weatherRequestIdRef = useRef(0)
+  const locationChoiceRef = useRef(false)
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
@@ -384,7 +388,7 @@ const WeatherApp = () => {
     if (savedFav) {
       try {
         setFavoriteCity(JSON.parse(savedFav))
-      } catch (e) {}
+      } catch {}
     }
   }, [])
 
@@ -446,7 +450,7 @@ const WeatherApp = () => {
       if (!result.ok || typeof data.answer !== 'string') throw new Error('chat failed')
       if (requestId !== chatRequestIdRef.current || controller.signal.aborted) return
       setChatMessages(previous => [...previous, { role: 'bot', text: data.answer }])
-    } catch (error) {
+    } catch {
       if (controller.signal.aborted || requestId !== chatRequestIdRef.current) return
       setChatInput(clean)
       setChatMessages(previous => [...previous, { role: 'bot', text: lang === 'bg'
@@ -478,22 +482,28 @@ const WeatherApp = () => {
     return { icon: icons[code] || '🌡️', desc: (t.weather as any)[code] || 'Unknown' }
   }
 
-  const searchCities = async (query: string) => {
-    if (query.length < 2) { setSuggestions([]); return }
+  const searchCities = async (query: string, requestId: number) => {
+    if (query.trim().length < 2) { setSuggestions([]); return }
     try {
       const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) + '&count=10&language=' + lang + '&format=json')
+      if (!res.ok) throw new Error('Geocoding failed')
       const data = await res.json()
-      setSuggestions(data.results || [])
-    } catch (e) { setSuggestions([]) }
+      if (requestId === searchRequestIdRef.current) setSuggestions(data.results || [])
+    } catch { if (requestId === searchRequestIdRef.current) setSuggestions([]) }
   }
 
   const handleSearchInput = (val: string) => {
     setSearchInput(val)
+    setSuggestions([])
+    const requestId = ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => searchCities(val), 300)
+    if (val.trim().length >= 2) searchTimer.current = setTimeout(() => searchCities(val.trim(), requestId), 300)
   }
 
   const selectCity = (result: any) => {
+    locationChoiceRef.current = true
+    ++searchRequestIdRef.current
+    if (searchTimer.current) clearTimeout(searchTimer.current)
     const name = result.name + (result.country ? ', ' + result.country : '')
     setCity(name)
     setCoords({ lat: result.latitude, lon: result.longitude })
@@ -510,7 +520,7 @@ const WeatherApp = () => {
     return date.toLocaleTimeString(lang === 'bg' ? 'bg-BG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-const fetchAiAdvice = async (dataForAi: any) => {
+const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     if (!dataForAi) return
 
     const fallbackAdvice = () => {
@@ -544,14 +554,16 @@ const fetchAiAdvice = async (dataForAi: any) => {
       })
       if (!response.ok) throw new Error('AI advice unavailable')
       const data = await response.json()
-      setAiAdvice(data.advice || fallbackAdvice())
+      if (requestId === weatherRequestIdRef.current) setAiAdvice(data.advice || fallbackAdvice())
     } catch {
-      setAiAdvice(fallbackAdvice())
+      if (requestId === weatherRequestIdRef.current) setAiAdvice(fallbackAdvice())
     }
   }
   const fetchWeather = async (lat: number, lon: number) => {
+    const requestId = ++weatherRequestIdRef.current
     setLoading(true)
     setError(null)
+    setAiAdvice(null)
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
@@ -570,12 +582,14 @@ const fetchAiAdvice = async (dataForAi: any) => {
         fetch(marineUrl),
         fetch(aqiUrl)
       ])
+      if (requestId !== weatherRequestIdRef.current) return
       
       if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error('Моля проверете връзката си с интернет.')
       const data = await weatherRes.value.json()
+      if (requestId !== weatherRequestIdRef.current) return
 
       let seaTemp = null
-      let hourlySeaTemp: any[] = []
+      let hourlySeaTemp = new Map<string, number | null>()
       if (marineRes.status === 'fulfilled' && marineRes.value.ok) {
         try {
           const marineData = await marineRes.value.json()
@@ -583,26 +597,27 @@ const fetchAiAdvice = async (dataForAi: any) => {
             seaTemp = Math.round(marineData.current.sea_surface_temperature)
           }
           if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
-            hourlySeaTemp = marineData.hourly.sea_surface_temperature
+            hourlySeaTemp = valuesByTime(marineData.hourly, 'sea_surface_temperature')
           }
-        } catch (e) {}
+        } catch {}
       }
 
       let currentAqi = null, currentPm10 = null, currentPm25 = null;
-      let hourlyAqi: any[] = [];
+      let hourlyAqi = new Map<string, number | null>();
       if (aqiRes.status === 'fulfilled' && aqiRes.value.ok) {
         try {
           const aqiData = await aqiRes.value.json();
           if (aqiData.current) {
-            currentAqi = Math.round(aqiData.current.european_aqi);
+            currentAqi = aqiData.current.european_aqi == null ? null : Math.round(aqiData.current.european_aqi);
             currentPm10 = aqiData.current.pm10;
             currentPm25 = aqiData.current.pm2_5;
           }
           if (aqiData.hourly && aqiData.hourly.european_aqi) {
-            hourlyAqi = aqiData.hourly.european_aqi;
+            hourlyAqi = valuesByTime(aqiData.hourly, 'european_aqi');
           }
-        } catch (e) {}
+        } catch {}
       }
+      if (requestId !== weatherRequestIdRef.current) return
 
       const cur = decodeWeatherCode(data.current.weather_code)
       
@@ -642,23 +657,17 @@ const fetchAiAdvice = async (dataForAi: any) => {
         uvIndex: Math.round(data.current.uv_index),
         code: data.current.weather_code,
         description: cur.desc
-      });
+      }, requestId);
 
-      const now = new Date()
-      const localISO = now.getFullYear() + '-' +
-        String(now.getMonth() + 1).padStart(2, '0') + '-' +
-        String(now.getDate()).padStart(2, '0') + 'T' +
-        String(now.getHours()).padStart(2, '0')
-      let startIdx = data.hourly.time.findIndex((time: string) => time.slice(0, 13) === localISO)
-      if (startIdx === -1) startIdx = 0
+      const startIdx = findHourlyStartIndex(data.hourly.time, data.current.time)
 
       const hr: any[] = []
       for (let i = 0; i < 24; i++) {
         const idx = startIdx + i
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
-        const sst = hourlySeaTemp.length > idx ? hourlySeaTemp[idx] : null
-        const aqiVal = hourlyAqi.length > idx ? hourlyAqi[idx] : null
+        const sst = hourlySeaTemp.get(data.hourly.time[idx]) ?? null
+        const aqiVal = hourlyAqi.get(data.hourly.time[idx]) ?? null
         
         hr.push({
           time: data.hourly.time[idx],
@@ -673,7 +682,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           dewPoint: Math.round(data.hourly.dew_point_2m[idx]),
           cloudCover: Math.round(data.hourly.cloud_cover[idx]),
           seaTemp: sst != null ? Math.round(sst) : null,
-          aqi: aqiVal !== null ? Math.round(aqiVal) : 0,
+          aqi: aqiVal !== null ? Math.round(aqiVal) : null,
           code: data.hourly.weather_code[idx],
           icon: code.icon
         })
@@ -682,7 +691,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
       const days: any[] = []
       for (let i = 1; i < Math.min(15, data.daily.time.length); i++) {
-        const d = new Date(data.daily.time[i])
+        const d = new Date(`${data.daily.time[i]}T12:00:00Z`)
         const code = decodeWeatherCode(data.daily.weather_code[i])
         
         let sumHum = 0, sumPress = 0, sumVis = 0, sumDew = 0, sumCloud = 0, sumSea = 0;
@@ -698,8 +707,9 @@ const fetchAiAdvice = async (dataForAi: any) => {
             sumCloud += data.hourly.cloud_cover[h] || 0;
             count++;
             
-            if (hourlySeaTemp.length > h && hourlySeaTemp[h] !== null) {
-               sumSea += hourlySeaTemp[h];
+            const seaAtHour = hourlySeaTemp.get(data.hourly.time[h]);
+            if (seaAtHour != null) {
+               sumSea += seaAtHour;
                seaCount++;
             }
           }
@@ -707,8 +717,8 @@ const fetchAiAdvice = async (dataForAi: any) => {
 
         days.push({
           dateStr: data.daily.time[i],
-          dayName: (t.weekDays as any)[d.getDay()],
-          dateFormatted: `${d.getDate()} ${(t.months as any)[d.getMonth()]}`,
+          dayName: (t.weekDays as any)[d.getUTCDay()],
+          dateFormatted: `${d.getUTCDate()} ${(t.months as any)[d.getUTCMonth()]}`,
           max: Math.round(data.daily.temperature_2m_max[i]),
           min: Math.round(data.daily.temperature_2m_min[i]),
           feelsLikeMax: Math.round(data.daily.apparent_temperature_max[i] || data.daily.temperature_2m_max[i]),
@@ -734,6 +744,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
       setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
 
     } catch (e: any) {
+      if (requestId !== weatherRequestIdRef.current) return
       console.error(e);
       setError(t.error)
       setLoading(false)
@@ -744,16 +755,18 @@ const fetchAiAdvice = async (dataForAi: any) => {
     fetchWeather(coords.lat, coords.lon)
     const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [coords, lang])
+  }, [coords, city, lang])
 
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
+        if (locationChoiceRef.current) return
         const lat = pos.coords.latitude, lon = pos.coords.longitude
         setCoords({ lat, lon })
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=18`)
           const data = await res.json()
+          if (locationChoiceRef.current) return
           
           const address = data.address;
           const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
@@ -780,7 +793,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             setExactLocation(null);
           }
 
-        } catch (e) { setCity(t.myLocation) }
+        } catch { if (!locationChoiceRef.current) setCity(t.myLocation) }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
@@ -796,7 +809,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
     if (weather.code === 65 || weather.code === 82) activeAlerts.push({ icon: '🌧️', text: (t as any).heavyRain });
   }
 
-  const openPopup = (e: any, item: any) => {
+  const openPopup = (e: any) => {
     const rect = e.currentTarget.getBoundingClientRect();
     let x = rect.left + (rect.width / 2) - 150;
     let y = rect.top - 320;
@@ -875,7 +888,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
       <div className="city-row">
         {favoriteCity && (
           <button 
-            onClick={() => { setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }); setExactLocation(null); }}
+            onClick={() => { locationChoiceRef.current = true; setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }); setExactLocation(null); }}
             className={city === favoriteCity.name ? 'city-btn fav-btn active' : 'city-btn fav-btn'}
           >
             ⭐ {favoriteCity.name}
@@ -886,7 +899,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
           if (favoriteCity && favoriteCity.name === c.name) return null;
           return (
             <button key={c.name}
-              onClick={() => { setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); }}
+              onClick={() => { locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -1041,7 +1054,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="hourly-row">
               {hourly.map((h, i) => (
                 <div key={i} className="hour-box"
-                  onClick={(e) => { openPopup(e, h); setSelectedHour(h); setSelectedDay(null) }}
+                  onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
                   style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
@@ -1060,7 +1073,7 @@ const fetchAiAdvice = async (dataForAi: any) => {
             <div className="daily-grid">
               {forecast.map((day, i) => (
                 <div key={i} className="day-box"
-                  onClick={(e) => { openPopup(e, day); setSelectedDay(day); setSelectedHour(null) }}
+                  onClick={(e) => { openPopup(e); setSelectedDay(day); setSelectedHour(null) }}
                   style={{ cursor: 'pointer', transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="day-name">{day.dayName}</p>
                   <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
