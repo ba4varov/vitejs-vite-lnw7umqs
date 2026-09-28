@@ -12,10 +12,10 @@ export type DeterministicUnderstanding = { intent: string; requestedCity: string
 export function normalizeQuestion(value: string): string
 export function normalizeBulgarianTimeExpressions(value: string): string
 export function localIsoDate(now?: Date, timezone?: string): string
-export function relativeForecastDate(scope: 'today' | 'tomorrow' | 'day_after_tomorrow', now?: Date, timezone?: string): string | null
+export function relativeForecastDate(scope: 'day_before_yesterday' | 'yesterday' | 'today' | 'tomorrow' | 'day_after_tomorrow', now?: Date, timezone?: string): string | null
 export function weekendForecastDates(scope: 'this_weekend' | 'next_weekend', now?: Date, timezone?: string): string[]
-export function extractRequestedDate(message: string, now?: Date, timezone?: string): string | null
-export function extractRequestedCity(message: string): string | null
+export function extractRequestedDate(message: string, now?: Date, timezone?: string, lang?: 'bg' | 'en'): string | null
+export function extractRequestedCity(message: string, lang?: 'bg' | 'en'): string | null
 export function extractTimeScope(message: string): string | null
 export function parseDeterministicQuestion(message: string, lang?: 'bg' | 'en', options?: { now?: Date; timezone?: string; quickAction?: 'umbrella' | 'clothing' | 'walk' }): DeterministicUnderstanding | null
 export function deterministicWeatherAnswer(summary: Record<string, any>, understood: DeterministicUnderstanding, lang?: 'bg' | 'en'): string
