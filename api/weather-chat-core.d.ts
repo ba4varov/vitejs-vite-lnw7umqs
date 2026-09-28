@@ -12,6 +12,7 @@ export function normalizeQuestion(value: string): string
 export function normalizeBulgarianTimeExpressions(value: string): string
 export function localIsoDate(now?: Date, timezone?: string): string
 export function relativeForecastDate(scope: 'today' | 'tomorrow' | 'day_after_tomorrow', now?: Date, timezone?: string): string | null
+export function weekendForecastDates(scope: 'this_weekend' | 'next_weekend', now?: Date, timezone?: string): string[]
 export function extractRequestedDate(message: string, now?: Date, timezone?: string): string | null
 export function extractRequestedCity(message: string): string | null
 export function extractTimeScope(message: string): string | null

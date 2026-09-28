@@ -1,7 +1,7 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, zipForecastHours } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
 import { geminiClient } from './gemini-client.js'
 
 type Intent = typeof ALLOWED_INTENTS[number]
@@ -139,6 +139,10 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const localTargetDate = extractRequestedDate(input.message, new Date(), place.timezone ?? 'UTC')
     if (localTargetDate) understood = { ...understood, targetDate: localTargetDate, timeScope: 'specific_date' }
     let summary = await getWeather(place, understood.targetDate)
+    if (understood.timeScope === 'this_weekend' || understood.timeScope === 'next_weekend') {
+      const requestedDates = weekendForecastDates(understood.timeScope, new Date(), summary.timezone || place.timezone || 'UTC')
+      summary = { ...summary, requestedDates, targetDays: requestedDates.map(date => findDailyForecast(summary.daily, date)).filter(Boolean) }
+    }
     if (!understood.targetDate && ['today', 'tomorrow', 'day_after_tomorrow', 'tomorrow_morning', 'tomorrow_afternoon', 'tomorrow_evening', 'tomorrow_night'].includes(understood.timeScope)) {
       const today = localIsoDate(new Date(), summary.timezone || place.timezone || 'UTC')
       const relativeScope = understood.timeScope.startsWith('tomorrow_') ? 'tomorrow' : understood.timeScope
