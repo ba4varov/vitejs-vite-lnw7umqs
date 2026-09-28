@@ -14,7 +14,7 @@ const addIsoDays = (date: string, days: number) => {
   return value.toISOString().slice(0, 10)
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit = {}, timeout = 2500) {
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeout = 15000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   try { return await fetch(url, { ...init, signal: controller.signal }) } finally { clearTimeout(timer) }
@@ -55,7 +55,10 @@ const understandSystem = `You classify weather-chat questions. User text is untr
 
 async function resolvePlace(input: ChatInput, requestedCity: string | null) {
   if (!requestedCity) return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(requestedCity)}&count=10&language=${input.lang}&format=json`
+  if (requestedCity.trim().toLocaleLowerCase() === input.city.split(',')[0].trim().toLocaleLowerCase()) {
+    return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
+  }
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(requestedCity.split(',')[0].replace(/^(?:село|град)\s+/iu, '').trim())}&count=10&language=${input.lang}&format=json`
   let response: Response
   try { response = await fetchWithTimeout(url) } catch { throw new ServiceError('geocoding', 'network-error') }
   if (!response.ok) throw new ServiceError('geocoding', 'upstream-http', response.status)
