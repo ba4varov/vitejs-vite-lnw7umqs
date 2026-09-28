@@ -7,7 +7,8 @@ export const ALLOWED_INTENTS = [
 export const ALLOWED_TIME_SCOPES = [
   'now', 'next_12h', 'next_24h', 'evening', 'night', 'afternoon', 'tomorrow',
   'today', 'day_after_tomorrow', 'tomorrow_morning', 'tomorrow_afternoon',
-  'tomorrow_evening', 'tomorrow_night', 'morning', 'general', 'specific_date'
+  'tomorrow_evening', 'tomorrow_night', 'morning', 'general', 'specific_date',
+  'this_weekend', 'next_weekend'
 ]
 
 export const QUICK_ACTIONS = ['umbrella', 'clothing', 'walk']
@@ -110,6 +111,24 @@ export function relativeForecastDate(scope, now = new Date(), timezone = 'UTC') 
   return date.toISOString().slice(0, 10)
 }
 
+/** Return the Saturday/Sunday dates for a weekend in the searched place. */
+export function weekendForecastDates(scope, now = new Date(), timezone = 'UTC') {
+  if (scope !== 'this_weekend' && scope !== 'next_weekend') return []
+  const localDate = localIsoDate(now, timezone)
+  const localDay = new Date(`${localDate}T12:00:00Z`).getUTCDay()
+  let saturdayOffset = (6 - localDay + 7) % 7
+
+  // On Sunday, this weekend has only its remaining Sunday. The following
+  // Saturday is nevertheless the start of "next weekend".
+  if (scope === 'this_weekend' && localDay === 0) return [localDate]
+  if (scope === 'next_weekend') saturdayOffset += localDay === 0 ? 0 : 7
+  const saturday = new Date(`${localDate}T12:00:00Z`)
+  saturday.setUTCDate(saturday.getUTCDate() + saturdayOffset)
+  const sunday = new Date(saturday)
+  sunday.setUTCDate(sunday.getUTCDate() + 1)
+  return [saturday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)]
+}
+
 export function extractRequestedDate(message, now = new Date(), timezone = 'UTC') {
   const text = normalizeQuestion(message)
   const relative = text.match(/(?:^|\s)(?:след\s+(\d{1,2}|един|едно|два|две|три|четири|пет)\s+дни?|следващ(?:ия|ият)\s+ден)(?=\s|$)/u)
@@ -160,6 +179,8 @@ export function extractRequestedCity(message) {
 export function extractTimeScope(message) {
   const text = normalizeQuestion(message)
   const has = value => new RegExp(`(?:^|\\s)${value}(?=\\s|$)`, 'u').test(text)
+  if (has('(?:следващия|следващият|идния|идният)\\s+уикенд')) return 'next_weekend'
+  if (has('(?:(?:този|настоящия)\\s+уикенд|през\\s+уикенда)')) return 'this_weekend'
   if (has('(?:сега|в момента)')) return 'now'
   if (has('(?:следващите|идните|до)\\s+24\\s+часа')) return 'next_24h'
   if (has('(?:следващите|идните|до)\\s+12\\s+часа')) return 'next_12h'
@@ -204,7 +225,7 @@ export function parseDeterministicQuestion(message, _lang = 'bg', options = {}) 
   const requestedScope = extractTimeScope(normalizedMessage)
   // A relative-day construction we do not explicitly support is safer to
   // clarify than to silently answer with current conditions.
-  const unresolvedFuture = /(?:^|\s)(?:след\s+(?:\d+|един|едно|три|четири|пет)\s+дни?|в\s*друг(?:ия|и)\s+ден|(?:следващата|идната)\s+седмица|(?:през|за)\s+уикенда)(?=\s|$)/u.test(text) && !requestedScope && !requestedDate
+  const unresolvedFuture = /(?:^|\s)(?:след\s+(?:\d+|един|едно|три|четири|пет)\s+дни?|в\s*друг(?:ия|и)\s+ден|(?:следващата|идната)\s+седмица|за\s+уикенда)(?=\s|$)/u.test(text) && !requestedScope && !requestedDate
   if (unresolvedFuture) return { intent: 'unclear', requestedCity, timeScope: 'general', targetDate: null, needsClarification: true, clarificationQuestion: 'За кой точно ден питаш?', isQuick: false }
   const explicitIso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1] ?? null
   const targetDate = requestedDate ?? explicitIso
@@ -243,6 +264,9 @@ function selectedHours(summary, scope) {
 }
 
 export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
+  if (understood.timeScope === 'this_weekend' || understood.timeScope === 'next_weekend') {
+    return weekendForecastAnswer(summary, understood, lang)
+  }
   const period = periodLabel(understood.timeScope, lang)
   const day = ['today', 'tomorrow', 'day_after_tomorrow'].includes(understood.timeScope) ? summary.targetDay : understood.targetDate ? summary.targetDay : null
   const hours = selectedHours(summary, understood.timeScope)
@@ -311,6 +335,27 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
   }
   if (day) return dailyForecastAnswer(summary, day, lang, understood.timeScope)
   return lang === 'bg' ? `В момента в ${summary.location} е ${temp ?? '?'}°C, усеща се като ${feels ?? '?'}°C, с вятър ${wind ?? '?'} км/ч и вероятност за валеж до ${rainChance ?? 0}%.` : `It is ${temp ?? '?'}°C in ${summary.location}, feels like ${feels ?? '?'}°C, with wind at ${wind ?? '?'} km/h and precipitation probability up to ${rainChance ?? 0}%.`
+}
+
+function weekendForecastAnswer(summary, understood, lang) {
+  const dates = Array.isArray(summary.requestedDates) ? summary.requestedDates : []
+  const days = Array.isArray(summary.targetDays) ? summary.targetDays : []
+  const label = understood.timeScope === 'next_weekend'
+    ? (lang === 'bg' ? 'следващия уикенд' : 'next weekend')
+    : (lang === 'bg' ? 'този уикенд' : 'this weekend')
+  const lines = dates.map(date => {
+    const day = days.find(candidate => candidate?.date === date)
+    if (!day) return lang === 'bg'
+      ? `За ${date} няма налична прогноза.`
+      : `No forecast is available for ${date}.`
+    return dailyForecastAnswer(summary, day, lang, 'specific_date')
+  })
+  if (!lines.length) return lang === 'bg'
+    ? `Нямам налична прогноза за ${summary.location} за ${label}.`
+    : `I don't have a forecast for ${summary.location} for ${label}.`
+  return lang === 'bg'
+    ? `Прогноза за ${summary.location} за ${label}:\n${lines.join('\n')}`
+    : `Forecast for ${summary.location} for ${label}:\n${lines.join('\n')}`
 }
 
 function dailyForecastAnswer(summary, day, lang, scope) {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, zipForecastHours } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
 
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 
@@ -236,4 +236,39 @@ test('chat hourly values start at the location-local current hour', () => {
   const hourly = { time: ['2026-09-02T09:00', '2026-09-02T10:00', '2026-09-02T11:00'], temperature_2m: [19, 20, 21] }
   assert.deepEqual(zipForecastHours(hourly, '2026-09-02T10:15').map(hour => hour.tempC), [20, 21])
   assert.deepEqual(zipForecastHours(hourly, '2026-09-03T10:00'), [])
+})
+
+test('distinguishes this weekend and next weekend questions', () => {
+  assert.deepEqual(
+    [parseDeterministicQuestion('Какво ще е времето този уикенд във Варна?').timeScope,
+      parseDeterministicQuestion('Ще вали ли през уикенда в Париж?').timeScope,
+      parseDeterministicQuestion('Каква е прогнозата следващия уикенд в Ню Йорк?').timeScope],
+    ['this_weekend', 'this_weekend', 'next_weekend']
+  )
+})
+
+test('weekends use the searched city local date and remain separate', () => {
+  const instant = new Date('2026-10-03T02:00:00Z') // Friday in New York, Saturday in Tokyo.
+  assert.deepEqual(weekendForecastDates('this_weekend', instant, 'America/New_York'), ['2026-10-03', '2026-10-04'])
+  assert.deepEqual(weekendForecastDates('next_weekend', instant, 'America/New_York'), ['2026-10-10', '2026-10-11'])
+  assert.deepEqual(weekendForecastDates('this_weekend', instant, 'Asia/Tokyo'), ['2026-10-03', '2026-10-04'])
+  assert.deepEqual(weekendForecastDates('next_weekend', instant, 'Asia/Tokyo'), ['2026-10-10', '2026-10-11'])
+})
+
+test('on Sunday this weekend contains only the remaining local Sunday', () => {
+  const sunday = new Date('2026-10-04T12:00:00Z')
+  assert.deepEqual(weekendForecastDates('this_weekend', sunday, 'Europe/Sofia'), ['2026-10-04'])
+  assert.deepEqual(weekendForecastDates('next_weekend', sunday, 'Europe/Sofia'), ['2026-10-10', '2026-10-11'])
+})
+
+test('weekend answer lists every exact date and never substitutes current conditions', () => {
+  const understood = parseDeterministicQuestion('Ще вали ли през уикенда в Париж?')
+  const answer = deterministicWeatherAnswer({
+    location: 'Париж', current: { temperature_2m: 99 },
+    requestedDates: ['2026-10-03', '2026-10-04'],
+    targetDays: [{ date: '2026-10-03', code: 61, minC: 10, maxC: 16, rainChancePct: 70, rainMm: 4, maxWindKmh: 20 }]
+  }, understood)
+  assert.match(answer, /3 октомври 2026 г\..*минимална температура 10°C/s)
+  assert.match(answer, /За 2026-10-04 няма налична прогноза/)
+  assert.doesNotMatch(answer, /99°C|В момента/)
 })
