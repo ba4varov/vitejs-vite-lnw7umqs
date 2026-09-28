@@ -112,6 +112,15 @@ export function relativeForecastDate(scope, now = new Date(), timezone = 'UTC') 
 
 export function extractRequestedDate(message, now = new Date(), timezone = 'UTC') {
   const text = normalizeQuestion(message)
+  const relative = text.match(/(?:^|\s)(?:след\s+(\d{1,2}|един|едно|два|две|три|четири|пет)\s+дни?|следващ(?:ия|ият)\s+ден)(?=\s|$)/u)
+  if (relative) {
+    const words = { един: 1, едно: 1, два: 2, две: 2, три: 3, четири: 4, пет: 5 }
+    const offset = relative[1] ? (words[relative[1]] ?? Number(relative[1])) : 1
+    if (offset < 1 || offset > 15) return null
+    const date = new Date(`${localIsoDate(now, timezone)}T12:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + offset)
+    return date.toISOString().slice(0, 10)
+  }
   let match = text.match(/(?:^|\s)(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?(?=\s|$)/u)
   let day; let month; let year
   if (match) [, day, month, year] = match
@@ -132,7 +141,7 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
 
 export function extractRequestedCity(message) {
   const cleaned = normalizeBulgarianTimeExpressions(message).replace(/[?!]+$/u, '').trim()
-  const stop = String.raw`(?=\s+(?:на|за)\s+\d|\s+(?:днес|утре|вдругиден|сега|в момента|тази|този|сутрин|следобед|вечер|нощ)(?:\s|$)|$)`
+  const stop = String.raw`(?=\s+(?:на|за)\s+\d|\s+(?:днес|утре|вдругиден|сега|в момента|тази|този|сутрин|следобед|вечер|нощ|довечера|през|след|за колко)(?:\s|$)|$)`
   // "за" denotes a place only when attached to an explicit weather construction.
   const patterns = [
     new RegExp(String.raw`(?:^|\s)(?:във|в)\s+([\p{L}][\p{L}'’.,-]*(?:\s+[\p{L}][\p{L}'’.,-]*){0,4}?)${stop}`, 'giu'),
@@ -152,17 +161,19 @@ export function extractTimeScope(message) {
   const text = normalizeQuestion(message)
   const has = value => new RegExp(`(?:^|\\s)${value}(?=\\s|$)`, 'u').test(text)
   if (has('(?:сега|в момента)')) return 'now'
+  if (has('(?:следващите|идните|до)\\s+24\\s+часа')) return 'next_24h'
+  if (has('(?:следващите|идните|до)\\s+12\\s+часа')) return 'next_12h'
   if (has('утре\\s+(?:през\\s+)?нощ(?:та)?')) return 'tomorrow_night'
   if (has('утре\\s+сутрин')) return 'tomorrow_morning'
   if (has('утре\\s+следобед')) return 'tomorrow_afternoon'
   if (has('утре\\s+вечер')) return 'tomorrow_evening'
   if (has('вдругиден')) return 'day_after_tomorrow'
   if (has('утре')) return 'tomorrow'
-  if (has('днес')) return 'today'
+  if (has('(?:днес|до края на деня)')) return 'today'
   if (has('тази сутрин')) return 'morning'
   if (has('този следобед')) return 'afternoon'
-  if (has('тази вечер')) return 'evening'
-  if (has('тази нощ')) return 'night'
+  if (has('(?:тази вечер|довечера|вечерта)')) return 'evening'
+  if (has('(?:тази нощ|през нощта)')) return 'night'
   return null
 }
 
@@ -176,20 +187,24 @@ export function parseDeterministicQuestion(message, _lang = 'bg', options = {}) 
   const actionIntent = { umbrella: 'rain', clothing: 'clothing', walk: 'walk' }[options.quickAction]
   const quickIntent = actionIntent ?? QUICK_QUESTIONS.get(text)
   let intent = quickIntent
-  if (!intent && /(чадър|вали|дъжд|валеж)/i.test(text)) intent = 'rain'
+  if (!intent && /(чадър|вали|превал|дъжд|валеж|сняг|снег)/i.test(text)) intent = 'rain'
   else if (!intent && /(облека|дрех|яке|палто)/i.test(text)) intent = 'clothing'
   else if (!intent && /(разходк|разходя|навън)/i.test(text)) intent = 'walk'
   else if (!intent && /(температур|колко.*градус|топло|студено)/i.test(text)) intent = 'temperature'
   else if (!intent && /(вятър|ветровито)/i.test(text)) intent = 'wind'
+  else if (!intent && /(пера|пране|простра|простирам)/i.test(text)) intent = 'laundry'
+  else if (!intent && /(измия|мия|автомивка).*колата|колата.*(?:измия|мия)/i.test(text)) intent = 'car_wash'
+  else if (!intent && /(плаж|море|морска вода)/i.test(text)) intent = 'marine'
+  else if (!intent && /(въздух|замърсен|aqi)/i.test(text)) intent = 'air_quality'
   else if (!intent && /(uv|ултравиолет)/i.test(text)) intent = 'uv'
-  else if (!intent && /(времето|прогноз)/i.test(text)) intent = 'general_weather'
+  else if (!intent && /(време|прогноз|слънц|облач)/i.test(text)) intent = 'general_weather'
   else if (!intent && (requestedCity || requestedDate)) intent = 'general_weather'
   if (!intent) return null
 
   const requestedScope = extractTimeScope(normalizedMessage)
   // A relative-day construction we do not explicitly support is safer to
   // clarify than to silently answer with current conditions.
-  const unresolvedFuture = /(?:^|\s)(?:след\s+(?:\d+|един|едно|три|четири|пет)\s+дни?|в\s*друг(?:ия|и)\s+ден)(?=\s|$)/u.test(text) && !requestedScope
+  const unresolvedFuture = /(?:^|\s)(?:след\s+(?:\d+|един|едно|три|четири|пет)\s+дни?|в\s*друг(?:ия|и)\s+ден|(?:следващата|идната)\s+седмица|(?:през|за)\s+уикенда)(?=\s|$)/u.test(text) && !requestedScope && !requestedDate
   if (unresolvedFuture) return { intent: 'unclear', requestedCity, timeScope: 'general', targetDate: null, needsClarification: true, clarificationQuestion: 'За кой точно ден питаш?', isQuick: false }
   const explicitIso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1] ?? null
   const targetDate = requestedDate ?? explicitIso
@@ -199,8 +214,8 @@ export function parseDeterministicQuestion(message, _lang = 'bg', options = {}) 
 
 const number = value => typeof value === 'number' && Number.isFinite(value) ? value : null
 const periodLabel = (scope, lang) => lang === 'en'
-  ? ({ now: 'now', today: 'today', morning: 'this morning', evening: 'this evening', afternoon: 'this afternoon', night: 'tonight', tomorrow: 'tomorrow', tomorrow_morning: 'tomorrow morning', tomorrow_afternoon: 'tomorrow afternoon', tomorrow_evening: 'tomorrow evening', tomorrow_night: 'tomorrow night' }[scope] ?? 'in the next 12 hours')
-  : ({ now: 'сега', today: 'днес', morning: 'тази сутрин', evening: 'тази вечер', afternoon: 'този следобед', night: 'тази нощ', tomorrow: 'утре', tomorrow_morning: 'утре сутрин', tomorrow_afternoon: 'утре следобед', tomorrow_evening: 'утре вечер', tomorrow_night: 'утре през нощта' }[scope] ?? 'през следващите 12 часа')
+  ? ({ now: 'now', next_12h: 'in the next 12 hours', next_24h: 'in the next 24 hours', today: 'today', morning: 'this morning', evening: 'this evening', afternoon: 'this afternoon', night: 'tonight', tomorrow: 'tomorrow', tomorrow_morning: 'tomorrow morning', tomorrow_afternoon: 'tomorrow afternoon', tomorrow_evening: 'tomorrow evening', tomorrow_night: 'tomorrow night' }[scope] ?? 'now')
+  : ({ now: 'сега', next_12h: 'през следващите 12 часа', next_24h: 'през следващите 24 часа', today: 'днес', morning: 'тази сутрин', evening: 'тази вечер', afternoon: 'този следобед', night: 'тази нощ', tomorrow: 'утре', tomorrow_morning: 'утре сутрин', tomorrow_afternoon: 'утре следобед', tomorrow_evening: 'утре вечер', tomorrow_night: 'утре през нощта' }[scope] ?? 'сега')
 
 const PERIOD_HOURS = {
   morning: [6, 12], afternoon: [12, 18], evening: [18, 23], night: [22, 30]
@@ -253,7 +268,7 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
 
   // A calendar date always wins over activity/current-condition intents.
   if (day && ['specific_date', 'today', 'tomorrow', 'day_after_tomorrow'].includes(understood.timeScope)) return dailyForecastAnswer(summary, day, lang, understood.timeScope)
-  if (hours.length && understood.intent === 'general_weather' && ['morning', 'afternoon', 'evening', 'night', 'tomorrow_morning', 'tomorrow_afternoon', 'tomorrow_evening', 'tomorrow_night'].includes(understood.timeScope)) {
+  if (hours.length && understood.intent === 'general_weather' && ['next_12h', 'next_24h', 'morning', 'afternoon', 'evening', 'night', 'tomorrow_morning', 'tomorrow_afternoon', 'tomorrow_evening', 'tomorrow_night'].includes(understood.timeScope)) {
     const temperatures = values('tempC'); const apparent = values('feelsC')
     const practical = (rainChance ?? 0) >= 35 || rainMm > 0.1 ? 'Предвиди защита от дъжд.' : (wind ?? 0) >= 30 ? 'Предвиди защита от вятър.' : 'Условията изглеждат подходящи за обичайни дейности.'
     return lang === 'bg'
@@ -276,6 +291,23 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
     const conditional = !bad && ((rainChance ?? 0) >= 35 || (wind ?? 0) >= 25 || (temp ?? 15) < 2 || (temp ?? 15) > 32 || (uv ?? 0) >= 6)
     const verdict = bad ? 'Не, не е подходящо за разходка' : conditional ? 'Да, но с повишено внимание е подходящо за разходка' : 'Да, подходящо е за разходка'
     return lang === 'en' ? `${bad ? 'No' : conditional ? 'Yes, with precautions' : 'Yes'}, a walk is suitable ${period}. Rain chance is ${rainChance ?? 0}%, wind up to ${wind ?? '?'} km/h, temperature about ${temp ?? '?'}°C and UV up to ${uv ?? '?'}${dangerous ? '; dangerous weather is possible' : ''}.` : `${verdict} ${period}. Валежи: до ${rainChance ?? 0}%, вятър: до ${wind ?? '?'} км/ч, температура: около ${temp ?? '?'}°C, UV: до ${uv ?? '?'}${dangerous ? '; възможно е опасно време' : ''}.`
+  }
+  if (understood.intent === 'temperature') return lang === 'bg'
+    ? `В ${summary.location} ${period} температурата е ${hours.length > 1 ? `${min('tempC') ?? '?'}–${max('tempC') ?? '?'}°C` : `${temp ?? '?'}°C`}, усеща се като ${feels ?? '?'}°C.`
+    : `In ${summary.location} ${period}, temperature is ${hours.length > 1 ? `${min('tempC') ?? '?'}–${max('tempC') ?? '?'}°C` : `${temp ?? '?'}°C`}, feels like ${feels ?? '?'}°C.`
+  if (understood.intent === 'wind') return lang === 'bg'
+    ? `В ${summary.location} ${period} вятърът е до ${wind ?? '?'} км/ч.`
+    : `In ${summary.location} ${period}, wind reaches ${wind ?? '?'} km/h.`
+  if (understood.intent === 'uv') return lang === 'bg'
+    ? `В ${summary.location} ${period} UV индексът е до ${uv ?? '?'}; при стойност 6 или повече ползвай слънцезащита.`
+    : `In ${summary.location} ${period}, UV index reaches ${uv ?? '?'}; use sun protection at 6 or above.`
+  if (understood.intent === 'air_quality') return lang === 'bg'
+    ? `В ${summary.location} текущият европейски индекс за качество на въздуха е ${summary.airQuality?.europeanAqi ?? 'неизвестен'}${summary.airQuality?.pm2_5 != null ? `, ФПЧ2.5: ${summary.airQuality.pm2_5} µg/m³` : ''}.` : `In ${summary.location}, current European AQI is ${summary.airQuality?.europeanAqi ?? 'unavailable'}.`
+  if (understood.intent === 'marine') return lang === 'bg'
+    ? `Край ${summary.location} текущата температура на морската повърхност е ${summary.marine?.seaTemperatureC != null ? `${summary.marine.seaTemperatureC}°C` : 'няма налични данни'}.` : `Sea surface temperature near ${summary.location} is ${summary.marine?.seaTemperatureC != null ? `${summary.marine.seaTemperatureC}°C` : 'unavailable'}.`
+  if (understood.intent === 'laundry' || understood.intent === 'car_wash') {
+    const wet = rainMm > 0.1 || (rainChance ?? 0) >= 35
+    return lang === 'bg' ? `${wet ? 'По-добре изчакай' : 'Условията изглеждат подходящи'} за ${understood.intent === 'laundry' ? 'простиране' : 'миене на колата'} ${period}. Валежи: до ${rainChance ?? '?'}% и около ${rainMm.toFixed(1)} мм.` : `${wet ? 'Better wait' : 'Conditions look suitable'} ${period}. Rain chance up to ${rainChance ?? '?'}%, about ${rainMm.toFixed(1)} mm.`
   }
   if (day) return dailyForecastAnswer(summary, day, lang, understood.timeScope)
   return lang === 'bg' ? `В момента в ${summary.location} е ${temp ?? '?'}°C, усеща се като ${feels ?? '?'}°C, с вятър ${wind ?? '?'} км/ч и вероятност за валеж до ${rainChance ?? 0}%.` : `It is ${temp ?? '?'}°C in ${summary.location}, feels like ${feels ?? '?'}°C, with wind at ${wind ?? '?'} km/h and precipitation probability up to ${rainChance ?? 0}%.`

@@ -166,10 +166,34 @@ test('New York local date determines the exact day-after-tomorrow ISO row', () =
   assert.doesNotMatch(answer, /В момента|99°C/)
 })
 
-test('unresolved future periods ask for clarification instead of current weather', () => {
-  const parsed = parseDeterministicQuestion('Какво ще е времето след три дни в Ню Йорк?')
-  assert.equal(parsed.needsClarification, true)
-  assert.match(parsed.clarificationQuestion, /кой точно ден/i)
+test('relative dates resolve in the requested city timezone; unsupported ranges ask for clarification', () => {
+  const parsed = parseDeterministicQuestion('Какво ще е времето след три дни в Ню Йорк?', 'bg', { now: fixedNow, timezone: 'America/New_York' })
+  assert.deepEqual([parsed.requestedCity, parsed.timeScope, parsed.targetDate], ['Ню Йорк', 'specific_date', '2026-09-05'])
+  const unsupported = parseDeterministicQuestion('Какво ще е времето след 20 дни в Ню Йорк?')
+  assert.equal(unsupported.needsClarification, true)
+})
+
+test('free Bulgarian periods keep the exact requested interval', () => {
+  for (const [question, scope] of [
+    ['Какво ще е времето днес във Варна?', 'today'],
+    ['Какво ще е времето утре в Токио?', 'tomorrow'],
+    ['Ще вали ли утре вечер в Лондон?', 'tomorrow_evening'],
+    ['Какво е времето през следващите 24 часа в Париж?', 'next_24h'],
+    ['Какъв ще е вятърът довечера?', 'evening']
+  ]) assert.equal(parseDeterministicQuestion(question).timeScope, scope, question)
+  assert.equal(parseDeterministicQuestion('Какво време ще е утре?').intent, 'general_weather')
+  assert.equal(parseDeterministicQuestion('Ще мога ли да простирам през следващите 24 часа?').intent, 'laundry')
+  assert.equal(parseDeterministicQuestion('Каква е прогнозата за уикенда?').needsClarification, true)
+  const nearMidnight = new Date('2026-09-03T02:00:00Z')
+  assert.equal(relativeForecastDate('today', nearMidnight, 'America/New_York'), '2026-09-02')
+  assert.equal(relativeForecastDate('tomorrow', nearMidnight, 'America/New_York'), '2026-09-03')
+})
+
+test('a 24-hour question describes 24 hourly values rather than current conditions', () => {
+  const hours = Array.from({ length: 24 }, (_, i) => ({ time: `2026-09-02T${String(i).padStart(2, '0')}:00`, tempC: i, rainChancePct: 5, rainMm: 0, windKmh: 7 }))
+  const answer = deterministicWeatherAnswer({ location: 'Париж', current: { temperature_2m: 99 }, nextHours: hours }, parseDeterministicQuestion('Какво е времето през следващите 24 часа в Париж?'))
+  assert.match(answer, /Париж през следващите 24 часа.*0–23°C/)
+  assert.doesNotMatch(answer, /99°C|В момента/)
 })
 
 test('tomorrow evening uses only matching local hours, not current temperature or full-day rain', () => {
