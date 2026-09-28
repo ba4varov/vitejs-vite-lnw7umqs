@@ -16,7 +16,7 @@ function advice(weather: Record<string, unknown>) {
   if (rain > 0 || chance >= 35 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return bg ? `Вземи чадър или непромокаемо яке — вероятността за валеж е ${chance}%.` : `Take an umbrella or waterproof jacket—the rain chance is ${chance}%.`
   if (wind >= 25) return bg ? `Закопчай якето — вятърът е около ${wind} км/ч.` : `Zip up your jacket—wind is around ${wind} km/h.`
   if (uv >= 6) return bg ? `UV индексът е ${uv}: ползвай слънцезащита и търси сянка.` : `UV index is ${uv}: use sunscreen and seek shade.`
-  if ((feels ?? 15) <= 10) return bg ? 'Хладно е — облечи се на слоеве и вземи яке.' : 'It is chilly—wear layers and take a jacket.'
+  if ((feels ?? 15) <= 10) return bg ? 'Хладно е — облечи по-топли дрехи и вземи яке.' : 'It is chilly—wear layers and take a jacket.'
   if ((temp ?? 15) >= 28) return bg ? 'Топло е — вземи вода, леки дрехи и слънцезащита.' : 'It is hot—take water, light clothing, and sunscreen.'
   return bg ? 'Времето е спокойно — подходящо е за излизане с обичайните сезонни дрехи.' : 'Conditions are calm—regular seasonal clothing should be comfortable.'
 }

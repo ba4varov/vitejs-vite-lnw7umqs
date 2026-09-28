@@ -1,7 +1,7 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
 import { geminiClient } from './gemini-client.js'
 
 type Intent = typeof ALLOWED_INTENTS[number]
@@ -130,7 +130,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (!understood || understood.needsClarification || understood.intent === 'unclear') {
       return response.status(200).json({ answer: understood?.clarificationQuestion ?? clarification(input.lang), intent: 'unclear', needsClarification: true })
     }
-    if (understood.intent === 'unrelated') return response.status(200).json({ answer: input.lang === 'bg' ? 'Мога да помогна с въпроси за времето.' : 'I can help with weather questions.', intent: understood.intent, needsClarification: false })
+    if (understood.intent === 'unrelated') return response.status(200).json({ answer: unrelatedWeatherAnswer(input.lang), intent: understood.intent, needsClarification: false })
 
     const place = await resolvePlace(input, understood.requestedCity)
     if (!place) return response.status(200).json({ answer: input.lang === 'bg' ? `Не намирам място „${understood.requestedCity}“. Как се изписва?` : `I cannot find “${understood.requestedCity}”. How is it spelled?`, intent: understood.intent, needsClarification: true })

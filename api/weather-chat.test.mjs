@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
 
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 
@@ -71,6 +71,23 @@ test('three quick questions are parsed deterministically', () => {
   for (const question of ['Да взема ли чадър?', 'Как да се облека?', 'Подходящо ли е за разходка?']) assert.equal(parseDeterministicQuestion(question).isQuick, true)
 })
 
+test('rejects unrelated and nonsensical prompts without asking for weather clarification', () => {
+  for (const question of ['Колко е 2+2?', 'Разкажи ми виц', 'асдф жкля', 'Нямам време за губене']) {
+    const parsed = parseDeterministicQuestion(question)
+    assert.equal(parsed.intent, 'unrelated', question)
+    assert.equal(parsed.needsClarification, false, question)
+  }
+  assert.equal(unrelatedWeatherAnswer('bg'), 'Мога да отговарям само на въпроси за времето. За всичко друго прогнозата ми е мъглива. 🌫️')
+})
+
+test('keeps normal weather questions deterministic and incomplete weather prompts clarifying', () => {
+  const tomorrow = parseDeterministicQuestion('Какво ще е времето утре?')
+  const umbrella = parseDeterministicQuestion('Да взема ли чадър?')
+  assert.deepEqual([tomorrow.intent, tomorrow.timeScope, tomorrow.needsClarification], ['general_weather', 'tomorrow', false])
+  assert.deepEqual([umbrella.intent, umbrella.timeScope, umbrella.needsClarification], ['rain', 'next_12h', false])
+  assert.deepEqual([parseDeterministicQuestion('Времето?').intent, parseDeterministicQuestion('Времето?').needsClarification], ['unclear', true])
+})
+
 const wetSummary = { location: 'София', current: { temperature_2m: 12, apparent_temperature: 9, wind_speed_10m: 28, uv_index: 2 }, nextHours: [
   { time: '2026-09-02T12:00', tempC: 12, feelsC: 9, rainMm: 1.2, rainChancePct: 80, windKmh: 28, uv: 2, code: 61 }
 ] }
@@ -79,6 +96,13 @@ test('quick answers use Open-Meteo precipitation, clothing, wind and UV values',
   assert.match(deterministicWeatherAnswer(wetSummary, parseDeterministicQuestion('Да взема ли чадър?')), /Да, вземи чадър.*80%.*1\.2 мм/)
   assert.match(deterministicWeatherAnswer(wetSummary, parseDeterministicQuestion('Как да се облека?')), /леко яке.*непромокаем.*28 км\/ч/)
   assert.match(deterministicWeatherAnswer(wetSummary, parseDeterministicQuestion('Подходящо ли е за разходка?')), /повишено внимание.*UV/)
+})
+
+test('clothing advice sounds natural in Bulgarian and retains rain and wind details', () => {
+  const cold = { ...wetSummary, current: { ...wetSummary.current, temperature_2m: 5, apparent_temperature: 2 }, nextHours: wetSummary.nextHours.map(hour => ({ ...hour, tempC: 5, feelsC: 2 })) }
+  const answer = deterministicWeatherAnswer(cold, parseDeterministicQuestion('Как да се облека?'))
+  assert.match(answer, /облечи по-топли дрехи.*непромокаемо яке.*ветроустойчиво яке/s)
+  assert.doesNotMatch(answer, /дрехи на слоеве/)
 })
 
 test('common Bulgarian city and date question is parsed without Gemini', () => {
@@ -206,7 +230,7 @@ test('tomorrow evening uses only matching local hours, not current temperature o
   ]
   const summary = { location: 'Варна', current: { time: `${today}T20:00`, temperature_2m: 32, apparent_temperature: 34 }, requestedDate: tomorrow, targetDay: { date: tomorrow, rainMm: 8, rainChancePct: 90 }, nextHours: hours }
   const clothing = deterministicWeatherAnswer(summary, { intent: 'clothing', timeScope: 'tomorrow_evening' })
-  assert.match(clothing, /утре вечер.*топло яке.*8°C.*6°C.*до 5 км\/ч/i)
+  assert.match(clothing, /утре вечер.*по-топли дрехи.*8°C.*6°C.*до 5 км\/ч/i)
   assert.doesNotMatch(clothing, /32°C|30°C|непромокаем/)
   const rain = deterministicWeatherAnswer(summary, { intent: 'rain', timeScope: 'tomorrow_evening' })
   assert.match(rain, /Не, не е нужен чадър утре вечер.*15%.*0\.0 мм/)
