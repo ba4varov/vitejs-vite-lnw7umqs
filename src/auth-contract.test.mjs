@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const source = await readFile(new URL('./auth-client.ts', import.meta.url), 'utf8')
+const payload = await readFile(new URL('./captcha-payload.js', import.meta.url), 'utf8')
 const ui = await readFile(new URL('./AuthPanel.tsx', import.meta.url), 'utf8')
 
 test('registration, confirmation resend and password recovery use Supabase Auth endpoints', () => {
@@ -27,4 +28,17 @@ test('all password forms use an independent accessible non-submit visibility tog
   assert.match(ui, /showPassword: 'Покажи паролата', hidePassword: 'Скрий паролата'/)
   assert.match(ui, /showPassword: 'Show password', hidePassword: 'Hide password'/)
   assert.match(ui, /<PasswordField label=\{t\.confirm\}/)
+})
+test('protected direct REST calls use the GoTrue captcha payload field', () => {
+  assert.match(payload, /gotrue_meta_security: \{ captcha_token: captchaToken \}/)
+  for (const operation of ['signUp', 'signIn', 'resendConfirmation', 'resetPassword']) {
+    assert.match(source, new RegExp(`function ${operation}\\([^)]*captchaToken`))
+  }
+  assert.doesNotMatch(source, /options\s*:\s*\{\s*captchaToken/)
+})
+test('UI requires a fresh token and resets it after every protected network attempt', () => {
+  assert.match(ui, /captchaConfigured && !captchaToken/)
+  assert.match(ui, /if \(captchaSent\).*setCaptchaToken\(null\).*setCaptchaReset/s)
+  assert.match(ui, /finally \{ setCaptchaToken\(null\); setCaptchaReset/)
+  assert.match(ui, /const changeView = .*setCaptchaToken\(null\)/)
 })

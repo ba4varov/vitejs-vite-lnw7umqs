@@ -1,3 +1,5 @@
+import { withCaptcha } from './captcha-payload.js'
+
 export type AuthUser = { id: string; email?: string; email_confirmed_at?: string }
 export type AuthSession = { access_token: string; refresh_token: string; expires_at?: number; user: AuthUser }
 
@@ -6,6 +8,7 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 const storageKey = 'meteo-pulse-auth'
 
 export const authConfigured = Boolean(url && key)
+export const captchaConfigured = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY)
 
 async function request(path: string, body?: object, token?: string, method?: string) {
   if (!authConfigured) throw new Error('AUTH_NOT_CONFIGURED')
@@ -37,17 +40,17 @@ export async function restoreSession(): Promise<AuthSession | null> {
   } catch { saveSession(null); return null }
 }
 
-export async function signUp(email: string, password: string, redirectTo: string) {
-  return request(`/signup?redirect_to=${encodeURIComponent(redirectTo)}`, { email, password })
+export async function signUp(email: string, password: string, redirectTo: string, captchaToken?: string) {
+  return request(`/signup?redirect_to=${encodeURIComponent(redirectTo)}`, withCaptcha({ email, password }, captchaToken))
 }
-export async function signIn(email: string, password: string): Promise<AuthSession> {
-  const data = await request('/token?grant_type=password', { email, password }); saveSession(data); return data
+export async function signIn(email: string, password: string, captchaToken?: string): Promise<AuthSession> {
+  const data = await request('/token?grant_type=password', withCaptcha({ email, password }, captchaToken)); saveSession(data); return data
 }
-export async function resendConfirmation(email: string, redirectTo: string) {
-  return request('/resend', { type: 'signup', email, options: { emailRedirectTo: redirectTo } })
+export async function resendConfirmation(email: string, redirectTo: string, captchaToken?: string) {
+  return request('/resend', withCaptcha({ type: 'signup', email, options: { emailRedirectTo: redirectTo } }, captchaToken))
 }
-export async function resetPassword(email: string, redirectTo: string) {
-  return request(`/recover?redirect_to=${encodeURIComponent(redirectTo)}`, { email })
+export async function resetPassword(email: string, redirectTo: string, captchaToken?: string) {
+  return request(`/recover?redirect_to=${encodeURIComponent(redirectTo)}`, withCaptcha({ email }, captchaToken))
 }
 export async function updatePassword(token: string, password: string) { return request('/user', { password }, token, 'PUT') }
 export async function signOut(session: AuthSession) {
