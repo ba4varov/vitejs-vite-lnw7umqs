@@ -9,6 +9,7 @@ import { loadLanguage, saveLanguage } from './language-storage.js'
 import { subscribeSession, type AuthSession } from './auth-client'
 import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, type Place } from './places-client'
 import { placeKey } from './places-core.js'
+import { createPlacesSessionGuard } from './places-session-guard.js'
 
 const translations = {
   bg: {
@@ -394,7 +395,7 @@ const WeatherApp = () => {
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
-  const sessionEpochRef = useRef(0)
+  const placesGuardRef = useRef(createPlacesSessionGuard())
   const t = translations[lang as keyof typeof translations]
 
   const toggleLanguage = () => {
@@ -403,30 +404,34 @@ const WeatherApp = () => {
     setLang(nextLanguage)
   }
 
-  const choosePlace = (place: Place) => {
+  const choosePlace = (place: Place, manual = true) => {
+    if (manual) placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
     setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ region: place.region || undefined, country: place.country || undefined })
   }
 
-  const loadAccountPlaces = async (active: AuthSession, epoch: number) => {
+  const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
     setPlacesBusy(true); setPlacesError(false)
     try {
       const snapshot = await fetchPlaces(active)
-      if (epoch !== sessionEpochRef.current) return
+      if (!placesGuardRef.current.isCurrent(ticket)) return
       setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId)
       const preferred = snapshot.places.find(place => place.id === snapshot.defaultPlaceId)
-      if (preferred) choosePlace(preferred)
+      if (placesGuardRef.current.resolveDefault(ticket) && preferred) choosePlace(preferred, false)
       setOfferImport(localPlaces().length > 0)
-    } catch { if (epoch === sessionEpochRef.current) setPlacesError(true) }
-    finally { if (epoch === sessionEpochRef.current) setPlacesBusy(false) }
+    } catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
+    finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
   }
 
   useEffect(() => { const unsubscribe = subscribeSession(active => {
-    const epoch = ++sessionEpochRef.current
-    setSession(active); setPlacesError(false); setOfferImport(false); setDefaultPlaceId(null)
-    // Clear the prior account immediately; never display it while the next request is pending.
-    setPlaces([])
-    if (active) loadAccountPlaces(active, epoch)
+    const { accountChanged, ticket } = placesGuardRef.current.changeSession(active?.user.id || null)
+    setSession(active); setPlacesError(false); setPlacesBusy(false)
+    if (accountChanged) {
+      setOfferImport(false); setDefaultPlaceId(null)
+      // Clear the prior account immediately; never display it while the next request is pending.
+      setPlaces([])
+    }
+    if (active) loadAccountPlaces(active, ticket)
     else { try { setPlaces(localPlaces()) } catch { setPlaces([]) } }
   }); return () => { unsubscribe() } }, [])
 
@@ -502,10 +507,12 @@ const WeatherApp = () => {
   const currentFavorite = places.find(place => placeKey(place) === placeKey(coords))
   const toggleFavorite = async () => {
     if (placesBusy) return
+    const ticket = placesGuardRef.current.ticket()
     setPlacesBusy(true); setPlacesError(false)
     try {
       if (currentFavorite) {
         if (session) await removePlace(session, currentFavorite.id!)
+        if (!placesGuardRef.current.isCurrent(ticket)) return
         const next = places.filter(place => placeKey(place) !== placeKey(currentFavorite))
         if (!session) saveLocalPlaces(next)
         setPlaces(next)
@@ -513,28 +520,30 @@ const WeatherApp = () => {
       } else {
         const nextPlace = { name: city.trim().slice(0, 120), region: placeDetails.region, country: placeDetails.country, lat: coords.lat, lon: coords.lon }
         const saved = session ? await addPlace(session, nextPlace) : nextPlace
+        if (!placesGuardRef.current.isCurrent(ticket)) return
         const next = [...places, saved]
         if (!session) saveLocalPlaces(next)
         setPlaces(next)
       }
-    } catch { setPlacesError(true) }
-    finally { setPlacesBusy(false) }
+    } catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
+    finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
   }
 
   const changeDefault = async (place: Place) => {
     if (!session || placesBusy) return
+    const ticket = placesGuardRef.current.ticket()
     setPlacesBusy(true); setPlacesError(false)
-    try { const next = defaultPlaceId === place.id ? null : place.id!; await setDefaultPlace(session, next); setDefaultPlaceId(next) }
-    catch { setPlacesError(true) } finally { setPlacesBusy(false) }
+    try { const next = defaultPlaceId === place.id ? null : place.id!; await setDefaultPlace(session, next); if (placesGuardRef.current.isCurrent(ticket)) setDefaultPlaceId(next) }
+    catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) } finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
   }
 
   const migrateLocalPlaces = async () => {
     if (!session) return
-    const epoch = sessionEpochRef.current
+    const ticket = placesGuardRef.current.ticket()
     setPlacesBusy(true); setPlacesError(false)
-    try { const snapshot = await importPlaces(session, localPlaces()); if (epoch !== sessionEpochRef.current) return; setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId); setOfferImport(false) }
-    catch { if (epoch === sessionEpochRef.current) setPlacesError(true) }
-    finally { if (epoch === sessionEpochRef.current) setPlacesBusy(false) }
+    try { const snapshot = await importPlaces(session, localPlaces()); if (!placesGuardRef.current.isCurrent(ticket)) return; setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId); setOfferImport(false) }
+    catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
+    finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
   }
 
   const decodeWeatherCode = (code: number) => {
@@ -572,6 +581,7 @@ const WeatherApp = () => {
   }
 
   const selectCity = (result: any) => {
+    placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
     ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
@@ -978,7 +988,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {t.quickCities.map((c: any) => {
           return (
             <button key={c.name}
-              onClick={() => { locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -993,7 +1003,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
         </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}
         {offerImport && session && <div className="places-import"><span>{lang === 'bg' ? 'Имаш места, запазени на това устройство.' : 'You have places saved on this device.'}</span><button onClick={migrateLocalPlaces} disabled={placesBusy}>{lang === 'bg' ? 'Прехвърли към профила' : 'Move to profile'}</button><button onClick={() => setOfferImport(false)}>{lang === 'bg' ? 'Не сега' : 'Not now'}</button></div>}
-        {placesError && <p className="places-error" role="alert">{lang === 'bg' ? 'Местата не можаха да се синхронизират.' : 'Places could not be synchronized.'} <button onClick={() => session ? loadAccountPlaces(session, sessionEpochRef.current) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
+        {placesError && <p className="places-error" role="alert">{lang === 'bg' ? 'Местата не можаха да се синхронизират.' : 'Places could not be synchronized.'} <button onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
 
       {loading && <div className="card center-text"><p style={{ fontSize: '1.5rem' }}>{t.loading}</p></div>}

@@ -19,14 +19,25 @@ export function dedupePlaces(places) {
   })
 }
 
+export function requireMatchingPlace(places, requested) {
+  const existing = places.find(place => placeKey(place) === placeKey(requested))
+  if (!existing) throw new Error('PLACE_CONFLICT_NOT_FOUND')
+  return existing
+}
+
 export function loadLocalPlaces(storage) {
-  let current = []
-  try { current = JSON.parse(storage.getItem(LOCAL_PLACES_KEY) || '[]') } catch {}
-  // Non-destructive legacy migration: keep bobbyWeatherFav intact for rollback.
+  let current = [], hasMigrated = false
   try {
-    const legacy = JSON.parse(storage.getItem('bobbyWeatherFav') || 'null')
-    if (validPlace(legacy)) current.push(legacy)
-  } catch {}
+    const saved = storage.getItem(LOCAL_PLACES_KEY)
+    hasMigrated = saved !== null
+    current = JSON.parse(saved || '[]')
+  } catch { hasMigrated = true }
+  // The presence of the new key is the migration marker. Keep the legacy key
+  // for rollback, but never resurrect it after the user empties the new list.
+  if (!hasMigrated) try {
+      const legacy = JSON.parse(storage.getItem('bobbyWeatherFav') || 'null')
+      if (validPlace(legacy)) current.push(legacy)
+    } catch {}
   const places = dedupePlaces(Array.isArray(current) ? current : [])
   storage.setItem(LOCAL_PLACES_KEY, JSON.stringify(places))
   return places

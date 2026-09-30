@@ -1,5 +1,5 @@
 import type { AuthSession } from './auth-client'
-import { dedupePlaces, LOCAL_PLACES_KEY, loadLocalPlaces, placeKey, validPlace } from './places-core.js'
+import { dedupePlaces, LOCAL_PLACES_KEY, loadLocalPlaces, requireMatchingPlace, validPlace } from './places-core.js'
 
 export type Place = { id?: string, name: string, region?: string | null, country?: string | null, lat: number, lon: number }
 export type PlacesSnapshot = { places: Place[], defaultPlaceId: string | null }
@@ -27,7 +27,7 @@ export async function addPlace(session: AuthSession, place: Place): Promise<Plac
   const rows = await rest(session, 'favorite_places?on_conflict=user_id,latitude_key,longitude_key', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify({ name: place.name.trim(), region: place.region || null, country: place.country || null, latitude: place.lat, longitude: place.lon }) })
   if (rows?.[0]) return { id: rows[0].id, name: rows[0].name, region: rows[0].region, country: rows[0].country, lat: Number(rows[0].latitude), lon: Number(rows[0].longitude) }
   const snapshot = await fetchPlaces(session)
-  return snapshot.places.find(item => placeKey(item) === placeKey(place))!
+  return requireMatchingPlace(snapshot.places, place)
 }
 export const removePlace = (session: AuthSession, id: string) => rest(session, `favorite_places?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
 export const setDefaultPlace = (session: AuthSession, id: string | null) => rest(session, 'rpc/set_my_default_place', { method: 'POST', body: JSON.stringify({ place_id: id }) })
