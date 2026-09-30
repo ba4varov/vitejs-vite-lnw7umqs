@@ -50,6 +50,11 @@ html, body, #root {
 .auth-dialog label { font-size: .9rem; font-weight: 700; }
 .auth-dialog input { width: 100%; padding: 13px 14px; border: 1px solid #cbd5e1; border-radius: 12px; font: inherit; }
 .auth-dialog input:focus { outline: 3px solid rgba(37,99,235,.2); border-color: #2563eb; }
+.password-field { position: relative; display: block; }
+.auth-dialog .password-field input { padding-right: 58px; }
+.auth-dialog .password-toggle { position: absolute; top: 50%; right: 3px; width: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 10px; transform: translateY(-50%); background: transparent; color: #334155; cursor: pointer; font-size: 1.15rem; }
+.auth-dialog .password-toggle:hover { background: #e2e8f0; }
+.auth-dialog .password-toggle:focus-visible { outline: 3px solid rgba(37,99,235,.35); }
 .auth-submit { padding: 13px !important; border-radius: 12px !important; }
 .auth-link { margin-top: 14px; padding: 4px !important; color: #1d4ed8 !important; box-shadow: none !important; background: transparent !important; }
 .auth-error { color: #b91c1c; line-height: 1.45; }.auth-success { color: #047857; line-height: 1.45; }.profile-email { margin-bottom: 10px; color: #475569; }
