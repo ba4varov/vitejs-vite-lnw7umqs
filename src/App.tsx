@@ -4,6 +4,7 @@ import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visib
 import { findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
+import { AuthPanel } from './AuthPanel'
 
 const translations = {
   bg: {
@@ -864,6 +865,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
+          <AuthPanel lang={lang as 'bg' | 'en'} />
           <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>

@@ -39,6 +39,20 @@ html, body, #root {
 .header-title-wrapper h1 { font-size: 1.8rem; margin: 0; }
 .header-title-wrapper p { margin: 4px 0 0; opacity: 0.7; }
 .header-btns { display: flex; gap: 12px; }
+.auth-nav { display: flex; gap: 8px; align-items: center; }
+.header-btns .primary, .auth-submit { background: #2563eb; color: white; }
+.auth-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgba(15,23,42,.65); }
+.auth-dialog { position: relative; width: min(440px, 100%); padding: 30px; border-radius: 24px; background: white; color: #1e293b; box-shadow: 0 24px 70px rgba(0,0,0,.28); text-align: left; }
+.auth-dialog h2 { margin-bottom: 20px; }
+.auth-close { position: absolute; top: 12px; right: 14px; font-size: 1.6rem; background: transparent !important; box-shadow: none !important; }
+.auth-dialog form, .auth-dialog label { display: grid; gap: 8px; }
+.auth-dialog form { gap: 16px; margin-top: 18px; }
+.auth-dialog label { font-size: .9rem; font-weight: 700; }
+.auth-dialog input { width: 100%; padding: 13px 14px; border: 1px solid #cbd5e1; border-radius: 12px; font: inherit; }
+.auth-dialog input:focus { outline: 3px solid rgba(37,99,235,.2); border-color: #2563eb; }
+.auth-submit { padding: 13px !important; border-radius: 12px !important; }
+.auth-link { margin-top: 14px; padding: 4px !important; color: #1d4ed8 !important; box-shadow: none !important; background: transparent !important; }
+.auth-error { color: #b91c1c; line-height: 1.45; }.auth-success { color: #047857; line-height: 1.45; }.profile-email { margin-bottom: 10px; color: #475569; }
 .header-btns button {
   background: white; border: none; padding: 10px 18px; border-radius: 20px;
   cursor: pointer; font-weight: bold; color: #1e293b;
@@ -376,6 +390,8 @@ canvas {
 @media (max-width: 650px) {
   .weather-app { padding: 12px; }
   .header-row { flex-direction: column; gap: 16px; text-align: center; }
+  .header-btns { width: 100%; flex-wrap: wrap; justify-content: center; }
+  .auth-nav { order: 2; width: 100%; justify-content: center; }
   .main-top { flex-direction: column; text-align: center; }
   .main-info-left { text-align: center; width: 100%; }
   .big-temp { font-size: 4rem; text-align: center; }
