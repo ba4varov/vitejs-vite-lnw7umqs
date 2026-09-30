@@ -25,10 +25,10 @@ npm run build
 
 Приложението използва Supabase Auth, а не собствено съхранение на пароли. Клиентът пази само стандартната Supabase сесия и я обновява при презареждане. Профилът и правата се четат през защитения сървърен маршрут `/api/profile`; планът е отделен от профила и не може да се променя от клиента.
 
-1. Създайте Supabase проект и изпълнете SQL файла `supabase/migrations/20260930000000_auth_profiles.sql` в SQL Editor (или чрез Supabase CLI).
+1. Създайте Supabase проект с **Enable Data API** включено, **Automatically expose new tables** изключено и RLS включено. Изпълнете целия SQL файл `supabase/migrations/20260930000000_auth_profiles.sql` в SQL Editor (или чрез Supabase CLI). Миграцията изрично отнема подразбиращите се права и дава само минималните `service_role` права, използвани от `/api/profile`, плюс `EXECUTE` на entitlement RPC само за `authenticated`.
 2. В **Authentication → URL Configuration** задайте Site URL `https://ba4varov-wheater.vercel.app/` и добавете Redirect URLs `http://localhost:5173/**` и `https://ba4varov-wheater.vercel.app/**`.
 3. В **Authentication → Providers → Email** включете Email provider и **Confirm email**. Настройте собствен SMTP доставчик за надеждни реални писма; без SMTP вградената услуга е ограничена и е предназначена главно за тестове.
 4. Копирайте `.env.example` като `.env.local`. За локален пълен поток стартирайте `vercel dev`; добавете същите променливи във Vercel Project Settings. `SUPABASE_SERVICE_ROLE_KEY` е само сървърна променлива и никога не трябва да има префикс `VITE_`.
 5. В Supabase email templates оставете `{{ .ConfirmationURL }}` за потвърждение и възстановяване: redirect адресът се подава от приложението според текущия origin.
 
-Нов акаунт получава сървърно `free` абонаментно състояние. Бъдещ доставчик на плащания трябва да актуализира `subscriptions` единствено от доверен webhook със service-role ключ; интерфейсът няма права за insert/update/delete върху тази таблица. Текущите прогнози, търсене, графики и чат остават публични.
+Нов акаунт получава сървърно `free` абонаментно състояние. В момента дори `service_role` няма table grant за промяна на `subscriptions`, защото реалният код не извършва такава операция. Бъдеща интеграция за плащания трябва да добави отделна миграция с минималното необходимо право и да актуализира `subscriptions` единствено от доверен webhook. Интерфейсът няма права за insert/update/delete върху тази таблица. Текущите прогнози, търсене, графики и чат остават публични.
