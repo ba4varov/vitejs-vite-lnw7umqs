@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { authConfigured, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
+import { authCallbackView } from './auth-flow.js'
 import { Turnstile } from './Turnstile'
 
 type View = 'closed' | 'login' | 'register' | 'forgot' | 'profile' | 'password'
@@ -31,7 +32,17 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     const hash = consumeAuthHash()
     let active = await restoreSession()
     if (hash?.access_token) {
-      try { const user = await getUser(hash.access_token); active = { ...hash, user } as AuthSession; saveSession(active); setView(hash.type === 'recovery' ? 'password' : 'profile') } catch { saveSession(null) }
+      try {
+        const user = await getUser(hash.access_token)
+        active = { ...hash, user } as AuthSession
+        saveSession(active)
+        const callbackView = authCallbackView(hash.type, user) as View
+        setView(callbackView)
+        if (callbackView === 'profile') {
+          try { const data = await profileRequest(active); setProfile(data); setName(data.name) }
+          catch (reason) { fail(reason) }
+        }
+      } catch { active = null; saveSession(null) }
     }
     setSession(active); setBusy(false)
   })() }, [])
@@ -44,9 +55,9 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     let captchaSent = false
     try {
       if (view === 'register') { if (password !== confirmation) throw new Error('mismatch'); captchaSent = true; await signUp(email, password, redirect, captchaToken || undefined); setMessage(t.verify) }
-      if (view === 'login') { captchaSent = true; const active = await signIn(email, password, captchaToken || undefined); setSession(active); const data = await profileRequest(active); setProfile(data); setName(data.name); changeView('profile') }
+      if (view === 'login') { captchaSent = true; const active = await signIn(email, password, captchaToken || undefined); setSession(active); changeView('closed') }
       if (view === 'forgot') { captchaSent = true; await resetPassword(email, redirect, captchaToken || undefined); setMessage(t.reset) }
-      if (view === 'password' && session) { await updatePassword(session.access_token, password); setMessage(t.success); setView('profile') }
+      if (view === 'password' && session) { await updatePassword(session.access_token, password); setPassword(''); setMessage(t.success) }
       if (view === 'profile' && session) { const data = await profileRequest(session, 'PATCH', name); setProfile(data); setMessage(t.success) }
     } catch (reason: any) { if (reason.message === 'mismatch') setError(t.mismatch); else fail(reason) } finally { if (captchaSent) { setCaptchaToken(null); setCaptchaReset(value => value + 1) }; setBusy(false) }
   }
