@@ -31,6 +31,12 @@ npm run build
 4. Копирайте `.env.example` като `.env.local`. За локален пълен поток стартирайте `vercel dev`; добавете същите променливи във Vercel Project Settings. `SUPABASE_SERVICE_ROLE_KEY` е само сървърна променлива и никога не трябва да има префикс `VITE_`.
 5. В Supabase email templates оставете `{{ .ConfirmationURL }}` за потвърждение и възстановяване: redirect адресът се подава от приложението според текущия origin.
 
+### „Моите места“
+
+След началната миграция приложете **отделно и в този ред** `supabase/migrations/20260930010000_favorite_places.sql` чрез Supabase SQL Editor или `supabase db push`, след което публикувайте frontend-а. Миграцията добавя само таблиците за места и настройки, RLS политики и атомарната функция за място по подразбиране; не променя `profiles`, `subscriptions` или auth trigger-ите. Не са нужни нови environment variables: браузърът използва съществуващите `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`, потребителския JWT и RLS (никога service-role ключ).
+
+Преди production проверете с два реални акаунта: добавяне/изтриване и дедупликация по координати; задаване и изтриване на default; reload и вход от друг браузър; изрично guest→profile прехвърляне; незабавно изчистване при logout/account switch. В SQL Editor с JWT на потребител A потвърдете, че `select`, `delete` и `insert` с `user_id` на B се отказват, както и `select public.set_my_default_place('<place-of-B>')`. Автоматичните Node тестове използват mock storage и не заместват тази реална RLS проверка.
+
 Нов акаунт получава сървърно `free` абонаментно състояние. В момента дори `service_role` няма table grant за промяна на `subscriptions`, защото реалният код не извършва такава операция. Бъдеща интеграция за плащания трябва да добави отделна миграция с минималното необходимо право и да актуализира `subscriptions` единствено от доверен webhook. Интерфейсът няма права за insert/update/delete върху тази таблица. Текущите прогнози, търсене, графики и чат остават публични.
 
 ## Cloudflare Turnstile за Supabase Auth
