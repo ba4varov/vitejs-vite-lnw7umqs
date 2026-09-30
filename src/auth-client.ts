@@ -19,8 +19,12 @@ async function request(path: string, body?: object, token?: string, method?: str
 }
 
 export function saveSession(session: AuthSession | null) {
-  if (session) localStorage.setItem(storageKey, JSON.stringify(session))
-  else localStorage.removeItem(storageKey)
+  try {
+    if (session) localStorage.setItem(storageKey, JSON.stringify(session))
+    else localStorage.removeItem(storageKey)
+  } catch {
+    // Authentication still works for the current page when browser storage is blocked.
+  }
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {

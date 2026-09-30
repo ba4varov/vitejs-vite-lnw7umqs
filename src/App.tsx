@@ -5,6 +5,7 @@ import { findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
+import { loadLanguage, saveLanguage } from './language-storage.js'
 
 const translations = {
   bg: {
@@ -350,7 +351,7 @@ const Chart = ({ hourly, darkMode, t }: any) => {
 }
 
 const WeatherApp = () => {
-  const [lang, setLang] = useState('bg')
+  const [lang, setLang] = useState<'bg' | 'en'>(() => loadLanguage())
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
@@ -386,13 +387,19 @@ const WeatherApp = () => {
   const chatRequestIdRef = useRef(0)
   const t = translations[lang as keyof typeof translations]
 
+  const toggleLanguage = () => {
+    const nextLanguage = lang === 'bg' ? 'en' : 'bg'
+    saveLanguage(nextLanguage)
+    setLang(nextLanguage)
+  }
+
   useEffect(() => {
-    const savedFav = localStorage.getItem('bobbyWeatherFav')
-    if (savedFav) {
-      try {
+    try {
+      const savedFav = localStorage.getItem('bobbyWeatherFav')
+      if (savedFav) {
         setFavoriteCity(JSON.parse(savedFav))
-      } catch {}
-    }
+      }
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -467,11 +474,11 @@ const WeatherApp = () => {
   const toggleFavorite = () => {
     if (favoriteCity && favoriteCity.name === city) {
       setFavoriteCity(null)
-      localStorage.removeItem('bobbyWeatherFav')
+      try { localStorage.removeItem('bobbyWeatherFav') } catch {}
     } else {
       const newFav = { name: city, lat: coords.lat, lon: coords.lon }
       setFavoriteCity(newFav)
-      localStorage.setItem('bobbyWeatherFav', JSON.stringify(newFav))
+      try { localStorage.setItem('bobbyWeatherFav', JSON.stringify(newFav)) } catch {}
     }
   }
 
@@ -865,8 +872,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
-          <AuthPanel lang={lang as 'bg' | 'en'} />
-          <button className="lang-btn" onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}>
+          <AuthPanel lang={lang} />
+          <button className="lang-btn" onClick={toggleLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
           <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
