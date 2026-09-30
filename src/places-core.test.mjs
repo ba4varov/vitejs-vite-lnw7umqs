@@ -53,6 +53,8 @@ test('migration scopes rows to auth.uid and guards defaults with an ownership FK
   assert.doesNotMatch(sql, /subscriptions[\s\S]*grant/i)
   const identitySql = readFileSync(new URL('../supabase/migrations/20260930020000_place_geoname_identity.sql', import.meta.url), 'utf8')
   assert.match(identitySql, /geoname_id bigint/)
+  assert.match(identitySql, /country_code text/)
+  assert.match(identitySql, /admin1_id bigint/)
 })
 
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return { promise, resolve } }
