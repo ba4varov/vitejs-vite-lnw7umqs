@@ -7,9 +7,11 @@ import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
 import { loadLanguage, saveLanguage } from './language-storage.js'
 import { subscribeSession, type AuthSession } from './auth-client'
-import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, type Place } from './places-client'
+import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, setPlaceIdentity, type Place } from './places-client'
 import { placeKey } from './places-core.js'
 import { createPlacesSessionGuard } from './places-session-guard.js'
+import { localizePlace } from './place-localization'
+import { createLocalizationGuard } from './place-localization-core.js'
 
 const translations = {
   bg: {
@@ -359,7 +361,7 @@ const WeatherApp = () => {
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
-  const [placeDetails, setPlaceDetails] = useState<{ region?: string, country?: string }>({})
+  const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
@@ -370,6 +372,7 @@ const WeatherApp = () => {
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
   const [places, setPlaces] = useState<Place[]>([])
+  const [localizedPlaces, setLocalizedPlaces] = useState<Place[]>([])
   const [defaultPlaceId, setDefaultPlaceId] = useState<string | null>(null)
   const [session, setSession] = useState<AuthSession | null>(null)
   const [placesError, setPlacesError] = useState(false)
@@ -391,12 +394,16 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const searchRequestIdRef = useRef(0)
   const weatherRequestIdRef = useRef(0)
+  const coordsRef = useRef(coords)
   const locationChoiceRef = useRef(false)
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
   const placesGuardRef = useRef(createPlacesSessionGuard())
+  const localizationGuardRef = useRef(createLocalizationGuard())
   const t = translations[lang as keyof typeof translations]
+
+  useEffect(() => { coordsRef.current = coords }, [coords])
 
   const toggleLanguage = () => {
     const nextLanguage = lang === 'bg' ? 'en' : 'bg'
@@ -407,8 +414,37 @@ const WeatherApp = () => {
   const choosePlace = (place: Place, manual = true) => {
     if (manual) placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
-    setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ region: place.region || undefined, country: place.country || undefined })
+    setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
   }
+
+  useEffect(() => {
+    const guard = localizationGuardRef.current
+    const ticket = guard.begin()
+    setLocalizedPlaces(places)
+    Promise.all(places.map(place => localizePlace(place, lang, { signal: ticket.controller.signal }).catch(() => place))).then(next => {
+      if (!guard.isCurrent(ticket)) return
+      setLocalizedPlaces(next)
+      const selected = next.find(place => placeKey(place) === placeKey(coordsRef.current))
+      if (selected) {
+        setCity(selected.name)
+        setPlaceDetails({ geonameId: selected.geonameId || undefined, countryCode: selected.countryCode || undefined, admin1Id: selected.admin1Id || undefined, region: selected.region || undefined, country: selected.country || undefined })
+      }
+      const originalsWithIdentity = places.map((original, index) => ({
+        ...original,
+        geonameId: next[index].geonameId,
+        countryCode: next[index].countryCode,
+        admin1Id: next[index].admin1Id
+      }))
+      const identityChanged = originalsWithIdentity.filter((place, index) => place.geonameId != null &&
+        (place.geonameId !== places[index].geonameId || place.countryCode !== places[index].countryCode || place.admin1Id !== places[index].admin1Id))
+      if (identityChanged.length) {
+        if (!session) saveLocalPlaces(originalsWithIdentity)
+        else identityChanged.forEach(place => { if (place.id) void setPlaceIdentity(session, place.id, place).catch(() => {}) })
+        setPlaces(originalsWithIdentity)
+      }
+    })
+    return () => guard.invalidate(ticket)
+  }, [lang, places, session?.user.id])
 
   const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
     setPlacesBusy(true); setPlacesError(false)
@@ -518,7 +554,7 @@ const WeatherApp = () => {
         setPlaces(next)
         if (currentFavorite.id === defaultPlaceId) setDefaultPlaceId(null)
       } else {
-        const nextPlace = { name: city.trim().slice(0, 120), region: placeDetails.region, country: placeDetails.country, lat: coords.lat, lon: coords.lon }
+        const nextPlace = { geonameId: placeDetails.geonameId, countryCode: placeDetails.countryCode, admin1Id: placeDetails.admin1Id, name: city.trim().slice(0, 120), region: placeDetails.region, country: placeDetails.country, lat: coords.lat, lon: coords.lon }
         const saved = session ? await addPlace(session, nextPlace) : nextPlace
         if (!placesGuardRef.current.isCurrent(ticket)) return
         const next = [...places, saved]
@@ -586,7 +622,7 @@ const WeatherApp = () => {
     ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
     setCity(result.name)
-    setPlaceDetails({ region: result.admin1, country: result.country })
+    setPlaceDetails({ geonameId: Number(result.id), countryCode: result.country_code, admin1Id: result.admin1_id == null ? undefined : Number(result.admin1_id), region: result.admin1, country: result.country })
     setCoords({ lat: result.latitude, lon: result.longitude })
     setSearchInput('')
     setSuggestions([])
@@ -998,7 +1034,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
       <section className="my-places" aria-labelledby="my-places-title">
         <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>
-        {places.length > 0 ? <div className="my-places-list">{places.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
+        {localizedPlaces.length > 0 ? <div className="my-places-list">{localizedPlaces.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
           <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} onClick={() => choosePlace(place)}><strong>{place.name}</strong>{(place.region || place.country) && <small>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
           {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
         </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}

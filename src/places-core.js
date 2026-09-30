@@ -4,6 +4,15 @@ export function placeKey(place) {
   return `${Number(place.lat).toFixed(4)},${Number(place.lon).toFixed(4)}`
 }
 
+export function placeIdentity(place) {
+  return place.geonameId != null ? `geo:${place.geonameId}` : `coords:${placeKey(place)}`
+}
+
+export function samePlace(left, right) {
+  if (left?.geonameId != null && right?.geonameId != null) return String(left.geonameId) === String(right.geonameId)
+  return placeKey(left) === placeKey(right)
+}
+
 export function validPlace(place) {
   return Boolean(place && typeof place.name === 'string' && place.name.trim().length > 0 && place.name.trim().length <= 120 &&
     Number.isFinite(Number(place.lat)) && Number(place.lat) >= -90 && Number(place.lat) <= 90 &&
