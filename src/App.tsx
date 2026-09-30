@@ -6,6 +6,10 @@ import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
 import { loadLanguage, saveLanguage } from './language-storage.js'
+import { subscribeSession, type AuthSession } from './auth-client'
+import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, type Place } from './places-client'
+import { placeKey } from './places-core.js'
+import { createPlacesSessionGuard } from './places-session-guard.js'
 
 const translations = {
   bg: {
@@ -355,6 +359,7 @@ const WeatherApp = () => {
   const [city, setCity] = useState('Варна')
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
+  const [placeDetails, setPlaceDetails] = useState<{ region?: string, country?: string }>({})
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
@@ -364,7 +369,12 @@ const WeatherApp = () => {
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
   const [forecast, setForecast] = useState<any[]>([])
-  const [favoriteCity, setFavoriteCity] = useState<{name: string, lat: number, lon: number} | null>(null)
+  const [places, setPlaces] = useState<Place[]>([])
+  const [defaultPlaceId, setDefaultPlaceId] = useState<string | null>(null)
+  const [session, setSession] = useState<AuthSession | null>(null)
+  const [placesError, setPlacesError] = useState(false)
+  const [placesBusy, setPlacesBusy] = useState(false)
+  const [offerImport, setOfferImport] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
   const [bgImageUrl, setBgImageUrl] = useState<string>('')
   
@@ -385,6 +395,7 @@ const WeatherApp = () => {
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
+  const placesGuardRef = useRef(createPlacesSessionGuard())
   const t = translations[lang as keyof typeof translations]
 
   const toggleLanguage = () => {
@@ -393,14 +404,36 @@ const WeatherApp = () => {
     setLang(nextLanguage)
   }
 
-  useEffect(() => {
+  const choosePlace = (place: Place, manual = true) => {
+    if (manual) placesGuardRef.current.manualSelection()
+    locationChoiceRef.current = true
+    setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ region: place.region || undefined, country: place.country || undefined })
+  }
+
+  const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
+    setPlacesBusy(true); setPlacesError(false)
     try {
-      const savedFav = localStorage.getItem('bobbyWeatherFav')
-      if (savedFav) {
-        setFavoriteCity(JSON.parse(savedFav))
-      }
-    } catch {}
-  }, [])
+      const snapshot = await fetchPlaces(active)
+      if (!placesGuardRef.current.isCurrent(ticket)) return
+      setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId)
+      const preferred = snapshot.places.find(place => place.id === snapshot.defaultPlaceId)
+      if (placesGuardRef.current.resolveDefault(ticket) && preferred) choosePlace(preferred, false)
+      setOfferImport(localPlaces().length > 0)
+    } catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
+    finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
+  }
+
+  useEffect(() => { const unsubscribe = subscribeSession(active => {
+    const { accountChanged, ticket } = placesGuardRef.current.changeSession(active?.user.id || null)
+    setSession(active); setPlacesError(false); setPlacesBusy(false)
+    if (accountChanged) {
+      setOfferImport(false); setDefaultPlaceId(null)
+      // Clear the prior account immediately; never display it while the next request is pending.
+      setPlaces([])
+    }
+    if (active) loadAccountPlaces(active, ticket)
+    else { try { setPlaces(localPlaces()) } catch { setPlaces([]) } }
+  }); return () => { unsubscribe() } }, [])
 
   useEffect(() => {
     chatRequestIdRef.current += 1
@@ -471,15 +504,46 @@ const WeatherApp = () => {
     }
   }
 
-  const toggleFavorite = () => {
-    if (favoriteCity && favoriteCity.name === city) {
-      setFavoriteCity(null)
-      try { localStorage.removeItem('bobbyWeatherFav') } catch {}
-    } else {
-      const newFav = { name: city, lat: coords.lat, lon: coords.lon }
-      setFavoriteCity(newFav)
-      try { localStorage.setItem('bobbyWeatherFav', JSON.stringify(newFav)) } catch {}
-    }
+  const currentFavorite = places.find(place => placeKey(place) === placeKey(coords))
+  const toggleFavorite = async () => {
+    if (placesBusy) return
+    const ticket = placesGuardRef.current.ticket()
+    setPlacesBusy(true); setPlacesError(false)
+    try {
+      if (currentFavorite) {
+        if (session) await removePlace(session, currentFavorite.id!)
+        if (!placesGuardRef.current.isCurrent(ticket)) return
+        const next = places.filter(place => placeKey(place) !== placeKey(currentFavorite))
+        if (!session) saveLocalPlaces(next)
+        setPlaces(next)
+        if (currentFavorite.id === defaultPlaceId) setDefaultPlaceId(null)
+      } else {
+        const nextPlace = { name: city.trim().slice(0, 120), region: placeDetails.region, country: placeDetails.country, lat: coords.lat, lon: coords.lon }
+        const saved = session ? await addPlace(session, nextPlace) : nextPlace
+        if (!placesGuardRef.current.isCurrent(ticket)) return
+        const next = [...places, saved]
+        if (!session) saveLocalPlaces(next)
+        setPlaces(next)
+      }
+    } catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
+    finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
+  }
+
+  const changeDefault = async (place: Place) => {
+    if (!session || placesBusy) return
+    const ticket = placesGuardRef.current.ticket()
+    setPlacesBusy(true); setPlacesError(false)
+    try { const next = defaultPlaceId === place.id ? null : place.id!; await setDefaultPlace(session, next); if (placesGuardRef.current.isCurrent(ticket)) setDefaultPlaceId(next) }
+    catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) } finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
+  }
+
+  const migrateLocalPlaces = async () => {
+    if (!session) return
+    const ticket = placesGuardRef.current.ticket()
+    setPlacesBusy(true); setPlacesError(false)
+    try { const snapshot = await importPlaces(session, localPlaces()); if (!placesGuardRef.current.isCurrent(ticket)) return; setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId); setOfferImport(false) }
+    catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
+    finally { if (placesGuardRef.current.isCurrent(ticket)) setPlacesBusy(false) }
   }
 
   const decodeWeatherCode = (code: number) => {
@@ -517,11 +581,12 @@ const WeatherApp = () => {
   }
 
   const selectCity = (result: any) => {
+    placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
     ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    const name = result.name + (result.country ? ', ' + result.country : '')
-    setCity(name)
+    setCity(result.name)
+    setPlaceDetails({ region: result.admin1, country: result.country })
     setCoords({ lat: result.latitude, lon: result.longitude })
     setSearchInput('')
     setSuggestions([])
@@ -788,6 +853,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           const address = data.address;
           const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
           setCity(mainCity);
+          setPlaceDetails({ region: address.state || address.county, country: address.country });
 
           const exactDetails = [];
           const street = address.road || address.pedestrian || address.street;
@@ -919,26 +985,26 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       <div className="info-line">{t.info}</div>
 
       <div className="city-row">
-        {favoriteCity && (
-          <button 
-            onClick={() => { locationChoiceRef.current = true; setCity(favoriteCity.name); setCoords({ lat: favoriteCity.lat, lon: favoriteCity.lon }); setExactLocation(null); }}
-            className={city === favoriteCity.name ? 'city-btn fav-btn active' : 'city-btn fav-btn'}
-          >
-            ⭐ {favoriteCity.name}
-          </button>
-        )}
-        
         {t.quickCities.map((c: any) => {
-          if (favoriteCity && favoriteCity.name === c.name) return null;
           return (
             <button key={c.name}
-              onClick={() => { locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); }}
+              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
           )
         })}
       </div>
+
+      <section className="my-places" aria-labelledby="my-places-title">
+        <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>
+        {places.length > 0 ? <div className="my-places-list">{places.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
+          <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} onClick={() => choosePlace(place)}><strong>{place.name}</strong>{(place.region || place.country) && <small>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
+          {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
+        </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}
+        {offerImport && session && <div className="places-import"><span>{lang === 'bg' ? 'Имаш места, запазени на това устройство.' : 'You have places saved on this device.'}</span><button onClick={migrateLocalPlaces} disabled={placesBusy}>{lang === 'bg' ? 'Прехвърли към профила' : 'Move to profile'}</button><button onClick={() => setOfferImport(false)}>{lang === 'bg' ? 'Не сега' : 'Not now'}</button></div>}
+        {placesError && <p className="places-error" role="alert">{lang === 'bg' ? 'Местата не можаха да се синхронизират.' : 'Places could not be synchronized.'} <button onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
+      </section>
 
       {loading && <div className="card center-text"><p style={{ fontSize: '1.5rem' }}>{t.loading}</p></div>}
 
@@ -1002,7 +1068,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                       </span>
                     )}
                     <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
-                      {favoriteCity?.name === city ? '⭐' : '☆'}
+                      {currentFavorite ? '⭐' : '☆'}
                     </button>
                   </h2>
                   <p className="desc" style={{ marginBottom: '8px' }}>{weather.description}</p>

@@ -6,6 +6,8 @@ export type AuthSession = { access_token: string; refresh_token: string; expires
 const url = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '')
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 const storageKey = 'meteo-pulse-auth'
+let currentSession: AuthSession | null = null
+const sessionListeners = new Set<(session: AuthSession | null) => void>()
 
 export const authConfigured = Boolean(url && key)
 export const captchaConfigured = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY)
@@ -22,12 +24,21 @@ async function request(path: string, body?: object, token?: string, method?: str
 }
 
 export function saveSession(session: AuthSession | null) {
+  currentSession = session
+  sessionListeners.forEach(listener => listener(session))
   try {
     if (session) localStorage.setItem(storageKey, JSON.stringify(session))
     else localStorage.removeItem(storageKey)
   } catch {
     // Authentication still works for the current page when browser storage is blocked.
   }
+}
+
+/** The single application-wide session source used by auth and user data. */
+export function subscribeSession(listener: (session: AuthSession | null) => void) {
+  sessionListeners.add(listener)
+  listener(currentSession)
+  return () => sessionListeners.delete(listener)
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {
