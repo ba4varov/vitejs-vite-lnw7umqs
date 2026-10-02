@@ -1,11 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { localizePlace } from './place-localization.js'
+import { localizePlace, localizePlaceSelection } from './place-localization.js'
 import { createLocalizationGuard } from './place-localization-core.js'
 
 const varna = {
   bg: { id: 726050, name: 'Варна', latitude: 43.2167, longitude: 27.9167, country_code: 'BG', country: 'България', admin1_id: 726051, admin1: 'Област Варна' },
   en: { id: 726050, name: 'Varna', latitude: 43.2167, longitude: 27.9167, country_code: 'BG', country: 'Bulgaria', admin1_id: 726051, admin1: 'Varna' }
+}
+
+const paris = {
+  bg: { id: 2988507, name: 'Париж', latitude: 48.8534, longitude: 2.3488, country_code: 'FR', country: 'Франция', admin1_id: 3012874, admin1: 'Ил дьо Франс' },
+  en: { id: 2988507, name: 'Paris', latitude: 48.8534, longitude: 2.3488, country_code: 'FR', country: 'France', admin1_id: 3012874, admin1: 'Île-de-France' }
 }
 
 function response(data) { return { ok: true, json: async () => data } }
@@ -47,6 +52,47 @@ test('bg to en to bg reuses the established identity without another name search
   assert.equal(bulgarian.name, 'Варна')
   assert.deepEqual([persistent.name, persistent.region, persistent.country], ['Варна', 'Област Варна', 'България'], 'identity enrichment does not overwrite fallback labels')
   assert.equal(api.calls.filter(url => url.includes('/search?')).length, 4, 'only the initial legacy resolution searches by name and region')
+})
+
+test('saved Varna and Paris labels follow the current language without changing favorite identity', async () => {
+  const calls = []
+  const fetcher = async url => {
+    calls.push(url)
+    const parsed = new URL(url)
+    const language = parsed.searchParams.get('language')
+    const result = parsed.searchParams.get('id') === String(paris.en.id) ? paris[language] : varna[language]
+    return response(result)
+  }
+  const saved = [
+    { id: 'varna-favorite', geonameId: varna.en.id, name: 'Варна', region: 'Област Варна', country: 'България', lat: varna.en.latitude, lon: varna.en.longitude },
+    { id: 'paris-favorite', geonameId: paris.en.id, name: 'Paris', region: 'Île-de-France', country: 'France', lat: paris.en.latitude, lon: paris.en.longitude }
+  ]
+
+  const english = await localizePlaceSelection(saved, saved[0], 'en', { fetcher, storage: null })
+  assert.deepEqual(english.places.map(place => [place.name, place.region, place.country]), [
+    ['Varna', 'Varna', 'Bulgaria'],
+    ['Paris', 'Île-de-France', 'France']
+  ])
+  assert.equal(english.selectedPlace.name, 'Varna')
+
+  const bulgarian = await localizePlaceSelection(saved, saved[1], 'bg', { fetcher, storage: null })
+  assert.deepEqual(bulgarian.places.map(place => [place.name, place.region, place.country]), [
+    ['Варна', 'Област Варна', 'България'],
+    ['Париж', 'Ил дьо Франс', 'Франция']
+  ])
+  assert.equal(bulgarian.selectedPlace.name, 'Париж')
+  assert.deepEqual(bulgarian.places.map(place => place.id), saved.map(place => place.id))
+  assert.equal(bulgarian.places.length, saved.length, 'language switching must not duplicate favorites')
+  assert.equal(calls.length, 4, 'the selected favorite reuses its localized collection entry')
+})
+
+test('an unsaved selected city is localized without adding it to favorites', async () => {
+  const api = geocoder({ get: paris })
+  const selected = { geonameId: paris.en.id, name: 'Paris', region: 'Île-de-France', country: 'France', lat: paris.en.latitude, lon: paris.en.longitude }
+  const localized = await localizePlaceSelection([], selected, 'bg', { fetcher: api.fetcher, storage: null })
+
+  assert.equal(localized.places.length, 0)
+  assert.deepEqual([localized.selectedPlace.name, localized.selectedPlace.region, localized.selectedPlace.country], ['Париж', 'Ил дьо Франс', 'Франция'])
 })
 
 test('a known id uses direct lookup even when same-name search results would be ambiguous', async () => {

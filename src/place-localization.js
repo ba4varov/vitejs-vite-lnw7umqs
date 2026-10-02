@@ -1,4 +1,5 @@
 import { cacheLabel, cachedLabel, identityFromResult, labelFromResult, matchGeocodingResult } from './place-localization-core.js'
+import { placeKey } from './places-core.js'
 
 const endpoint = 'https://geocoding-api.open-meteo.com/v1'
 const supportedLanguages = new Set(['bg', 'en'])
@@ -45,4 +46,14 @@ export async function localizePlace(place, language, dependencies = {}) {
   const label = labelFromResult(localized)
   cacheLabel(storage, identity.geonameId, language, label)
   return { ...identity, ...identityFromResult(localized), ...label }
+}
+
+export async function localizePlaceSelection(places, selectedPlace, language, dependencies = {}) {
+  const localizedPlaces = await Promise.all(places.map(place => localizePlace(place, language, dependencies).catch(() => place)))
+  const selectedIndex = places.findIndex(place => placeKey(place) === placeKey(selectedPlace))
+  const localizedSelection = selectedIndex >= 0
+    ? localizedPlaces[selectedIndex]
+    : await localizePlace(selectedPlace, language, dependencies).catch(() => selectedPlace)
+
+  return { places: localizedPlaces, selectedPlace: localizedSelection }
 }

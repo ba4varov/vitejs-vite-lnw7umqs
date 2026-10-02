@@ -10,7 +10,7 @@ import { subscribeSession, type AuthSession } from './auth-client'
 import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, setPlaceIdentity, type Place } from './places-client'
 import { placeKey } from './places-core.js'
 import { createPlacesSessionGuard } from './places-session-guard.js'
-import { localizePlace } from './place-localization'
+import { localizePlaceSelection } from './place-localization'
 import { createLocalizationGuard } from './place-localization-core.js'
 
 const translations = {
@@ -438,15 +438,15 @@ const WeatherApp = () => {
   useEffect(() => {
     const guard = localizationGuardRef.current
     const ticket = guard.begin()
-    setLocalizedPlaces(places)
-    Promise.all(places.map(place => localizePlace(place, lang, { signal: ticket.controller.signal }).catch(() => place))).then(next => {
+    const savedSelection = places.find(place => placeKey(place) === placeKey(coordsRef.current))
+    const selectedPlace = savedSelection || { ...placeDetails, name: city, ...coordsRef.current }
+    localizePlaceSelection(places, selectedPlace, lang, { signal: ticket.controller.signal }).then(localized => {
       if (!guard.isCurrent(ticket)) return
+      const next = localized.places
       setLocalizedPlaces(next)
-      const selected = next.find(place => placeKey(place) === placeKey(coordsRef.current))
-      if (selected) {
-        setCity(selected.name)
-        setPlaceDetails({ geonameId: selected.geonameId || undefined, countryCode: selected.countryCode || undefined, admin1Id: selected.admin1Id || undefined, region: selected.region || undefined, country: selected.country || undefined })
-      }
+      const selected = localized.selectedPlace
+      setCity(selected.name)
+      setPlaceDetails({ geonameId: selected.geonameId || undefined, countryCode: selected.countryCode || undefined, admin1Id: selected.admin1Id || undefined, region: selected.region || undefined, country: selected.country || undefined })
       const originalsWithIdentity = places.map((original, index) => ({
         ...original,
         geonameId: next[index].geonameId,
@@ -462,7 +462,7 @@ const WeatherApp = () => {
       }
     })
     return () => guard.invalidate(ticket)
-  }, [lang, places, session?.user.id])
+  }, [lang, places, session?.user.id, coords.lat, coords.lon])
 
   const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
     setPlacesBusy(true); setPlacesError(false)
@@ -1044,7 +1044,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           return (
             <button key={c.name}
               onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
-              className={city === c.name ? 'city-btn active' : 'city-btn'}>
+              className={placeKey(coords) === placeKey(c) ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
           )
