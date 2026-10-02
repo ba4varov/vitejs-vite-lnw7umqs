@@ -1220,8 +1220,6 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
           </section>
 
-          <Chart hourly={hourly} darkMode={darkMode} t={t} />
-
           <section className="card forecast-section">
             <h3>{t.days14}</h3>
             <div className="daily-grid">
@@ -1243,6 +1241,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               ))}
             </div>
           </section>
+
+          <Chart hourly={hourly} darkMode={darkMode} t={t} />
 
           <section className="card map-section">
             <h3>🌍 {t.interactiveMap}</h3>
