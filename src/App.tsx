@@ -11,6 +11,7 @@ import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLoca
 import { placeKey } from './places-core.js'
 import { createPlacesSessionGuard } from './places-session-guard.js'
 import { localizePlace } from './place-localization'
+import { localizeAccountPlaces } from './account-place-localization.js'
 import { createLocalizationGuard } from './place-localization-core.js'
 import { localizeCurrentLocation, locationFromReverseGeocode, reverseGeocodeLocation } from './current-location-localization.js'
 
@@ -421,7 +422,12 @@ const WeatherApp = () => {
   const placesGuardRef = useRef(createPlacesSessionGuard())
   const localizationGuardRef = useRef(createLocalizationGuard())
   const currentLocalizationGuardRef = useRef(createLocalizationGuard())
+  const langRef = useRef(lang)
   const t = translations[lang as keyof typeof translations]
+
+  useEffect(() => {
+    langRef.current = lang
+  }, [lang])
 
   const toggleLanguage = () => {
     const nextLanguage = lang === 'bg' ? 'en' : 'bg'
@@ -439,7 +445,6 @@ const WeatherApp = () => {
   useEffect(() => {
     const guard = localizationGuardRef.current
     const ticket = guard.begin()
-    setLocalizedPlaces(places)
     Promise.all(places.map(place => localizePlace(place, lang, { signal: ticket.controller.signal }).catch(() => place))).then(next => {
       if (!guard.isCurrent(ticket)) return
       setLocalizedPlaces(next)
@@ -485,8 +490,13 @@ const WeatherApp = () => {
     try {
       const snapshot = await fetchPlaces(active)
       if (!placesGuardRef.current.isCurrent(ticket)) return
-      setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId)
-      const preferred = snapshot.places.find(place => place.id === snapshot.defaultPlaceId)
+      const localized = await localizeAccountPlaces(snapshot.places, snapshot.defaultPlaceId, () => langRef.current,
+        (place, language) => localizePlace(place, language))
+      if (!placesGuardRef.current.isCurrent(ticket)) return
+      setPlaces(snapshot.places)
+      setLocalizedPlaces(localized.localizedPlaces)
+      setDefaultPlaceId(snapshot.defaultPlaceId)
+      const preferred = localized.preferred
       if (placesGuardRef.current.resolveDefault(ticket) && preferred) choosePlace(preferred, false)
       setOfferImport(localPlaces().length > 0)
     } catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
@@ -500,6 +510,7 @@ const WeatherApp = () => {
       setOfferImport(false); setDefaultPlaceId(null)
       // Clear the prior account immediately; never display it while the next request is pending.
       setPlaces([])
+      setLocalizedPlaces([])
     }
     if (active) loadAccountPlaces(active, ticket)
     else { try { setPlaces(localPlaces()) } catch { setPlaces([]) } }
