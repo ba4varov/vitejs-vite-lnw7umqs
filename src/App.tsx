@@ -353,7 +353,25 @@ const Chart = ({ hourly, darkMode, t }: any) => {
     { key: 'temp', label: t.temp, unit: '°C' }, { key: 'rain', label: t.rain, unit: t.mm },
     { key: 'wind', label: t.windChart, unit: t.windUnit }, { key: 'pressure', label: t.pressureChart, unit: t.hpa }
   ]
-  return <section className="card charts-section" aria-labelledby="charts-title"><h3 id="charts-title">{t.chart}</h3><div className="charts-grid">{chartsData.map(chart => <SingleChart key={chart.key} hourly={hourly} darkMode={darkMode} type={chart.key} label={chart.label} unit={chart.unit} />)}</div></section>
+  const [selectedChart, setSelectedChart] = useState<ChartType>('temp')
+  const [mobileCharts, setMobileCharts] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 760px)')
+    const updateLayout = () => setMobileCharts(query.matches)
+    query.addEventListener('change', updateLayout)
+    return () => query.removeEventListener('change', updateLayout)
+  }, [])
+
+  const visibleCharts = mobileCharts ? chartsData.filter(chart => chart.key === selectedChart) : chartsData
+
+  return <section className="card charts-section" aria-labelledby="charts-title">
+    <h3 id="charts-title">{t.chart}</h3>
+    {mobileCharts && <div className="chart-selector" role="tablist" aria-label={t.chart}>
+      {chartsData.map(chart => <button key={chart.key} type="button" role="tab" aria-selected={selectedChart === chart.key} className={selectedChart === chart.key ? 'active' : ''} onClick={() => setSelectedChart(chart.key as ChartType)}>{chart.label}</button>)}
+    </div>}
+    <div className="charts-grid">{visibleCharts.map(chart => <SingleChart key={chart.key} hourly={hourly} darkMode={darkMode} type={chart.key} label={chart.label} unit={chart.unit} />)}</div>
+  </section>
 }
 
 const WeatherApp = () => {
