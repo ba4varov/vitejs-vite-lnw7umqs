@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { localizeAccountPlaces } from './account-place-localization.js'
+import { findLocalizedEquivalent, localizeAccountPlaces } from './account-place-localization.js'
 
 test('English UI login never applies a Bulgarian stored default place as its display label', async () => {
   const stored = [{
@@ -45,4 +45,11 @@ test('account localization retries when the UI language changes in flight', asyn
 
   assert.deepEqual(requestedLanguages, ['en', 'bg'])
   assert.equal(result.preferred.name, 'Варна')
+})
+
+test('finds a localized preferred copy by coordinates when persistent ids are unavailable', () => {
+  const stored = { name: 'Варна', lat: 43.2141, lon: 27.9147 }
+  const localized = { name: 'Varna', lat: 43.2141, lon: 27.9147 }
+
+  assert.equal(findLocalizedEquivalent([localized], stored), localized)
 })
