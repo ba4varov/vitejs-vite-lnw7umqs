@@ -12,6 +12,7 @@ import { placeKey } from './places-core.js'
 import { createPlacesSessionGuard } from './places-session-guard.js'
 import { localizePlace } from './place-localization'
 import { createLocalizationGuard } from './place-localization-core.js'
+import { localizeCurrentLocation, locationFromReverseGeocode, reverseGeocodeLocation } from './current-location-localization.js'
 
 const translations = {
   bg: {
@@ -380,6 +381,7 @@ const WeatherApp = () => {
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
+  const [locationSource, setLocationSource] = useState<'default' | 'quick' | 'search' | 'place' | 'geolocation'>('default')
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
@@ -412,16 +414,14 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const searchRequestIdRef = useRef(0)
   const weatherRequestIdRef = useRef(0)
-  const coordsRef = useRef(coords)
   const locationChoiceRef = useRef(false)
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
   const placesGuardRef = useRef(createPlacesSessionGuard())
   const localizationGuardRef = useRef(createLocalizationGuard())
+  const currentLocalizationGuardRef = useRef(createLocalizationGuard())
   const t = translations[lang as keyof typeof translations]
-
-  useEffect(() => { coordsRef.current = coords }, [coords])
 
   const toggleLanguage = () => {
     const nextLanguage = lang === 'bg' ? 'en' : 'bg'
@@ -432,6 +432,7 @@ const WeatherApp = () => {
   const choosePlace = (place: Place, manual = true) => {
     if (manual) placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
+    setLocationSource('place')
     setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
   }
 
@@ -442,11 +443,6 @@ const WeatherApp = () => {
     Promise.all(places.map(place => localizePlace(place, lang, { signal: ticket.controller.signal }).catch(() => place))).then(next => {
       if (!guard.isCurrent(ticket)) return
       setLocalizedPlaces(next)
-      const selected = next.find(place => placeKey(place) === placeKey(coordsRef.current))
-      if (selected) {
-        setCity(selected.name)
-        setPlaceDetails({ geonameId: selected.geonameId || undefined, countryCode: selected.countryCode || undefined, admin1Id: selected.admin1Id || undefined, region: selected.region || undefined, country: selected.country || undefined })
-      }
       const originalsWithIdentity = places.map((original, index) => ({
         ...original,
         geonameId: next[index].geonameId,
@@ -463,6 +459,26 @@ const WeatherApp = () => {
     })
     return () => guard.invalidate(ticket)
   }, [lang, places, session?.user.id])
+
+  useEffect(() => {
+    if (locationSource === 'geolocation') return
+    const guard = currentLocalizationGuardRef.current
+    const ticket = guard.begin()
+    const current = { name: city, lat: coords.lat, lon: coords.lon, ...placeDetails }
+    void localizeCurrentLocation(current, lang, t.quickCities, localizePlace, { signal: ticket.controller.signal }).then(localized => {
+      if (!guard.isCurrent(ticket)) return
+      setCity(localized.name)
+      setPlaceDetails(details => ({
+        ...details,
+        geonameId: localized.geonameId ?? details.geonameId,
+        countryCode: localized.countryCode ?? details.countryCode,
+        admin1Id: localized.admin1Id ?? details.admin1Id,
+        region: localized.region ?? undefined,
+        country: localized.country ?? undefined
+      }))
+    }).catch(() => {})
+    return () => guard.invalidate(ticket)
+  }, [lang, coords.lat, coords.lon, placeDetails.geonameId, locationSource])
 
   const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
     setPlacesBusy(true); setPlacesError(false)
@@ -637,6 +653,7 @@ const WeatherApp = () => {
   const selectCity = (result: any) => {
     placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
+    setLocationSource('search')
     ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
     setCity(result.name)
@@ -892,49 +909,32 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     fetchWeather(coords.lat, coords.lon)
     const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [coords, city, lang])
+  }, [coords.lat, coords.lon])
 
   useEffect(() => {
     if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+      navigator.geolocation.getCurrentPosition((pos) => {
         if (locationChoiceRef.current) return
         const lat = pos.coords.latitude, lon = pos.coords.longitude
+        setLocationSource('geolocation')
+        setPlaceDetails({})
         setCoords({ lat, lon })
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${lang}&zoom=18`)
-          const data = await res.json()
-          if (locationChoiceRef.current) return
-          
-          const address = data.address;
-          const mainCity = address.city || address.town || address.village || address.county || t.myLocation;
-          setCity(mainCity);
-          setPlaceDetails({ region: address.state || address.county, country: address.country });
-
-          const exactDetails = [];
-          const street = address.road || address.pedestrian || address.street;
-          
-          if (street) {
-            exactDetails.push(street);
-          }
-          if (address.house_number) {
-            exactDetails.push(address.house_number);
-          }
-          
-          if (exactDetails.length === 0) {
-            const neighborhood = address.suburb || address.neighbourhood || address.city_district;
-            if (neighborhood) exactDetails.push(neighborhood);
-          }
-          
-          if (exactDetails.length > 0) {
-            setExactLocation(exactDetails.join(' '));
-          } else {
-            setExactLocation(null);
-          }
-
-        } catch { if (!locationChoiceRef.current) setCity(t.myLocation) }
       }, () => {}, { timeout: 5000 })
     }
   }, [])
+
+  useEffect(() => {
+    if (locationSource !== 'geolocation') return
+    const controller = new AbortController()
+    void reverseGeocodeLocation(coords, lang, { signal: controller.signal }).then(data => {
+      if (controller.signal.aborted || locationChoiceRef.current) return
+      const localized = locationFromReverseGeocode(data, t.myLocation)
+      setCity(localized.name)
+      setPlaceDetails({ region: localized.region, country: localized.country })
+      setExactLocation(localized.exactLocation)
+    }).catch(() => { if (!controller.signal.aborted && !locationChoiceRef.current) setCity(t.myLocation) })
+    return () => controller.abort()
+  }, [lang, coords.lat, coords.lon, locationSource])
 
   const activeAlerts = [];
   if (weather) {
@@ -1043,7 +1043,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {t.quickCities.map((c: any) => {
           return (
             <button key={c.name}
-              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
