@@ -851,7 +851,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           visibility: count > 0 ? Math.round((sumVis / count) / 1000) : 0,
           dewPoint: count > 0 ? Math.round(sumDew / count) : 0,
           cloudCover: count > 0 ? Math.round(sumCloud / count) : 0,
-          seaTemp: seaCount > 0 ? Math.round(sumSea / seaCount) : null
+          seaTemp: seaCount > 0 ? Math.round(sumSea / seaCount) : null,
+          description: code.desc
         })
       }
       setForecast(days)
@@ -1052,7 +1053,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       )}
 
       {!loading && !error && weather && (
-        <div>
+        <main className="forecast-dashboard">
           {activeAlerts.length > 0 && (
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
@@ -1184,7 +1185,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             <p className="chat-disclaimer">{lang === 'bg' ? 'Съветите са информативни. При опасно време следвай указанията на местните власти.' : 'Advice is informational. During severe weather, follow local authority guidance.'}</p>
           </section>
 
-          <div className="card">
+          <section className="card hourly-section">
             <h3>{t.hours24}</h3>
             <div className="hourly-row">
               {hourly.map((h, i) => (
@@ -1199,11 +1200,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
           <Chart hourly={hourly} darkMode={darkMode} t={t} />
 
-          <div className="card">
+          <section className="card forecast-section">
             <h3>{t.days14}</h3>
             <div className="daily-grid">
               {forecast.map((day, i) => (
@@ -1213,6 +1214,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                   <p className="day-name">{day.dayName}</p>
                   <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
                   <p className="day-icon"><AnimatedIcon icon={day.icon} size="2rem" /></p>
+                  <p className="day-condition">{day.description}</p>
                   <p className="day-temp">
                     <span className="max">{day.max}°</span><br />
                     <span className="min">{day.min}°</span>
@@ -1222,9 +1224,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="card">
+          <section className="card map-section">
             <h3>🌍 {t.interactiveMap}</h3>
             <div style={{ borderRadius: '12px', overflow: 'hidden', marginTop: '16px', background: darkMode ? '#1e293b' : '#f1f5f9' }}>
               <iframe
@@ -1236,10 +1238,10 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 style={{ display: 'block' }}
               ></iframe>
             </div>
-          </div>
+          </section>
 
           {weather.aqi !== null && weather.aqi !== undefined && (
-            <div className="card">
+            <section className="card aqi-section">
               <h3>🍃 {t.airQuality}</h3>
               <div className="stats-grid" style={{ marginBottom: '16px' }}>
                 <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
@@ -1249,9 +1251,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
                 <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} />
               </div>
-            </div>
+            </section>
           )}
-        </div>
+        </main>
       )}
 
       <ProjectShowcase lang={lang} />
