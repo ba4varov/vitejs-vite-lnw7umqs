@@ -1,3 +1,4 @@
+import { navigate } from './admin-navigation'
 import { test, expect } from '@playwright/test'
 const user = { id: '00000000-0000-0000-0000-000000000001', email: 'admin@example.invalid' }
 async function setup(page: any, status = 200, signedIn = true) {
@@ -21,12 +22,12 @@ async function setup(page: any, status = 200, signedIn = true) {
 test('admin direct open, refresh, users search pagination, profile, logout',async({page})=>{
   await setup(page); await page.goto('/admin'); await expect(page.locator('.admin-stats strong').filter({hasText:/^21$/})).toBeVisible()
   await page.reload(); await expect(page.locator('.admin-stats strong').filter({hasText:/^21$/})).toBeVisible()
-  await page.getByRole('button',{name:'Потребители',exact:true}).click()
+  await navigate(page,'Потребители')
   await expect(page.getByRole('button',{name:'first@example.invalid'})).toBeVisible()
   await page.getByRole('button',{name:'Следваща'}).click(); await expect(page.getByRole('button',{name:'second@example.invalid'})).toBeVisible()
   await page.getByRole('searchbox').fill('first'); await expect(page.getByText('Страница 1',{exact:false})).toBeVisible()
   await page.getByRole('button',{name:'first@example.invalid'}).click(); await expect(page.getByRole('heading',{name:'Основна информация'})).toBeVisible()
-  await page.getByRole('button',{name:'Администраторски профил'}).click(); await expect(page.getByText('Имейл: admin@example.invalid')).toBeVisible()
+  await navigate(page,'Администраторски профил'); await expect(page.getByText('Имейл: admin@example.invalid')).toBeVisible()
   await page.getByRole('button',{name:'Изход',exact:true}).click(); await expect(page.getByText('Влез с имейл и парола')).toBeVisible()
   await page.reload(); await expect(page.getByText('Влез с имейл и парола')).toBeVisible()
 })

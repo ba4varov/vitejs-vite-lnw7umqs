@@ -1,3 +1,4 @@
+import { navigate } from './admin-navigation'
 import { test, expect } from '@playwright/test'
 const id='00000000-0000-0000-0000-000000000001'
 async function setup(page:any, status=200, empty=false, missing=true) {
@@ -21,27 +22,27 @@ for(const width of [320,390,768,1440]) for(const lang of ['bg','en']) for(const 
  await expect(page.getByText('Supabase: Свързан',{exact:true})).toBeVisible()
  if(lang==='en')await page.getByRole('button',{name:'EN',exact:true}).click()
  if(theme==='dark')await page.getByRole('button',{name:lang==='bg'?'Смени темата':'Toggle theme'}).click()
- await page.getByRole('button',{name:lang==='bg'?'Статистики':'Statistics',exact:true}).click()
+ await navigate(page,lang==='bg'?'Статистики':'Statistics')
  await expect(page.locator('.admin-metric-chart')).toHaveCount(4)
  const bar=page.locator('.admin-metric-chart').first().getByRole('button').first();await bar.focus();await page.keyboard.press('Enter');await expect(bar).toHaveAttribute('aria-pressed','true')
  await page.getByLabel(lang==='bg'?'Период':'Period',{exact:true}).selectOption('12m')
  await expect(page.locator('.admin-metric-chart').first().getByRole('button')).toHaveCount(12)
- await page.screenshot({path:`docs/admin-stage3-screenshots/statistics-${width}-${lang}-${theme}.png`,fullPage:true})
+ await page.screenshot({path:`work/stage5-regressions/admin-stage3-screenshots/statistics-${width}-${lang}-${theme}.png`,fullPage:true})
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
- await page.getByRole('button',{name:lang==='bg'?'Журнал на действията':'Action log',exact:true}).click()
- await expect(page.locator('tbody tr')).toHaveCount(1)
+ await navigate(page,lang==='bg'?'Журнал на действията':'Action log')
+ await expect(page.locator('.admin-audit-entry')).toHaveCount(1)
  await page.getByLabel(lang==='bg'?'Действие':'Action',{exact:true}).selectOption('user_favorites_view')
- await expect(page.locator('tbody')).toContainText(lang==='bg'?'Преглед на любими градове':'View favorite cities')
- await page.screenshot({path:`docs/admin-stage3-screenshots/audit-${width}-${lang}-${theme}.png`,fullPage:true})
+ await expect(page.locator('.admin-audit-table')).toContainText(lang==='bg'?'Преглед на любими градове':'View favorite cities')
+ await page.screenshot({path:`work/stage5-regressions/admin-stage3-screenshots/audit-${width}-${lang}-${theme}.png`,fullPage:true})
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
  const count=calls.length;await page.clock.install();await page.clock.fastForward(120000);expect(calls.length).toBe(count)
 })
 for(const status of [401,403,503])test(`stage3 failure ${status}`,async({page})=>{
- await setup(page,status);await page.goto('/admin');await page.getByRole('button',{name:'Статистики',exact:true}).click()
+ await setup(page,status);await page.goto('/admin');await navigate(page,'Статистики')
  await expect(page.getByText(status===401?'Сесията е невалидна или е изтекла. Влез отново.':status===403?'Нямаш администраторски права.':'Липсва конфигурация за етап 3.',{exact:false})).toBeVisible()
  await expect(page.locator('.admin-metric-chart')).toHaveCount(0)
- if(status===503){await page.getByRole('button',{name:'Начално табло',exact:true}).click();await expect(page.getByText('Supabase: Свързан',{exact:true})).toBeVisible()}
+ if(status===503){await navigate(page,'Начално табло');await expect(page.getByText('Supabase: Свързан',{exact:true})).toBeVisible()}
 })
-test('empty locations and audit',async({page})=>{await setup(page,200,true);await page.goto('/admin');await page.getByRole('button',{name:'Статистики',exact:true}).click();await expect(page.getByText('Няма данни.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Журнал на действията',exact:true}).click();await expect(page.getByText('Няма журнални записи за този филтър.')).toBeVisible()})
+test('empty locations and audit',async({page})=>{await setup(page,200,true);await page.goto('/admin');await navigate(page,'Статистики');await expect(page.getByText('Няма данни.',{exact:true})).toBeVisible();await navigate(page,'Журнал на действията');await expect(page.getByText('Няма журнални записи за този филтър.')).toBeVisible()})
 
-test('generic server error has retry and no invented statistics',async({page})=>{await setup(page,503,false,false);await page.goto('/admin');await page.getByRole('button',{name:'Статистики',exact:true}).click();await expect(page.getByText('Данните не могат да бъдат заредени.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Опитай отново'})).toBeVisible();await expect(page.locator('.admin-metric-chart')).toHaveCount(0)})
+test('generic server error has retry and no invented statistics',async({page})=>{await setup(page,503,false,false);await page.goto('/admin');await navigate(page,'Статистики');await expect(page.getByText('Данните не могат да бъдат заредени.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Опитай отново'})).toBeVisible();await expect(page.locator('.admin-metric-chart')).toHaveCount(0)})

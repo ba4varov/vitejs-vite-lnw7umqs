@@ -14,7 +14,7 @@ export function AdminRegistrationChart({ registrations, title, details, scrollHi
       <div className="admin-chart">
         {registrations.map(day => <button className="admin-chart-day" key={day.date}
           title={`${day.date}: ${day.count}`} aria-label={`${day.date}: ${day.count}`}
-          aria-pressed={selected?.date === day.date} onClick={() => setSelected(day)}>
+          aria-pressed={selected?.date === day.date} onClick={() => setSelected(day)} onFocus={() => setSelected(day)} onMouseEnter={() => setSelected(day)}>
           <span className="admin-chart-bar-area"><span className="admin-chart-bar" style={{ height: `${day.count / maximum * 160}px` }} /></span>
           <span className="admin-chart-date">{day.date.slice(8)}.{day.date.slice(5, 7)}</span>
         </button>)}
