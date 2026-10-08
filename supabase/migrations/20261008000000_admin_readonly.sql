@@ -26,9 +26,9 @@ begin
     'free', (select count(*) from public.subscriptions where plan = 'free'),
     'pro', (select count(*) from public.subscriptions where plan = 'pro'),
     'registrations', (select jsonb_agg(jsonb_build_object('date', d.day::date, 'count',
-      (select count(*) from auth.users u where u.created_at >= d.day and u.created_at < d.day + interval '1 day')) order by d.day)
-      from generate_series(date_trunc('day', now() at time zone 'UTC') at time zone 'UTC' - interval '29 days',
-        date_trunc('day', now() at time zone 'UTC') at time zone 'UTC', interval '1 day') d(day))
+      (select count(*) from auth.users u where u.created_at >= (d.day at time zone 'UTC') and u.created_at < ((d.day + interval '1 day') at time zone 'UTC'))) order by d.day)
+      from generate_series(date_trunc('day', now() at time zone 'UTC') - interval '29 days',
+        date_trunc('day', now() at time zone 'UTC'), interval '1 day') d(day))
   );
 end; $$;
 

@@ -1,0 +1,69 @@
+// Runs only disposable, network-isolated Docker containers. Never accepts a DB URL.
+import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { randomBytes, createHmac } from 'node:crypto'
+import assert from 'node:assert/strict'
+import { setTimeout as delay } from 'node:timers/promises'
+const root = new URL('../', import.meta.url)
+const prefix = `meteo-admin-test-${process.pid}`
+const pg = `${prefix}-pg`, rest = `${prefix}-rest`
+const environment = { ...process.env }
+for (const key of ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH']) delete environment[key]
+function docker(args, input, allowFailure = false) {
+  const result = spawnSync('docker', ['--host=unix:///var/run/docker.sock', ...args], { env: environment, input, encoding:'utf8',timeout:60000 })
+  if (!allowFailure && (result.error || result.status !== 0)) throw new Error(`Docker ${args[0]} failed: ${result.error?.message || result.stderr}`)
+  return result
+}
+const sql = text => docker(['exec','-i',pg,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],text).stdout
+const secret = randomBytes(48).toString('hex') // Ephemeral test-only secret, never printed or persisted.
+function jwt(sub, expires = Math.floor(Date.now()/1000)+600, signingKey = secret) {
+  const header = Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({role:'authenticated',sub,exp:expires})).toString('base64url')
+  const data = `${header}.${payload}`
+  return `${data}.${createHmac('sha256',signingKey).update(data).digest('base64url')}`
+}
+function request(path, token, body = '{}') {
+  const message = `POST ${path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Type: application/json\r\n${token ? `Authorization: Bearer ${token}\r\n` : ''}Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`
+  const raw = docker(['exec','-i',pg,'bash','-c','exec 3<>/dev/tcp/127.0.0.1/3000; cat >&3; cat <&3'],message).stdout
+  const split = raw.indexOf('\r\n\r\n')
+  assert.ok(split>=0,'HTTP response headers missing')
+  return {status:Number(raw.split(' ')[1]),body:JSON.parse(raw.slice(split+4))}
+}
+try {
+  docker(['run','-d','--name',pg,'--network','none','--tmpfs','/var/lib/postgresql/data','-e','POSTGRES_HOST_AUTH_METHOD=trust','postgres:17-bookworm'])
+  let ready=false
+  for(let i=0;i<60;i++) { if(docker(['exec',pg,'pg_isready','-U','postgres'],undefined,true).status===0){ready=true;break} await delay(500) }
+  assert.ok(ready,'PostgreSQL startup timed out')
+  console.log(sql(readFileSync(new URL('tests/sql/admin-bootstrap.sql',root),'utf8')))
+  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql']) {
+    sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
+  }
+  console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
+  // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
+  docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
+  ready=false
+  for(let i=0;i<60;i++) { if(docker(['exec',pg,'bash','-c','exec 3<>/dev/tcp/127.0.0.1/3000'],undefined,true).status===0){ready=true;break} await delay(500) }
+  assert.ok(ready,'PostgREST startup timed out')
+  const admin='00000000-0000-0000-0000-000000000001', ordinary='00000000-0000-0000-0000-000000000002'
+  for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users']) {
+    assert.equal(request(endpoint,jwt(ordinary)).status,403,'Ordinary direct RPC must fail')
+    assert.equal(request(endpoint,null).status,401,'Anonymous direct RPC must fail')
+    assert.equal(request(endpoint,'invalid-token').status,401,'Malformed JWT must fail')
+    assert.equal(request(endpoint,jwt(admin,Math.floor(Date.now()/1000)-120)).status,401,'Expired admin JWT must fail')
+    assert.equal(request(endpoint,jwt(admin,undefined,'wrong-test-key')).status,401,'Forged admin JWT must fail')
+    assert.equal(request(endpoint,jwt(undefined)).status,403,'Valid signed JWT without subject must fail')
+  }
+  console.log('PASS: real PostgREST direct RPC returns 403 for ordinary users; 401 for missing, malformed, expired and forged JWTs')
+  const stats=request('/rpc/admin_statistics',jwt(admin)); assert.equal(stats.status,200)
+  assert.deepEqual(['total','last7','last30','favorites','free','pro'].map(key=>stats.body[key]),[3,1,2,1,2,1])
+  assert.equal(stats.body.registrations.length,30)
+  const users=request('/rpc/admin_users',jwt(admin),JSON.stringify({search_email:'ORDINARY',page_number:1})); assert.equal(users.status,200); assert.equal(users.body.total,1)
+  console.log('PASS: explicit administrator receives real database statistics and filtered users via HTTP RPC')
+  sql(`delete from public.admin_memberships where user_id='${admin}';`)
+  assert.equal(request('/rpc/admin_statistics',jwt(admin)).status,403)
+  console.log('PASS: revoked membership rejects previously valid administrator JWT')
+  console.log('LIMIT: minimal Auth schema + real PostgreSQL/PostgREST; full Supabase GoTrue and deployed Vercel API are not exercised.')
+} finally {
+  docker(['rm','-f',rest],undefined,true)
+  docker(['rm','-f',pg],undefined,true)
+}
