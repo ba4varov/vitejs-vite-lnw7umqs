@@ -19,8 +19,17 @@ await page.route('**/*',async route=>{const url=route.request().url();if(url.sta
 await page.addInitScript(({count,lang})=>{localStorage.setItem('meteoPulseLanguage',lang);if(!localStorage.getItem('meteoPulsePlacesV1'))localStorage.setItem('meteoPulsePlacesV1',JSON.stringify(Array.from({length:count},(_,i)=>({name:i===0?'Варна':i===1?'Sofia':'A very long city name for layout '+i,lat:i===0?43.2141:42+i/10,lon:i===0?27.9147:23+i/10,region:'A long region name',country:'Bulgaria'}))));},{count,lang});
 await page.goto(baseUrl);await page.locator('.hour-box').first().waitFor();await page.waitForFunction(n=>document.querySelectorAll('.place-chip').length===n,count);if(!sea){await page.locator('.city-btn').nth(1).click();await page.locator('.hour-box').first().waitFor();}if(dark)await page.locator('.header-btns > .icon-btn').click();
 const check=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,hours:document.querySelectorAll('.hour-box').length,days:document.querySelectorAll('.day-box').length,places:document.querySelectorAll('.place-chip').length,heights:[...document.querySelectorAll('.hour-box')].map(e=>e.getBoundingClientRect().height),time:document.querySelector('.hour-time').textContent,sea:document.querySelectorAll('.hour-sea').length}));
-if(check.overflow||check.hours!==24||check.days!==14||check.places!==count||new Set(check.heights).size!==1||check.time!=='23:00'||check.sea!==(sea?24:0))throw new Error(JSON.stringify({width,lang,dark,count,sea,check}));
-if(lang==='bg'&&!dark&&count===5&&sea&&(width===1440||width===390))await page.screenshot({path:`${output}/after-${width}.png`,fullPage:true});
+if(check.overflow||check.hours!==24||check.days!==14||check.places!==count||new Set(check.heights).size!==1||check.time!=='23:00'||check.sea!==0)throw new Error(JSON.stringify({width,lang,dark,count,sea,check}));
+if(count===5 && sea){
+  const boxes=await page.locator('.hourly-section, .forecast-section').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}}));
+  const left=Math.min(...boxes.map(b=>b.x)), top=Math.min(...boxes.map(b=>b.y));
+  await page.screenshot({fullPage:true,path:`${output}/forecast-${width}-${lang}-${dark?'dark':'light'}.png`,clip:{x:left,y:top,width:Math.max(...boxes.map(b=>b.x+b.width))-left,height:Math.max(...boxes.map(b=>b.y+b.height))-top}});
+}
+await page.locator('.hour-box').first().click();await page.locator('.popup-card').waitFor();
+await page.locator('.popup-card .chart-tab').last().click();
+const details=await page.locator('.popup-card').innerText();
+if(!details.includes('35%') || !details.includes('0.2') || (sea&&!details.includes('20°C')))throw new Error('Hourly details lost data');
+await page.locator('.popup-card .icon-btn').click();
 await page.reload();await page.locator('.hour-box').first().waitFor();await page.waitForFunction(n=>document.querySelectorAll('.place-chip').length===n,count);if(await page.locator('.place-chip').count()!==count)throw new Error('Reload lost favorites');
 await page.locator('.forecast-scroll-controls button').last().click();await page.waitForFunction(()=>document.querySelector('.hourly-row').scrollLeft>0);await page.locator('.hourly-row').evaluate(e=>e.scrollLeft=e.scrollWidth);if(await page.locator('.hourly-row').evaluate(e=>e.scrollLeft)<=0)throw new Error('Scrolling failed');
 results.push({width,lang,dark,count,sea,status:'passed'});fs.writeFileSync(output+'/progress.json',JSON.stringify({checked:results.length,last:results.at(-1)}));if(results.length%20===0)console.log('Checked '+results.length);await ctx.close();}

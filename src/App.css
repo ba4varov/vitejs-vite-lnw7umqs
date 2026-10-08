@@ -712,12 +712,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .default-place { flex: 0 0 36px; }
 .my-places.my-places-empty, .weather-app.dark .my-places.my-places-empty { padding: 0; border: 0; box-shadow: none; background: transparent; margin-bottom: 18px; }
 .places-empty { margin: 0; text-align: center; color: var(--weather-muted); }
-.hour-box { flex: 0 0 164px; min-width: 0; font: inherit; color: var(--weather-ink); cursor: pointer; gap: 6px; }
+.hour-box { flex: 0 0 148px; min-width: 0; font: inherit; color: var(--weather-ink); cursor: pointer; gap: 8px; padding: 16px 12px; }
 .hour-condition { min-height: 2.5em; font-size: .8rem; line-height: 1.25; color: var(--weather-muted); }
-.hour-metrics { width: 100%; margin: 0; font-size: .75rem; }
-.hour-metrics div { display: flex; justify-content: space-between; gap: 6px; padding-block: 4px; border-bottom: 1px solid var(--weather-line); }
-.hour-metrics dt { text-align: left; overflow-wrap: anywhere; }
-.hour-metrics dd { margin: 0; white-space: nowrap; font-weight: 600; }
 .hour-box:focus-visible, .hourly-row:focus-visible { outline: 2px solid var(--weather-blue); outline-offset: -2px; }
 .hourly-row, .daily-grid { overscroll-behavior-x: contain; }
 @media (max-width: 760px) { .hour-box { min-width: 0; } .main-info-left h2 { overflow-wrap: anywhere; } }
@@ -725,3 +721,5 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .forecast-heading { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
 .forecast-scroll-controls { display: flex; gap: 4px; flex: 0 0 auto; }
 .forecast-scroll-controls button { width: 32px; height: 32px; padding: 0; border: 1px solid var(--weather-line); border-radius: 8px; background: var(--weather-surface-soft); color: var(--weather-ink); cursor: pointer; }
+
+.hour-box[aria-pressed="true"] { border-color: var(--weather-blue); box-shadow: inset 0 0 0 1px var(--weather-blue); }

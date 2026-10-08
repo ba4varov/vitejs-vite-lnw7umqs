@@ -1229,19 +1229,13 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               {hourly.map((h) => (
                 <button type="button" key={h.time} className="hour-box"
                   onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
-                  style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
+                  aria-pressed={selectedHour?.time === h.time}>
                   <p className="hour-time">{h.hour}</p>
-                  <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
-                  <p className="hour-temp">{h.temp == null ? '—' : `${h.temp}°C`}</p>
+                  <p className="hour-icon"><AnimatedIcon icon={h.icon} size="2rem" /></p>
                   <p className="hour-condition">{h.description}</p>
-                  <dl className="hour-metrics">
-                    {h.feelsLike != null && <div><dt>{t.feelsLike}</dt><dd>{h.feelsLike}°C</dd></div>}
-                    {h.humidity != null && <div><dt>{t.humidity}</dt><dd>{h.humidity}%</dd></div>}
-                    {h.rainProbability != null && <div><dt>{lang === 'bg' ? 'Вероятност за валежи' : 'Rain chance'}</dt><dd>{h.rainProbability}%</dd></div>}
-                    {h.rain != null && <div><dt>{lang === 'bg' ? 'Валежи' : 'Precipitation'}</dt><dd>{h.rain} {t.mm}</dd></div>}
-                  </dl>
+                  <p className="hour-temp">{h.temp == null ? '—' : `${h.temp}°C`}</p>
                   {h.wind != null && <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>}
-                  {h.seaTemp != null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
+
                 </button>
               ))}
             </div>
@@ -1362,7 +1356,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp == null ? '—' : `${selectedHour.temp}°C`}</p></div>
                 <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike == null ? '—' : `${selectedHour.feelsLike}°C`}</p></div>
                 <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity == null ? '—' : `${selectedHour.humidity}%`}</p></div>
-                <div className="stat-box"><p>☁️</p><p className="label">Време</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{lang === 'bg' ? 'Време' : 'Weather'}</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
               </>}
               {detailTab === 'atmosphere' && <>
                 <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedHour.pressure} {t.hpa}</p></div>
@@ -1373,7 +1367,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               {detailTab === 'water' && <>
                 <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind == null ? '—' : `${selectedHour.wind} ${t.windUnit}`}</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain == null ? '—' : `${selectedHour.rain} ${t.mm}`}</p></div>
-                {selectedHour.seaTemp !== null ? (
+                {selectedHour.rainProbability != null && <div className="stat-box"><p>☔</p><p className="label">{lang === 'bg' ? 'Вероятност за валежи' : 'Rain chance'}</p><p className="value">{selectedHour.rainProbability}%</p></div>}
+                {selectedHour.aqi != null && <div className="stat-box"><p>🍃</p><p className="label">AQI</p><p className="value">{selectedHour.aqi}</p></div>}
+                {selectedHour.seaTemp != null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
                 ) : (
                   <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
