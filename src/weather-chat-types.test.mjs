@@ -3,7 +3,7 @@ import test from 'node:test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import { ALLOWED_INTENTS, ALLOWED_TIME_SCOPES, QUICK_ACTIONS } from '../api/weather-chat-core.js'
+import { ALLOWED_INTENTS, ALLOWED_TIME_SCOPES, QUICK_ACTIONS } from '../server/weather-chat-core.js'
 const root = fileURLToPath(new URL('../', import.meta.url))
 function diagnostics(source) {
   const config = ts.readConfigFile(path.join(root, 'tsconfig.api.json'), ts.sys.readFile)
@@ -19,7 +19,7 @@ function diagnostics(source) {
   const program = ts.createProgram([filename], parsed.options, host)
   return ts.getPreEmitDiagnostics(program)
 }
-const imports = `import { ALLOWED_INTENTS, ALLOWED_TIME_SCOPES, QUICK_ACTIONS, findDailyForecast, deterministicWeatherAnswer, relativeForecastDate, parseUnderstanding, type WeatherSummary } from './weather-chat-core.js';\n`
+const imports = `import { ALLOWED_INTENTS, ALLOWED_TIME_SCOPES, QUICK_ACTIONS, findDailyForecast, deterministicWeatherAnswer, relativeForecastDate, parseUnderstanding, type WeatherSummary } from '../server/weather-chat-core.js';\n`
 test('serverless type contracts retain forecast fields, archive omissions and Gemini without isQuick', () => {
   const errors = diagnostics(imports + `
     const summary: WeatherSummary = { location: 'Sofia', targetDay: null, historical: true };

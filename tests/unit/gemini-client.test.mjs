@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { createGeminiClient, GeminiServiceError } from './gemini-client.js'
+import { createGeminiClient, GeminiServiceError } from '../../server/gemini-client.js'
 
 const key = 'super-secret-test-key'
 const model = (name, methods = ['generateContent'], description = 'Text model') => ({ name: `models/${name}`, supportedGenerationMethods: methods, description })
@@ -64,8 +64,8 @@ test('returns a controlled error when discovery has no compatible model', async 
 })
 
 test('Gemini remains optional and weather advice is deterministic', async () => {
-  const [chat, advice] = await Promise.all([readFile(new URL('./weather-chat.ts', import.meta.url), 'utf8'), readFile(new URL('./weather-advice.ts', import.meta.url), 'utf8')])
-  assert.match(chat, /import \{ geminiClient \} from '\.\/gemini-client\.js'/)
+  const [chat, advice] = await Promise.all([readFile(new URL('../../api/weather-chat.ts', import.meta.url), 'utf8'), readFile(new URL('../../api/weather-advice.ts', import.meta.url), 'utf8')])
+  assert.match(chat, /import \{ geminiClient \} from '\.\.\/server\/gemini-client\.js'/)
   assert.doesNotMatch(advice, /gemini|generativelanguage/i)
   assert.match(chat, /parseDeterministicQuestion\(input\.message.*\)[\s\S]+if \(!understood\) understood = await optionalGeminiUnderstanding/)
   assert.doesNotMatch(`${chat}\n${advice}`, /models\/gemini-[^'"`]+:generateContent/)

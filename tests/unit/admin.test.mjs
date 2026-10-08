@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { handleAdmin } from './admin-core.js'
+import { handleAdmin } from '../../server/admin-core.js'
 const env = { SUPABASE_URL: 'https://test.invalid', SUPABASE_ANON_KEY: 'anon' }
 async function run({ token = 'Bearer valid', authorized = true, valid = true, query = {}, method = 'GET', failure = 0, membershipFailure = 0, temperature = 17, openMeteoFailure = false } = {}) {
   const calls = []

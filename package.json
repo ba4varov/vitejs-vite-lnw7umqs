@@ -8,9 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test api/*.test.mjs src/*.test.mjs",
+    "test": "node --test tests/unit/*.test.mjs src/*.test.mjs",
     "test:admin:browser": "playwright test",
-    "test:admin:sql": "node scripts/test-admin-sql.mjs"
+    "test:admin:sql": "node scripts/test-admin-sql.mjs",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.117.3",

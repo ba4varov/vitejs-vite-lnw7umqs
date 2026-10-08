@@ -8,6 +8,40 @@
 
 Извършени са само изолирани тестове. Не са проверени Production, реалният Supabase GoTrue или публикуваният Vercel endpoint. Няма ръчен Production deployment, сливане на PR или Production SQL. Push към същия PR задейства автоматичния Vercel Preview; действителният статус се проверява отделно от локалния build.
 
+## Окончателна корекция на Vercel Hobby лимита
+
+Собственикът предостави точния отказ: **`No more than 12 Serverless Functions can be added to a Deployment on the Hobby plan.`** Това установява deployment блокера след „Build Completed“/„Deploying outputs“ и заменя предишната неизвестна причина. Шестте TypeScript diagnostics бяха отделен вече поправен кодов проблем.
+
+Преди тази корекция `api/` съдържаше 17 файла: пет действителни TypeScript endpoints, пет JavaScript помощни модула, пет `.test.mjs` файла и две декларации. Директорията за автоматично откриване на Functions вече съдържа **само петте endpoints**:
+
+| Endpoint | Bundled вътрешни модули |
+| --- | --- |
+| `api/admin.ts` | `server/admin-core.js`, `server/profile-core.js` |
+| `api/admin-management.ts` | `server/admin-management-core.js`, `server/profile-core.js` |
+| `api/profile.ts` | `server/profile-core.js` |
+| `api/weather-advice.ts` | Няма отделен вътрешен модул |
+| `api/weather-chat.ts` | `server/weather-chat-core.js`, `server/gemini-client.js` |
+
+Всички пет помощни модула и двете `.d.ts` декларации са преместени заедно в `server/`. Старите API тестове са в `tests/unit/`; `npm test` изпълнява тях и съществуващите `src/*.test.mjs`. Обновени са endpoint imports, тестовите imports, прочитането на source/migration файлове и виртуалният TypeScript fixture. Публичните URL адреси са непроменени. Няма обединяване на endpoints, промяна на `vercel.json`, изключване на помощни модули от bundle или платен план. Помощните файлове остават достъпни за server-side dependency tracing.
+
+Проверено е локално с **официалния `@vercel/node` 23.0.0 builder** в отделна временна директория: генерирани са **5 Lambda обекта**, runtime `nodejs24.x`, с действителните handlers и всички нужни вътрешни модули в bundles. Няма `.test.mjs` в bundle или допълнителни helper endpoints. [Резултат от проверката](vercel-functions-stage4.json). Builder проверката използва вече инсталираните зависимости; не стартира remote build/deployment. Не се представя като live Vercel статус. Builder отпечатва неблокиращо съобщение при прочитане на lockfile metadata; и петте Lambda bundles се генерират успешно.
+
+Регресията `tests/unit/vercel-endpoints.test.mjs` проверява целия `api/` списък и точно петте разрешени файла, така че добавянето на помощен/тестов файл или поддиректория да откаже теста. `npm run typecheck` е изричен script за съществуващата `tsc -b` проверка. Бизнес логиката на преместените helper модули е непроменена; вътрешните им взаимни imports също са непроменени.
+
+| Проверка след преместването | Резултат |
+| --- | --- |
+| `npm test` | **209/209 PASS** |
+| `npm run test:admin:sql` | **PASS**, реални изолирани PostgreSQL/PostgREST, SQL/JWT, Free/Pro, SQL журнал и fail-closed |
+| `npm run lint` | **PASS** |
+| `npm run typecheck` | **PASS**, включително API imports и съседните declarations в `server/` |
+| `npm run build` | **PASS**; само съществуващото Vite insights предупреждение |
+| `CHROMIUM_PATH=/usr/bin/chromium npm run test:admin:browser` | **67/67 PASS** |
+| Официален Node builder / Functions | **5/5 Lambda bundles**, под Hobby лимита 12 |
+
+Запазени са регистрациите, Google OAuth, публичните прогнози, BG/EN чатботът, административните статистики, любимите градове, директното RPC журнализиране и Free/Pro логиката. Block/restore остават изключени. Няма Production SQL, ръчен deployment, платен план, нов PR или сливане. След push се изчаква автоматичният Preview за точния commit; окончателният наблюдаван live статус и deployment линк се записват в описанието на съществуващия PR №54 и финалния отчет. Ако има нов отказ, той трябва да се диагностицира по новия точен error code, без да се приписва автоматично на вече отстранения лимит.
+
+Следващите Vercel секции описват историята **преди** установяването и поправката на Hobby лимита, а не актуалната първопричина.
+
 ## Актуализация на PR №54 — точни видове прочитания
 
 При едно отваряне `AdminUserDetails` извиква `admin_users(selected_id)` за самоличност/регистрация/план и отделно `admin_user_favorites`. `AdminManagement` извиква `admin_management_account(selected_id)` за план, Auth статус, административно членство, произход на ръчния Pro и история. Предишната ревизия означаваше и двата различни прочита като `user_details_view`.
@@ -139,7 +173,7 @@
 
 | Команда/проверка | Резултат и обхват |
 | --- | --- |
-| `npm test` | 208/208 PASS — съществуващи и нови endpoint тестове; Auth отговорите в новите unit тестове са контролирани doubles |
+| `npm test` | 209/209 PASS — съществуващи и нови endpoint тестове; Auth отговорите в новите unit тестове са контролирани doubles |
 | `npm run lint` | PASS |
 | `npm run build` | PASS, включително strict TypeScript на всички API файлове; съществуващо Vite предупреждение за Vercel insights script |
 | `npm run test:admin:sql` | PASS — истински PostgreSQL 17 + PostgREST 13.0.7 в disposable network-isolated Docker, реалните migrations, JWT подписи/expiry, direct RPC isolation, revoked membership, atomic audit rollback, Free/Pro entitlements, concurrent duplicate requests |
@@ -153,9 +187,9 @@ Browser проверява точно един identity, management и favorites
 
 ## Променени файлове
 
-- `api/admin-core.js`: новите read actions и разширен allowlist на audit filters.
-- `api/admin-management-core.js`, `api/admin-management.ts`: защитен POST за плановете и отказ на block/restore.
-- `api/admin-management.test.mjs`: права, валидиране, грешки, повторения и read parameters.
+- `server/admin-core.js`: новите read actions и разширен allowlist на audit filters.
+- `server/admin-management-core.js`, `api/admin-management.ts`: защитен POST за плановете и отказ на block/restore.
+- `tests/unit/admin-management.test.mjs`: права, валидиране, грешки, повторения и read parameters.
 - `src/AdminApp.tsx`, `src/AdminRegistrationChart.tsx`, `src/AdminManagement.tsx`, `src/AdminApp.css`, `src/admin-client.ts`, `src/admin-i18n.js`: интерфейс, достъпност, език, тема, заявки и fallback.
 - `supabase/migrations/20261008030000_admin_management.sql`: единствената нова миграция.
 - `scripts/test-admin-sql.mjs`, `tests/sql/admin-bootstrap.sql`, `tests/sql/admin-stage4.sql`, `tests/sql/admin-profile-audit.sql`: изолирани реални SQL/PostgREST проверки; bootstrap добавя тестовото Auth banned_until.

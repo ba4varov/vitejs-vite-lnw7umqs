@@ -1,0 +1,48 @@
+{
+  "builder": "23.0.0",
+  "count": 5,
+  "functions": [
+    {
+      "endpoint": "api/admin-management.ts",
+      "runtime": "nodejs24.x",
+      "handler": "api/admin-management.js",
+      "serverFiles": [
+        "server/admin-management-core.js",
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "endpoint": "api/admin.ts",
+      "runtime": "nodejs24.x",
+      "handler": "api/admin.js",
+      "serverFiles": [
+        "server/admin-core.js",
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "endpoint": "api/profile.ts",
+      "runtime": "nodejs24.x",
+      "handler": "api/profile.js",
+      "serverFiles": [
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "endpoint": "api/weather-advice.ts",
+      "runtime": "nodejs24.x",
+      "handler": "api/weather-advice.js",
+      "serverFiles": []
+    },
+    {
+      "endpoint": "api/weather-chat.ts",
+      "runtime": "nodejs24.x",
+      "handler": "api/weather-chat.js",
+      "serverFiles": [
+        "server/weather-chat-core.js",
+        "server/gemini-client.js"
+      ]
+    }
+  ],
+  "verification": "local official builder; live deployment status is recorded in PR #54"
+}

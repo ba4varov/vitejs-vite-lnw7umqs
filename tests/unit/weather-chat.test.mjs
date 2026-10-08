@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedCity, extractRequestedDate, findDailyForecast, geminiUnderstandingError, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../../server/weather-chat-core.js'
 
 const valid = { message: 'Ще вали ли утре във Варна?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' }
 

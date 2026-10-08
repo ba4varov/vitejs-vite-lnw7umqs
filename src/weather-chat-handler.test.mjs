@@ -2,14 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
-import { parseUnderstanding, deterministicWeatherAnswer } from '../api/weather-chat-core.js'
+import { parseUnderstanding, deterministicWeatherAnswer } from '../server/weather-chat-core.js'
 
 // Execute the actual serverless handler; compilation is separately gated by tsc -b.
 const filename = new URL('../api/weather-chat.ts', import.meta.url)
 const source = readFileSync(filename, 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
-  .replaceAll("'./weather-chat-core.js'", JSON.stringify(new URL('../api/weather-chat-core.js', import.meta.url).href))
-  .replaceAll("'./gemini-client.js'", JSON.stringify(new URL('../api/gemini-client.js', import.meta.url).href))
+  .replaceAll("'../server/weather-chat-core.js'", JSON.stringify(new URL('../server/weather-chat-core.js', import.meta.url).href))
+  .replaceAll("'../server/gemini-client.js'", JSON.stringify(new URL('../server/gemini-client.js', import.meta.url).href))
 const { default: handler } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
 const dates = Array.from({ length: 16 }, (_, i) => `2026-10-${String(8 + i).padStart(2, '0')}`)
 const daily = time => ({ time, weather_code: time.map(() => 0), temperature_2m_min: time.map(() => 11), temperature_2m_max: time.map(() => 21), precipitation_sum: time.map(() => 0), precipitation_probability_max: time.map(() => 0), wind_speed_10m_max: time.map(() => 8), uv_index_max: time.map(() => 3) })

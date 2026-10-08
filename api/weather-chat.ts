@@ -1,9 +1,9 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent } from './weather-chat-core.js'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from './weather-chat-core.js'
-import { geminiClient } from './gemini-client.js'
+import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent } from '../server/weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
+import { geminiClient } from '../server/gemini-client.js'
 
 type ChatInput = ValidChatInput
 // Upstream response shapes describe the fields consumed here, including archive omissions.

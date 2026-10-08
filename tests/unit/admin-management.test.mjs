@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { handleAdminManagement } from './admin-management-core.js'
+import { handleAdminManagement } from '../../server/admin-management-core.js'
 const admin='00000000-0000-0000-0000-000000000001',target='00000000-0000-0000-0000-000000000002'
 const body={action:'plan',targetId:target,plan:'pro',expectedPlan:'free',requestId:'30000000-0000-0000-0000-000000000001',confirmed:true}
 const env={SUPABASE_URL:'https://supabase.example.invalid',SUPABASE_ANON_KEY:'test-anon',SUPABASE_SERVICE_ROLE_KEY:'test-server-only'}
@@ -18,7 +18,7 @@ test('SQL refusal, audit failure, missing migration and unknown commit never rep
 test('idempotent replay is only successful after SQL confirms it',async()=>{const {res}=await run({sql:{confirmed:true,replayed:true,plan:'pro',changedAt:'2026-10-08T12:00:00Z'}});assert.equal(res.code,200);assert.equal(res.value.replayed,true)})
 test('read methods cannot mutate',async()=>{const {res,calls}=await run({method:'GET'});assert.equal(res.code,405);assert.equal(calls.length,0)})
 
-import { handleAdmin } from './admin-core.js'
+import { handleAdmin } from '../../server/admin-core.js'
 test('management read endpoint validates filters, UUID and real calendar dates before RPC',async()=>{
  for(const query of [{action:'management-account',id:'invalid'},{action:'management-users',from:'2026-02-30'},{action:'management-users',from:'2026-10-10',to:'2026-10-01'},{action:'management-users',status:'invented'},{action:'management-users',page:['1']}]){
   const calls=[];const res={setHeader(){},status(code){this.code=code;return this},json(value){this.value=value;return this}}
