@@ -396,13 +396,14 @@ canvas {
 .my-places-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .my-places-heading h2 { margin: 0; font-size: 1rem; }
 .my-places-heading span, .places-empty { color: #64748b; font-size: .82rem; }
-.my-places-list { display: flex; gap: 8px; overflow-x: auto; padding: 2px 1px 7px; }
-.place-chip { display: flex; flex: 0 0 auto; overflow: hidden; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; }
+.my-places-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 1px; }
+.place-chip { display: flex; flex: 0 0 auto; width: 232px; max-width: 100%; height: 88px; box-sizing: border-box; min-width: 0; overflow: hidden; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; }
 .place-chip button { border: 0; border-radius: 0; }
-.place-select { display: flex; flex-direction: column; align-items: flex-start; padding: 7px 10px; background: transparent; color: inherit; }
-.place-select small { max-width: 160px; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-select { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; text-align: left; padding: 7px 10px; background: transparent; color: inherit; }
+.place-select strong { width: 100%; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.place-select small { max-width: 100%; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .place-select.active { background: #2563eb; color: white; }
-.default-place { width: 38px; background: rgba(148,163,184,.16); color: inherit; font-size: 1rem; }
+.default-place { flex: 0 0 44px; width: 44px; padding: 0; background: rgba(148,163,184,.16); color: inherit; font-size: 1rem; }
 .place-chip button:focus-visible, .places-import button:focus-visible, .places-error button:focus-visible { outline: 3px solid #60a5fa; outline-offset: -3px; }
 .places-import { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: .86rem; }
 .places-import button, .places-error button { padding: 6px 10px; border: 0; border-radius: 9px; background: #2563eb; color: #fff; }
@@ -537,6 +538,9 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   box-shadow: 0 6px 22px rgba(24,64,94,.055);
 }
 .header-title-wrapper h1 { color: var(--weather-blue-deep); font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 780; letter-spacing: -.035em; }
+.brand-home { display: inline-block; color: inherit; text-decoration: none; cursor: pointer; border-radius: 6px; }
+.brand-home:hover { color: var(--weather-blue); background: var(--weather-blue-soft); }
+.brand-home:focus-visible { outline: 3px solid var(--weather-blue); outline-offset: 4px; }
 .header-title-wrapper .subtitle { color: var(--weather-muted); opacity: 1 !important; }
 .header-btns button { min-height: 42px; padding: 9px 15px; border: 1px solid var(--weather-line); border-radius: 12px; box-shadow: none; }
 .header-btns button:hover { transform: none; background: var(--weather-blue-soft); border-color: #b8d6e9; }
@@ -552,7 +556,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .city-btn { padding: 8px 15px; border: 1px solid var(--weather-line); border-radius: 999px; box-shadow: none; }
 .city-btn:hover { border-color: #91bdd8; background: var(--weather-blue-soft); }
 .city-btn.active { border-color: var(--weather-blue); background: var(--weather-blue); }
-.my-places { max-width: 1100px; margin: 0 auto 24px; padding: 15px 18px; border-color: var(--weather-line); background: var(--weather-surface); box-shadow: 0 5px 18px rgba(24,64,94,.045); }
+.my-places { width: fit-content; box-sizing: border-box; max-width: min(1100px, 100%); margin: 0 auto 24px; padding: 15px 18px; border-color: var(--weather-line); background: var(--weather-surface); box-shadow: 0 5px 18px rgba(24,64,94,.045); }
 .place-chip { border-color: var(--weather-line); border-radius: 11px; }
 .place-select.active { background: var(--weather-blue); }
 .forecast-dashboard { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
