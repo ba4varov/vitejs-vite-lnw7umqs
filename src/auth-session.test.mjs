@@ -193,7 +193,7 @@ test('real Google callback publishes to shared session, repeat login retains use
   assert.equal(await f.auth.consumeGoogleCallback(), true)
   assert.equal(f.active().user.id, existing.user.id)
   assert.equal(f.active().access_token, 'google')
-  assert.deepEqual(JSON.parse(f.values.get('meteo-pulse-auth')), f.active())
+  assert.deepEqual(JSON.parse(f.values.get('meteo-pulse-auth')), JSON.parse(JSON.stringify(f.active())))
   assert.equal(f.pending.size, 0)
   assert.equal(f.active().provider_token, undefined)
   assert.ok(!f.values.get('meteo-pulse-auth').includes('never-store-google-token'))
