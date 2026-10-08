@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { authConfigured, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
+import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCallback, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
 import { Turnstile } from './Turnstile'
 
 type View = 'closed' | 'login' | 'register' | 'forgot' | 'profile' | 'password'
 const copy = {
-  bg: { login: 'Вход', register: 'Регистрация', profile: 'Моят профил', logout: 'Изход', email: 'Имейл', password: 'Парола', confirm: 'Потвърди паролата', showPassword: 'Покажи паролата', hidePassword: 'Скрий паролата', name: 'Име (незадължително)', forgot: 'Забравена парола?', send: 'Изпрати', save: 'Запази', plan: 'Текущ план', free: 'Безплатен', close: 'Затвори', mismatch: 'Паролите не съвпадат.', verify: 'Провери имейла си, за да потвърдиш регистрацията.', resent: 'Писмото за потвърждение е изпратено отново.', reset: 'Изпратихме инструкции за нова парола.', success: 'Промяната е запазена.', loading: 'Зареждане…', resend: 'Изпрати потвърждението отново', unavailable: 'Регистрацията още не е настроена. Виж README за необходимите настройки.', failure: 'Операцията е неуспешна. Провери данните и опитай отново.', newPassword: 'Нова парола', signedOut: 'Излязохте успешно.', captchaRequired: 'Потвърдете, че сте човек, преди да изпратите.', captcha: { loading: 'Зареждане на проверката…', ready: 'Проверката е успешна.', expired: 'Проверката изтече. Потвърдете отново.', error: 'Проверката не се зареди или възникна грешка.', retry: 'Опитай отново' } },
-  en: { login: 'Sign in', register: 'Register', profile: 'My profile', logout: 'Sign out', email: 'Email', password: 'Password', confirm: 'Confirm password', showPassword: 'Show password', hidePassword: 'Hide password', name: 'Name (optional)', forgot: 'Forgot password?', send: 'Send', save: 'Save', plan: 'Current plan', free: 'Free', close: 'Close', mismatch: 'Passwords do not match.', verify: 'Check your email to confirm your registration.', resent: 'The confirmation email was sent again.', reset: 'We sent password reset instructions.', success: 'Your changes were saved.', loading: 'Loading…', resend: 'Resend confirmation', unavailable: 'Registration is not configured yet. See README for the required setup.', failure: 'The operation failed. Check your details and try again.', newPassword: 'New password', signedOut: 'You have signed out.', captchaRequired: 'Please confirm you are human before submitting.', captcha: { loading: 'Loading verification…', ready: 'Verification successful.', expired: 'Verification expired. Please verify again.', error: 'Verification failed to load or encountered an error.', retry: 'Try again' } },
+  bg: { google: 'Продължи с Google', googleFailure: 'Входът с Google е отказан, прекъснат или неуспешен. Опитай отново.', login: 'Вход', register: 'Регистрация', profile: 'Моят профил', logout: 'Изход', email: 'Имейл', password: 'Парола', confirm: 'Потвърди паролата', showPassword: 'Покажи паролата', hidePassword: 'Скрий паролата', name: 'Име (незадължително)', forgot: 'Забравена парола?', send: 'Изпрати', save: 'Запази', plan: 'Текущ план', free: 'Безплатен', close: 'Затвори', mismatch: 'Паролите не съвпадат.', verify: 'Провери имейла си, за да потвърдиш регистрацията.', resent: 'Писмото за потвърждение е изпратено отново.', reset: 'Изпратихме инструкции за нова парола.', success: 'Промяната е запазена.', loading: 'Зареждане…', resend: 'Изпрати потвърждението отново', unavailable: 'Регистрацията още не е настроена. Виж README за необходимите настройки.', failure: 'Операцията е неуспешна. Провери данните и опитай отново.', newPassword: 'Нова парола', signedOut: 'Излязохте успешно.', captchaRequired: 'Потвърдете, че сте човек, преди да изпратите.', captcha: { loading: 'Зареждане на проверката…', ready: 'Проверката е успешна.', expired: 'Проверката изтече. Потвърдете отново.', error: 'Проверката не се зареди или възникна грешка.', retry: 'Опитай отново' } },
+  en: { google: 'Continue with Google', googleFailure: 'Google sign-in was denied, interrupted or failed. Please try again.', login: 'Sign in', register: 'Register', profile: 'My profile', logout: 'Sign out', email: 'Email', password: 'Password', confirm: 'Confirm password', showPassword: 'Show password', hidePassword: 'Hide password', name: 'Name (optional)', forgot: 'Forgot password?', send: 'Send', save: 'Save', plan: 'Current plan', free: 'Free', close: 'Close', mismatch: 'Passwords do not match.', verify: 'Check your email to confirm your registration.', resent: 'The confirmation email was sent again.', reset: 'We sent password reset instructions.', success: 'Your changes were saved.', loading: 'Loading…', resend: 'Resend confirmation', unavailable: 'Registration is not configured yet. See README for the required setup.', failure: 'The operation failed. Check your details and try again.', newPassword: 'New password', signedOut: 'You have signed out.', captchaRequired: 'Please confirm you are human before submitting.', captcha: { loading: 'Loading verification…', ready: 'Verification successful.', expired: 'Verification expired. Please verify again.', error: 'Verification failed to load or encountered an error.', retry: 'Try again' } },
 }
 
 function PasswordField({ label, value, onChange, autoComplete, showLabel, hideLabel }: { label: string, value: string, onChange: (event: ChangeEvent<HTMLInputElement>) => void, autoComplete: string, showLabel: string, hideLabel: string }) {
@@ -36,6 +36,9 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   useEffect(() => { (async () => {
     const hash = consumeAuthHash()
     let active = await restoreSession()
+    try {
+      if (await consumeGoogleCallback()) { active = await restoreSession(); setView('closed') }
+    } catch { setView('login'); setError(t.googleFailure) }
     if (hash?.access_token) {
       try {
         const user = await getUser(hash.access_token)
@@ -52,6 +55,13 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     setSession(active); setBusy(false)
   })() }, [])
 
+  const googleLogin = async () => {
+    if (busy) return
+    setBusy(true); setError(''); setMessage('')
+    try { await signInWithGoogle() }
+    catch { setError(t.googleFailure) }
+    finally { setBusy(false) }
+  }
   const fail = (reason: unknown) => { console.error(reason); setError(t.failure); setMessage('') }
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (busy) return
@@ -84,6 +94,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       <h2 id="auth-title">{view === 'profile' ? t.profile : view === 'register' ? t.register : view === 'forgot' ? t.forgot : view === 'password' ? t.newPassword : t.login}</h2>
       {!authConfigured && <p className="auth-error">{t.unavailable}</p>}
       {view === 'profile' && profile && <><p className="profile-email">{profile.email}</p><p><strong>{t.plan}:</strong> {t.free}</p></>}
+      {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
       <form onSubmit={submit}>
         {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>}
         {(view === 'login' || view === 'register' || view === 'password') && <PasswordField label={view === 'password' ? t.newPassword : t.password} value={password} onChange={e => setPassword(e.target.value)} autoComplete={view === 'login' ? 'current-password' : 'new-password'} showLabel={t.showPassword} hideLabel={t.hidePassword} />}
