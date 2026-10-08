@@ -2,11 +2,11 @@
 
 ## Резултат и граници
 
-Етап 4 добавя защитено ръчно Free → Pro → Free управление, история за избрания акаунт, търсене по имейл/име, филтри по план, Auth статус и дата, както и последни действия и ограничена проверка на състоянието на началното табло. Запазени са таблиците за потребители, любими градове, абонаменти и журнал. Не са променени публичните прогнози, Open-Meteo, чатботът, Google OAuth, регистрацията, паролите, сесиите или логиката на любимите градове.
+Етап 4 добавя защитено ръчно Free → Pro → Free управление, история за избрания акаунт, търсене по имейл/име, филтри по план, Auth статус и дата, както и последни действия и ограничена проверка на състоянието на началното табло. Запазени са таблиците за потребители, любими градове, абонаменти и журнал. Публичните прогнози, Open-Meteo, Google OAuth, регистрацията, паролите, сесиите и логиката на любимите градове са запазени. Последната корекция поправя само типовете на Serverless чатбота и TypeScript build конфигурацията; детерминираният parser и текстовете на BG/EN са непроменени.
 
 **Временното блокиране и възстановяването на достъп умишлено са недостъпни.** Това е предвиденият в заданието безопасен режим при недоказана защита срещу стари JWT. Бутоните са disabled с обяснение на BG/EN. Защитеният endpoint връща `BLOCKING_UNAVAILABLE` и не извиква Auth Admin API. Няма промяна на реални акаунти и няма окончателно изтриване.
 
-Извършени са само изолирани тестове. Не са проверени Production, реалният Supabase GoTrue или публикуваният Vercel endpoint. Няма deployment, сливане на PR или Production SQL.
+Извършени са само изолирани тестове. Не са проверени Production, реалният Supabase GoTrue или публикуваният Vercel endpoint. Няма ръчен Production deployment, сливане на PR или Production SQL. Push към същия PR задейства автоматичния Vercel Preview; действителният статус се проверява отделно от локалния build.
 
 ## Актуализация на PR №54 — точни видове прочитания
 
@@ -22,6 +22,25 @@
 
 Общо: **три смислово различни записа**, всеки с истинския `auth.uid()`, избрания акаунт и резултат. SQL и signed-JWT/PostgREST тестовете проверяват действителния брой редове, типовете, актьора и обекта. Директният management RPC записва по един `user_management_view` и за `success`, и за `not_found`. При отказ на журнала всички три чувствителни RPC отказват да върнат данни. Новият филтър има BG/EN означения и същата защита.
 
+## Корекция на TypeScript грешките във Vercel Build Logs
+
+Собственикът предостави шест конкретни diagnostics от `api/weather-chat.ts`. Установена е причината за тях: непълни декларации на помощните функции, твърде тесен inferred forecast обект и липса на изрична Node среда в конфигурацията за Serverless. Предишният `npm run build` проверяваше само `src/` и `vite.config.ts`, затова локалният PASS не покриваше API TypeScript.
+
+| Diagnostic / стар ред | Причина | Корекция |
+| --- | --- | --- |
+| TS2591 / 124, `process` | Node globals не са изрично включени в Serverless конфигурацията | Root `tsconfig.json`: `types: ["node"]`, NodeNext; съществуващият `@types/node` се използва без нова dependency |
+| TS2353 / 155, `requestedDates` | Inferred forecast обект не описва уикенд обобщение | Общ `WeatherSummary` с `requestedDates` и `targetDays` |
+| TS2345 / 160, относителен период | `timeScope` е обявен като произволен string | Реални literal unions и type guard за петте относителни периода; `tomorrow_*` продължава да използва утре |
+| TS2353 / 161, `requestedDate` | Inferred forecast обект не описва избраната дата за почасовите периоди | `requestedDate` е част от общия summary договор |
+| TS2740 / 164, archive срещу forecast | Историческите данни нямат current/hourly/daily forecast полета | Общ договор с опционални forecast полета; archive запазва `historical` и `targetDay` |
+| TS2345 / 166, `isQuick` | Renderer декларацията изисква поле, което Gemini не връща и renderer не използва | Базов `Understanding` за renderer; `DeterministicUnderstanding` отделно добавя задължителния `isQuick` |
+
+`findDailyForecast<T>` запазва целия тип на намерения ден вместо да го свежда до `{date}`. Hourly/current/daily upstream данните имат конкретни структурни типове. Gemini payload е `unknown` с безопасно прочитане на вложения текст. Не са добавени `any`, `@ts-ignore`, `noCheck` или изключени TypeScript проверки. `tsconfig.api.json` включва всички API TypeScript файлове, използва `strict: true` и е част от `tsc -b`. `allowJs` позволява съществуващите JavaScript помощни модули да се резолвират; не отменя проверката на TypeScript. Browser конфигурацията остава отделна.
+
+Добавени са 30 регресии в `src/weather-chat-handler.test.mjs` и `src/weather-chat-types.test.mjs`, извън папката за Serverless endpoints. 28 runtime проверки изпълняват реалния handler/renderer с изолирани HTTP fixtures и фиксиран часовник: BG/EN, днес/утре/вдругиден/вчера/завчера, четирите `tomorrow_*` периода, конкретна дата, този/следващия уикенд, друг град с неговите координати, quick action и Gemini без `isQuick`. Две compiler проверки доказват приемането на валидните договори/Node globals, съвпадението на literal enums с runtime allowlists и отказа за неправилен относителен период или непълен weather обект. Runtime parser, forecast URL параметри, геокодиране и отговорите са запазени.
+
+**Шестте diagnostics са реален поправен кодов проблем, но не доказват единствената причина за Failed deployment.** Според предоставената информация логовете стигат до „Build Completed“ и „Deploying outputs“. Пълният текст след тези редове и deployment error code още не са предоставени. Не е установена друга конкретна блокираща грешка и това не доказва липсата на такава. Последният статус на автоматичния Preview за новия commit се записва в описанието на PR №54 след push; локалният PASS не означава Vercel Ready.
+
 ## Vercel deployment — проверено и непотвърдено
 
 Проверен е посоченият deployment **`dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a`**, проект `weather`, team slug `ba4varov-projects`, за първоначалния PR commit `492de8bd83b5c024a45f822f61d8bfa2c33f5f81`.
@@ -30,7 +49,7 @@
 - GitHub status description препраща към `npx vercel inspect dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a --logs`; не съдържа първопричината или error code.
 - GitHub check `Vercel Preview Comments` е успешен само за липса на нерешени коментари. Това **не е** успешно build/deployment състояние.
 - Vercel dashboard/build logs не са достъпни чрез наличната връзка. Открит е Vercel plugin, но той още не е свързан с проекта. Средата няма конфигурирана Vercel самоличност/credential; не е започван интерактивен login и не са търсени стойности на секрети.
-- **Точната причина остава непотвърдена.** Няма основание да се приписва на този локално успешен build или да се променят Vercel settings по предположение. Не е потвърден успешен нов Preview deployment.
+- **Окончателната причина за Failed след „Deploying outputs“ остава непотвърдена.** Предоставените впоследствие шест TypeScript diagnostics са поправени, както е описано по-горе. Не се променят Vercel settings по предположение и няма потвърден Ready в наличните стари deployment данни.
 
 След корекцията е проверен и автоматичният Preview за commit `0f1724a61cfdfc48f197ab22943d74485a50148c`: **`dpl_FRjakN9r8bzZi6Zh41ETh9hndHwy`** също има GitHub Vercel status **`failure`**. [Новият deployment](https://vercel.com/ba4varov-projects/weather/FRjakN9r8bzZi6Zh41ETh9hndHwy) не е успешен въпреки всички локални PASS проверки. И този status препраща към CLI inspect, без да разкрива error code или Build Logs. Това не установява дали причината е в кода, Vercel конфигурацията или правата; не се прави предположение.
 
@@ -114,9 +133,9 @@
 
 | Команда/проверка | Резултат и обхват |
 | --- | --- |
-| `npm test` | 178/178 PASS — съществуващи и нови endpoint тестове; Auth отговорите в новите unit тестове са контролирани doubles |
+| `npm test` | 208/208 PASS — съществуващи и нови endpoint тестове; Auth отговорите в новите unit тестове са контролирани doubles |
 | `npm run lint` | PASS |
-| `npm run build` | PASS; съществуващо Vite предупреждение за Vercel insights script |
+| `npm run build` | PASS, включително strict TypeScript на всички API файлове; съществуващо Vite предупреждение за Vercel insights script |
 | `npm run test:admin:sql` | PASS — истински PostgreSQL 17 + PostgREST 13.0.7 в disposable network-isolated Docker, реалните migrations, JWT подписи/expiry, direct RPC isolation, revoked membership, atomic audit rollback, Free/Pro entitlements, concurrent duplicate requests |
 | `CHROMIUM_PATH=/usr/bin/chromium npm run test:admin:browser` | 67/67 PASS — истински Chromium; API и Auth тестовите данни са изолирани mocks |
 | Production/GoTrue/deployed endpoint | Не е тествано и не е променяно |
@@ -137,3 +156,5 @@ Browser проверява точно един identity, management и favorites
 - `tests/admin-stage4.spec.ts`: новите Chromium проверки и screenshots.
 - `tests/admin.spec.ts`, `tests/admin-stage2.spec.ts`: fixtures изрично моделират липсващата Етап 4 миграция в старите deployments.
 - `docs/admin-stage4-bg.md`, `docs/admin-stage4-screenshots/*`: настоящият отчет и действителните Chromium изображения. Историческите screenshots от Етапи 1–3 се запазват.
+
+Последната TypeScript корекция не променя административните компоненти/RPC, миграциите или Supabase. Изискваните останали Build/Deployment Logs трябва да съдържат края след „Deploying outputs“, точния error code и commit SHA; собственикът може да ги предостави редактирани без секрети или да свърже Vercel достъп до проекта.
