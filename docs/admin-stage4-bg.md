@@ -41,6 +41,12 @@
 
 **Шестте diagnostics са реален поправен кодов проблем, но не доказват единствената причина за Failed deployment.** Според предоставената информация логовете стигат до „Build Completed“ и „Deploying outputs“. Пълният текст след тези редове и deployment error code още не са предоставени. Не е установена друга конкретна блокираща грешка и това не доказва липсата на такава. Последният статус на автоматичния Preview за новия commit се записва в описанието на PR №54 след push; локалният PASS не означава Vercel Ready.
 
+След push на TypeScript корекцията, commit **`05fc773c55082e14ba72a081cd0be474e3b59216`**, е проверен действителният автоматичен Preview **[`dpl_BGzbaz2dEAvAWg65twmdmWV1BYMG`](https://vercel.com/ba4varov-projects/weather/BGzbaz2dEAvAWg65twmdmWV1BYMG)**. GitHub Vercel status е **`failure`**, обновен на **2026-10-08 13:44:34 UTC**. **Preview не е Ready.** Status description съдържа само CLI inspect командата, без конкретен error code. Изискани са пълните останали Build/Deployment Logs за този deployment, включително след „Build Completed“/„Deploying outputs“; без тях окончателният deployment отказ не може да бъде диагностициран.
+
+Собственикът с Vercel достъп може да изпълни `npx vercel inspect dpl_BGzbaz2dEAvAWg65twmdmWV1BYMG --logs --scope ba4varov-projects` и да предостави редактирания изход, deployment details/error code и commit SHA или да свърже достъп до логовете на `weather`. Не трябва да предоставя секрети. Не е стартиран ръчен deployment.
+
+Допълнително локално сравнение с предишната PR ревизия `a86d5f9` изпълни същите изолирани сценарии: всички 27 handler случая върнаха **точно еднакви HTTP статуси, response обекти и upstream URL заявки** преди/след корекцията. 28/28 PASS включва и отделния renderer тест без `isQuick`. Това доказва запазването на провереното поведение, без да се представя като live Vercel проверка. Последващият commit, който записва този отчет, също има отделен Preview; неговият актуален статус се отчита в PR описанието.
+
 ## Vercel deployment — проверено и непотвърдено
 
 Проверен е посоченият deployment **`dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a`**, проект `weather`, team slug `ba4varov-projects`, за първоначалния PR commit `492de8bd83b5c024a45f822f61d8bfa2c33f5f81`.
