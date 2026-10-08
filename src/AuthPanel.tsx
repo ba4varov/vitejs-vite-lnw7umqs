@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { authConfigured, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
+import { authConfigured, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
 import { Turnstile } from './Turnstile'
 
@@ -28,6 +28,11 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const onCaptchaTokenChange = useCallback((token: string | null) => setCaptchaToken(token), [])
   const changeView = (next: View) => { setCaptchaToken(null); setError(''); setMessage(''); setView(next) }
 
+  useEffect(() => subscribeSession(active => {
+    setSession(active)
+    if (!active) { setProfile(null); setName(''); setView('closed') }
+  }), [])
+
   useEffect(() => { (async () => {
     const hash = consumeAuthHash()
     let active = await restoreSession()
@@ -42,7 +47,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
           try { const data = await profileRequest(active); setProfile(data); setName(data.name) }
           catch (reason) { fail(reason) }
         }
-      } catch { active = null; saveSession(null) }
+      } catch (reason) { fail(reason) }
     }
     setSession(active); setBusy(false)
   })() }, [])
@@ -62,7 +67,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     } catch (reason: any) { if (reason.message === 'mismatch') setError(t.mismatch); else fail(reason) } finally { if (captchaSent) { setCaptchaToken(null); setCaptchaReset(value => value + 1) }; setBusy(false) }
   }
   const openProfile = async () => { setView('profile'); setError(''); setMessage(''); if (!session) return; setBusy(true); try { const data = await profileRequest(session); setProfile(data); setName(data.name) } catch (reason) { fail(reason) } finally { setBusy(false) } }
-  const logout = async () => { if (!session) return; setBusy(true); await signOut(session); setSession(null); setView('closed'); setMessage(t.signedOut); setBusy(false) }
+  const logout = async () => { if (!session) return; const active = session; setSession(null); setProfile(null); setView('closed'); setMessage(t.signedOut); setBusy(false); await signOut(active) }
   const resend = async () => {
     if (busy) return
     if (captchaConfigured && !captchaToken) { setError(t.captchaRequired); return }

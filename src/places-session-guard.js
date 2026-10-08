@@ -8,7 +8,7 @@ export function createPlacesSessionGuard() {
     changeSession(nextAccountId) {
       const accountChanged = accountId !== nextAccountId
       accountId = nextAccountId
-      epoch += 1
+      if (accountChanged) epoch += 1
       if (accountChanged) defaultEligible = nextAccountId !== null
       return { accountChanged, ticket: this.ticket() }
     },
