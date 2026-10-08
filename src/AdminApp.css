@@ -25,7 +25,7 @@
 .admin-app button[aria-current=page]{background:var(--bg);color:var(--accent);border-color:var(--line);font-weight:700}
 .admin-app aside>a:not(.admin-brand){margin-top:auto}.admin-app button{min-height:44px;transition:background .15s,border-color .15s}
 .admin-app button:hover:not(:disabled){background:var(--bg);border-color:var(--accent)}
-.admin-app main{padding:24px 36px 40px;max-width:1700px;width:100%;margin:auto;align-self:start}
+.admin-app main{padding:24px 36px 40px;max-width:1700px;width:100%;margin:0 auto;align-self:start}
 .admin-app header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:26px}.admin-app header h1{font-size:17px;margin:0;font-weight:650}
 .admin-heading{display:flex;align-items:center;gap:12px}.admin-app .admin-menu-toggle{display:none}
 .admin-section-heading{margin-bottom:24px}.admin-section-heading h2{font-size:27px;letter-spacing:-.7px;margin:0 0 4px}.admin-section-heading p{margin:0;color:var(--muted)}
