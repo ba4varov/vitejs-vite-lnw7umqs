@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase backups and private administrator configuration
+.env
+.env.*
+!.env.example
+backups/
+backup-staging/
+*.dump
+*.backup
+*.tar
+*.tar.gz
+*.age
+*.sha256
+.pgpass
+.pg_service.conf
+*service*.conf
+*age-key*
+supabase/.temp/
+__pycache__/
+*.pyc
