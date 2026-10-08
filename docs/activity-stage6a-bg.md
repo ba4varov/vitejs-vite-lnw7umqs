@@ -95,7 +95,33 @@ npm install --prefix work/vercel-builder --cache work/npm-cache @vercel/node@23.
 node scripts/verify-vercel-functions.cjs
 ```
 
-GoTrue поведението на реален Google/email OAuth и live Production/Vercel endpoints не е изпълнявано в тестовете. Съществуващите Auth/OAuth/session unit regressions се изпълняват, а техният код не е променен.
+## Финална интеграция с реален Supabase Auth / GoTrue — 8 октомври 2026
+
+**PASS — 8 групи проверки**, завършени в 18:12:15 UTC. Използвани са действителни GoTrue **v2.177.0**, PostgreSQL **17** и PostgREST **13.0.7**, миграциите от проекта, непроменените API handlers и реалният административен интерфейс в Chromium. Няма mocked Auth/API отговори. GoTrue сам създава Auth таблиците чрез собствените си миграции и издава потребителските JWT; те не се конструират от теста.
+
+Средата е отделна Docker bridge мрежа, временна база в tmpfs и HTTP портове само на `127.0.0.1`. Използвани са три нови синтетични `.invalid` акаунта и случайни локални ключове/пароли само в паметта. Тестът не приема Production URL, не зарежда `.env` във Vite, не използва Production credentials. Външните browser заявки се прекъсват, без подмяна на отговори. Контейнерите и мрежата са премахнати след проверката.
+
+| Реален сценарий | Резултат |
+| --- | --- |
+| Регистрация, email/password вход, GoTrue JWT, refresh-token rotation | PASS; липсващ, невалиден и подправен JWT се отхвърлят с 401 |
+| Съгласие по подразбиране изключено; действие преди разрешение | PASS; `NO_CONSENT`, нула аналитични записи |
+| Включване чрез действителния `/api/activity` | PASS; сървърът връща включено съгласие и revision |
+| Реално добавяне на любимо място чрез PostgREST с потребителски JWT, последвано от `/api/activity` | PASS; физически запис в базата, `favorite_add` отчетен, повторният operation ID е `DUPLICATE` |
+| Административни агрегати | PASS; DAU/WAU/MAU = 1, съгласия = 1, добавени любими = 1 |
+| Chromium вход с реален GoTrue и показване на агрегатите | PASS; действителният `/admin` показва DAU = 1 и добавени любими = 1 |
+| Чужди записи и неупълномощен потребител | PASS; admin API = 403; директните analytics таблици = 403 за owner/other/admin; чужди favorites = празен резултат чрез RLS; подправен userId = 400; RPC с чужда revision = `NO_CONSENT` |
+| Оттегляне и изтриване | PASS; нула analytics записи за акаунта, остаряло събитие = `NO_CONSENT`, агрегатите са нулеви, Chromium показва празния период; основният favorite е запазен |
+
+Възпроизводим тест: [`../scripts/test-activity-integration.mjs`](../scripts/test-activity-integration.mjs). Безопасен машинен отчет с точните image digests: [`activity-real-integration.json`](activity-real-integration.json). Не съдържа JWT, пароли, ключове или идентификатори на тестовите акаунти.
+
+```sh
+# Нужни са локален Docker socket, налични трите images, npm dependencies и Chromium.
+CHROMIUM_PATH=/usr/bin/chromium npm run test:activity:integration
+```
+
+**Граници:** това е реална локална Auth/API/DB/admin интеграция, а не изпълнение във Vercel runtime или hosted staging Supabase. Добавянето на favorite е действителна DB операция, последвана от API събитие от теста; не е browser click по основния метеорологичен интерфейс. Google OAuth, SMTP confirmation/recovery, външни weather/chat услуги и всички други feature потоци не са проверени с този тест. За тях липсват конфигуриран отделен hosted staging проект, test OAuth provider/redirects, тестова SMTP услуга и staging weather/chat credentials. Те остават за отделна staging smoke проверка. Production не е използван.
+
+Новият тест/отчет не добавят runtime функции или зависимости. Официалната проверка остава **6 Lambda bundles**, съвместими с Vercel Hobby. Предишните 132 browser проверки и screenshots са с fixtures; новият резултат по-горе е отделна реална интеграция.
 
 ## Безопасно активиране след review
 

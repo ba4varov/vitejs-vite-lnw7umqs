@@ -11,7 +11,8 @@
     "test": "node --test tests/unit/*.test.mjs src/*.test.mjs",
     "test:admin:browser": "playwright test",
     "test:admin:sql": "node scripts/test-admin-sql.mjs",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test:activity:integration": "node scripts/test-activity-integration.mjs"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.117.3",
