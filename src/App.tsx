@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import { ForecastPeriodCard } from './ForecastPeriodCard'
 import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
-import { findHourlyStartIndex, valuesByTime } from './weather-utils.js'
+import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
@@ -733,7 +734,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
-        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature,precipitation_probability' +
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
 
@@ -838,16 +839,18 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         hr.push({
           time: data.hourly.time[idx],
           hour: data.hourly.time[idx].slice(11, 16),
-          temp: Math.round(data.hourly.temperature_2m[idx]),
-          feelsLike: Math.round(data.hourly.apparent_temperature[idx]),
-          rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
-          wind: Math.round(data.hourly.wind_speed_10m[idx]),
-          pressure: Math.round(data.hourly.surface_pressure[idx]),
-          humidity: Math.round(data.hourly.relative_humidity_2m[idx]),
-          visibility: Math.round((data.hourly.visibility[idx] || 0) / 1000),
-          dewPoint: Math.round(data.hourly.dew_point_2m[idx]),
-          cloudCover: Math.round(data.hourly.cloud_cover[idx]),
-          seaTemp: sst != null ? Math.round(sst) : null,
+          temp: hourlyNumber(data.hourly.temperature_2m[idx]),
+          feelsLike: hourlyNumber(data.hourly.apparent_temperature[idx]),
+          rain: hourlyNumber(data.hourly.precipitation[idx], false),
+          rainProbability: hourlyNumber(data.hourly.precipitation_probability?.[idx]),
+          description: code.desc,
+          wind: hourlyNumber(data.hourly.wind_speed_10m[idx]),
+          pressure: hourlyNumber(data.hourly.surface_pressure[idx]),
+          humidity: hourlyNumber(data.hourly.relative_humidity_2m[idx]),
+          visibility: data.hourly.visibility[idx] == null ? null : hourlyNumber(data.hourly.visibility[idx] / 1000),
+          dewPoint: hourlyNumber(data.hourly.dew_point_2m[idx]),
+          cloudCover: hourlyNumber(data.hourly.cloud_cover[idx]),
+          seaTemp: hourlyNumber(sst),
           aqi: aqiVal !== null ? Math.round(aqiVal) : null,
           code: data.hourly.weather_code[idx],
           icon: code.icon
@@ -860,46 +863,32 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         const d = new Date(`${data.daily.time[i]}T12:00:00Z`)
         const code = decodeWeatherCode(data.daily.weather_code[i])
         
-        let sumHum = 0, sumPress = 0, sumVis = 0, sumDew = 0, sumCloud = 0, sumSea = 0;
-        let count = 0, seaCount = 0;
-        const startH = i * 24;
-        
-        for(let h = startH; h < startH + 24; h++) {
-          if (data.hourly && h < data.hourly.time.length) {
-            sumHum += data.hourly.relative_humidity_2m[h] || 0;
-            sumPress += data.hourly.surface_pressure[h] || 0;
-            sumVis += data.hourly.visibility[h] || 0;
-            sumDew += data.hourly.dew_point_2m[h] || 0;
-            sumCloud += data.hourly.cloud_cover[h] || 0;
-            count++;
-            
-            const seaAtHour = hourlySeaTemp.get(data.hourly.time[h]);
-            if (seaAtHour != null) {
-               sumSea += seaAtHour;
-               seaCount++;
-            }
-          }
-        }
+        const startH = i * 24
+        const mean = (field: string) => meanObservation((data.hourly?.[field] || []).slice(startH, startH + 24))
+        const seaMean = meanObservation(data.hourly.time.slice(startH, startH + 24).map(time => hourlySeaTemp.get(time)))
+        const visibility = mean('visibility')
 
         days.push({
           dateStr: data.daily.time[i],
+          code: data.daily.weather_code[i],
           dayName: (t.weekDays as any)[d.getUTCDay()],
           dateFormatted: `${d.getUTCDate()} ${(t.months as any)[d.getUTCMonth()]}`,
-          max: Math.round(data.daily.temperature_2m_max[i]),
-          min: Math.round(data.daily.temperature_2m_min[i]),
-          feelsLikeMax: Math.round(data.daily.apparent_temperature_max[i] || data.daily.temperature_2m_max[i]),
+          max: hourlyNumber(data.daily.temperature_2m_max[i]),
+          min: hourlyNumber(data.daily.temperature_2m_min[i]),
+          feelsLikeMax: hourlyNumber(data.daily.apparent_temperature_max[i]),
           icon: code.icon,
-          rain: Math.max(0, data.daily.precipitation_sum[i] || 0).toFixed(1),
-          wind: Math.round(data.daily.wind_speed_10m_max[i] || 0),
-          uv: Math.round(data.daily.uv_index_max[i] || 0),
+          rain: hourlyNumber(data.daily.precipitation_sum[i], false),
+          rainProbability: hourlyNumber(data.daily.precipitation_probability_max?.[i]),
+          wind: hourlyNumber(data.daily.wind_speed_10m_max[i]),
+          uv: hourlyNumber(data.daily.uv_index_max[i]),
           sunrise: data.daily.sunrise && data.daily.sunrise[i] ? formatTime(data.daily.sunrise[i]) : '--:--',
           sunset: data.daily.sunset && data.daily.sunset[i] ? formatTime(data.daily.sunset[i]) : '--:--',
-          humidity: count > 0 ? Math.round(sumHum / count) : 0,
-          pressure: count > 0 ? Math.round(sumPress / count) : 0,
-          visibility: count > 0 ? Math.round((sumVis / count) / 1000) : 0,
-          dewPoint: count > 0 ? Math.round(sumDew / count) : 0,
-          cloudCover: count > 0 ? Math.round(sumCloud / count) : 0,
-          seaTemp: seaCount > 0 ? Math.round(sumSea / seaCount) : null,
+          humidity: hourlyNumber(mean('relative_humidity_2m')),
+          pressure: hourlyNumber(mean('surface_pressure')),
+          visibility: visibility == null ? null : hourlyNumber(visibility / 1000),
+          dewPoint: hourlyNumber(mean('dew_point_2m')),
+          cloudCover: hourlyNumber(mean('cloud_cover')),
+          seaTemp: hourlyNumber(seaMean),
           description: code.desc
         })
       }
@@ -1064,12 +1053,12 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         })}
       </div>
 
-      <section className="my-places" aria-labelledby="my-places-title">
-        <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>
+      <section className={`my-places${localizedPlaces.length ? "" : " my-places-empty"}`} aria-label={lang === 'bg' ? 'Моите места' : 'My places'}>
+        {localizedPlaces.length > 0 && <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>}
         {localizedPlaces.length > 0 ? <div className="my-places-list">{localizedPlaces.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
           <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} aria-pressed={placeKey(place) === placeKey(coords)} onClick={() => choosePlace(place)}><strong title={place.name}>{place.name}</strong>{(place.region || place.country) && <small title={[place.region, place.country].filter(Boolean).join(', ')}>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
           {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
-        </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}
+        </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави любим град със звездата до името му' : 'Add a favorite city with the star next to its name'}</p>}
         {offerImport && session && <div className="places-import"><span>{lang === 'bg' ? 'Имаш места, запазени на това устройство.' : 'You have places saved on this device.'}</span><button onClick={migrateLocalPlaces} disabled={placesBusy}>{lang === 'bg' ? 'Прехвърли към профила' : 'Move to profile'}</button><button onClick={() => setOfferImport(false)}>{lang === 'bg' ? 'Не сега' : 'Not now'}</button></div>}
         {placesError && <p className="places-error" role="alert">{lang === 'bg' ? 'Местата не можаха да се синхронизират.' : 'Places could not be synchronized.'} <button onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
@@ -1217,41 +1206,36 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           </section>
 
           <section className="card hourly-section">
-            <h3>{t.hours24}</h3>
-            <div className="hourly-row">
-              {hourly.map((h, i) => (
-                <div key={i} className="hour-box"
-                  onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
-                  style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
-                  <p className="hour-time">{h.hour}</p>
-                  <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
-                  <p className="hour-temp">{h.temp}°C</p>
-                  <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
-                  {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
-                </div>
-              ))}
+            <div className="forecast-heading"><h3>{t.hours24}</h3><div className="forecast-scroll-controls">
+              {[-1, 1].map(direction => <button type="button" key={direction} aria-label={lang === 'bg' ? (direction < 0 ? 'Предишни часове' : 'Следващи часове') : (direction < 0 ? 'Previous hours' : 'Next hours')} onClick={event => {
+                const row = event.currentTarget.closest('section')?.querySelector('.hourly-row')
+                row?.scrollBy({ left: direction * row.clientWidth * .8, behavior: 'smooth' })
+              }}>{direction < 0 ? '←' : '→'}</button>)}
+            </div></div>
+            <div className="hourly-row" tabIndex={0} aria-label={t.hours24}>
+              {hourly.map(h => <ForecastPeriodCard key={h.time} period="hour" item={{ ...h, description: decodeWeatherCode(h.code).desc }} language={lang} label={h.hour}
+                date={`${Number(h.time.slice(8, 10))} ${t.months[Number(h.time.slice(5, 7)) - 1]}`}
+                icon={<AnimatedIcon icon={h.icon} size="2rem" />} selected={selectedHour?.time === h.time}
+                onClick={event => { openPopup(event); setSelectedHour(h); setSelectedDay(null) }} />)}
             </div>
           </section>
 
           <section className="card forecast-section">
-            <h3>{t.days14}</h3>
-            <div className="daily-grid">
-              {forecast.map((day, i) => (
-                <div key={i} className="day-box"
-                  onClick={(e) => { openPopup(e); setSelectedDay(day); setSelectedHour(null) }}
-                  style={{ cursor: 'pointer', transform: selectedDay && selectedDay.dateStr === day.dateStr ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
-                  <p className="day-name">{day.dayName}</p>
-                  <p style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>{day.dateFormatted}</p>
-                  <p className="day-icon"><AnimatedIcon icon={day.icon} size="2rem" /></p>
-                  <p className="day-condition">{day.description}</p>
-                  <p className="day-temp">
-                    <span className="max">{day.max}°</span><br />
-                    <span className="min">{day.min}°</span>
-                  </p>
-                  <p className="day-rain">🌧 {day.rain}{t.mm}</p>
-                  <p className="day-wind">🌬️ {day.wind}{t.windUnit}</p>
-                </div>
-              ))}
+            <div className="forecast-heading"><h3>{t.days14}</h3><div className="forecast-scroll-controls">
+              {[-1, 1].map(direction => <button type="button" key={direction} aria-label={lang === 'bg' ? (direction < 0 ? 'Предишни дни' : 'Следващи дни') : (direction < 0 ? 'Previous days' : 'Next days')} onClick={event => {
+                const row = event.currentTarget.closest('section')?.querySelector('.daily-grid')
+                row?.scrollBy({ left: direction * row.clientWidth * .8, behavior: 'smooth' })
+              }}>{direction < 0 ? '←' : '→'}</button>)}
+            </div></div>
+            <div className="daily-grid" tabIndex={0} aria-label={t.days14}>
+              {forecast.map(day => {
+                const localizedDay = { ...day, description: decodeWeatherCode(day.code).desc,
+                  dayName: t.weekDays[new Date(`${day.dateStr}T12:00:00Z`).getUTCDay()],
+                  dateFormatted: `${Number(day.dateStr.slice(8, 10))} ${t.months[Number(day.dateStr.slice(5, 7)) - 1]}` }
+                return <ForecastPeriodCard key={day.dateStr} period="day" item={localizedDay} language={lang} label={localizedDay.dayName} date={localizedDay.dateFormatted}
+                  icon={<AnimatedIcon icon={day.icon} size="2rem" />} selected={selectedDay?.dateStr === day.dateStr}
+                  onClick={event => { openPopup(event); setSelectedDay(localizedDay); setSelectedHour(null) }} />
+              })}
             </div>
           </section>
 
@@ -1304,23 +1288,24 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
             <div className="popup-grid">
               {detailTab === 'main' && <>
-                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedDay.min}° / {selectedDay.max}°</p></div>
-                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">до {selectedDay.feelsLikeMax}°</p></div>
+                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{formatWeatherValue(selectedDay.min, '°')} / {formatWeatherValue(selectedDay.max, '°')}</p></div>
+                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{formatWeatherValue(selectedDay.feelsLikeMax, '°C')}</p></div>
                 <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{selectedDay.sunrise}</p></div>
                 <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{selectedDay.sunset}</p></div>
-                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedDay.humidity}%</p></div>
-                <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{selectedDay.uv}</p></div>
+                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{formatWeatherValue(selectedDay.humidity, '%')}</p></div>
+                <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{formatWeatherValue(selectedDay.uv, '')}</p></div>
               </>}
               {detailTab === 'atmosphere' && <>
-                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedDay.pressure} {t.hpa}</p></div>
-                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{selectedDay.visibility} {t.km}</p></div>
-                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{selectedDay.cloudCover}%</p></div>
-                <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedDay.dewPoint}°C</p></div>
+                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{formatWeatherValue(selectedDay.pressure, t.hpa)}</p></div>
+                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{formatWeatherValue(selectedDay.visibility, t.km)}</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{formatWeatherValue(selectedDay.cloudCover, '%')}</p></div>
+                <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{formatWeatherValue(selectedDay.dewPoint, '°C')}</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedDay.wind} {t.windUnit}</p></div>
-                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedDay.rain} {t.mm}</p></div>
-                {selectedDay.seaTemp !== null ? (
+                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{formatWeatherValue(selectedDay.wind, t.windUnit)}</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{formatWeatherValue(selectedDay.rain, t.mm)}</p></div>
+                {selectedDay.rainProbability != null && <div className="stat-box"><p>☔</p><p className="label">{lang === 'bg' ? 'Вероятност за валежи' : 'Rain chance'}</p><p className="value">{selectedDay.rainProbability}%</p></div>}
+                {selectedDay.seaTemp != null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedDay.seaTemp}°C</p></div>
                 ) : (
                   <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
@@ -1345,21 +1330,23 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
             <div className="popup-grid">
               {detailTab === 'main' && <>
-                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp}°C</p></div>
-                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike}°C</p></div>
-                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity}%</p></div>
-                <div className="stat-box"><p>☁️</p><p className="label">Време</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
+                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp == null ? '—' : `${selectedHour.temp}°C`}</p></div>
+                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike == null ? '—' : `${selectedHour.feelsLike}°C`}</p></div>
+                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity == null ? '—' : `${formatWeatherValue(selectedHour.humidity, '%')}`}</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{lang === 'bg' ? 'Време' : 'Weather'}</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
               </>}
               {detailTab === 'atmosphere' && <>
-                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{selectedHour.pressure} {t.hpa}</p></div>
-                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{selectedHour.visibility} {t.km}</p></div>
-                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{selectedHour.cloudCover}%</p></div>
-                <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedHour.dewPoint}°C</p></div>
+                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{formatWeatherValue(selectedHour.pressure, t.hpa)}</p></div>
+                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{formatWeatherValue(selectedHour.visibility, t.km)}</p></div>
+                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{formatWeatherValue(selectedHour.cloudCover, '%')}</p></div>
+                <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{formatWeatherValue(selectedHour.dewPoint, '°C')}</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
-                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain} {t.mm}</p></div>
-                {selectedHour.seaTemp !== null ? (
+                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind == null ? '—' : `${selectedHour.wind} ${t.windUnit}`}</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain == null ? '—' : `${selectedHour.rain} ${t.mm}`}</p></div>
+                {selectedHour.rainProbability != null && <div className="stat-box"><p>☔</p><p className="label">{lang === 'bg' ? 'Вероятност за валежи' : 'Rain chance'}</p><p className="value">{selectedHour.rainProbability}%</p></div>}
+                {selectedHour.aqi != null && <div className="stat-box"><p>🍃</p><p className="label">AQI</p><p className="value">{selectedHour.aqi}</p></div>}
+                {selectedHour.seaTemp != null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
                 ) : (
                   <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>

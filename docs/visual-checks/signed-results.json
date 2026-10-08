@@ -1,0 +1,133 @@
+{
+  "note": "Real Chromium, synthetic API fixtures, mock authenticated sessions only. No live Open-Meteo or Supabase verification.",
+  "results": [
+    {
+      "width": 1440,
+      "lang": "bg",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 1440,
+      "lang": "bg",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 1440,
+      "lang": "en",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 1440,
+      "lang": "en",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 768,
+      "lang": "bg",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 768,
+      "lang": "bg",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 768,
+      "lang": "en",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 768,
+      "lang": "en",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 390,
+      "lang": "bg",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 390,
+      "lang": "bg",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 390,
+      "lang": "en",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 390,
+      "lang": "en",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 320,
+      "lang": "bg",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 320,
+      "lang": "bg",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 320,
+      "lang": "en",
+      "dark": false,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    },
+    {
+      "width": 320,
+      "lang": "en",
+      "dark": true,
+      "count": 5,
+      "sea": true,
+      "status": "passed"
+    }
+  ]
+}

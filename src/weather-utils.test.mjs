@@ -18,3 +18,31 @@ test('auxiliary marine and AQI hours align by timestamp and preserve missing val
   assert.equal(values.get('2026-09-02T11:00'), null)
   assert.equal(values.get('2026-09-02T12:00'), undefined)
 })
+
+test('missing hourly observations stay absent while measured zero remains valid', async () => {
+  const { hourlyNumber } = await import('./weather-utils.js')
+  for (const value of [null, undefined, NaN, Infinity, '12']) assert.equal(hourlyNumber(value), null)
+  assert.equal(hourlyNumber(0), 0)
+  assert.equal(hourlyNumber(12.6), 13)
+  assert.equal(hourlyNumber(0.25, false), 0.25)
+})
+
+test('overview distinguishes hourly observations from daily maxima and totals', async () => {
+  const { forecastOverview } = await import('./weather-utils.js')
+  const item = { temp: 17, max: 23, min: 9, rain: 0.2, wind: 12 }
+  for (const language of ['bg', 'en']) {
+    const hour = forecastOverview(item, 'hour', language), day = forecastOverview(item, 'day', language)
+    assert.equal(hour.temperature, '17°C')
+    assert.equal(day.temperature, '23°C')
+    assert.notEqual(hour.explanation, day.explanation)
+    assert.ok(hour.rain.startsWith('0.2'))
+    assert.equal(forecastOverview({}, 'day', language).rain, '—')
+    assert.equal(forecastOverview({ rain: 0 }, 'hour', language).rain.split(' ')[0], '0')
+  }
+})
+test('daily averages exclude absent values and preserve genuine zero', async () => {
+  const { meanObservation } = await import('./weather-utils.js')
+  assert.equal(meanObservation([null, undefined, NaN]), null)
+  assert.equal(meanObservation([0, null, 10]), 5)
+  assert.equal(meanObservation([0, 0]), 0)
+})
