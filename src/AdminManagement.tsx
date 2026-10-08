@@ -15,6 +15,7 @@ export function AdminManagement({ user, session, t, onDenied, onChanged }: any) 
   useEffect(() => { live.current = true; return () => { live.current = false; abort.current?.abort() } }, [])
   useEffect(() => {
     const controller = new AbortController(); setState('loading'); setAccount(null)
+    // Audited plan/access/history read (user_management_view), separate from identity and favorites.
     adminRequest(session, 'management-account', { id: user.id }, controller.signal).then(value => {
       if (value && (!Array.isArray(value.history) || typeof value.canManagePlan !== 'boolean')) throw new Error('INVALID_RESPONSE'); if (!controller.signal.aborted) { setAccount(value); setState(value ? 'ok' : 'error') }
     }).catch(error => { if (!controller.signal.aborted) { setState(error.configurationMissing ? 'missing' : 'error'); if (error instanceof AdminError && [401,403].includes(error.status)) onDenied(error.status) } })

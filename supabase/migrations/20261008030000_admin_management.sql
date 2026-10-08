@@ -2,7 +2,7 @@
 begin;
 alter table public.admin_audit_log drop constraint admin_audit_log_action_check;
 alter table public.admin_audit_log add constraint admin_audit_log_action_check
- check(action in ('user_details_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore'));
+ check(action in ('user_details_view','user_management_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore'));
 alter table public.admin_audit_log add column reason text,
  add column previous_value text, add column new_value text, add column request_id uuid;
 alter table public.admin_audit_log add constraint admin_audit_reason_check
@@ -61,8 +61,9 @@ begin
   'history',(select coalesce(jsonb_agg(h order by occurred_at desc,id desc),'[]'::jsonb) from
    (select id,admin_id,action,occurred_at,outcome,reason,previous_value,new_value from public.admin_audit_log where object_id=u.id order by occurred_at desc,id desc limit 50) h)
  ) into result from auth.users u left join public.subscriptions s on s.user_id=u.id where u.id=selected_id;
+ -- Separate identity reads from plan/access/history reads; direct RPC remains audited.
  insert into public.admin_audit_log(admin_id,action,object_type,object_id,outcome)
- values(auth.uid(),'user_details_view','user',selected_id,case when result is null then 'not_found' else 'success' end);
+ values(auth.uid(),'user_management_view','user',selected_id,case when result is null then 'not_found' else 'success' end);
  return result;
 end; $$;
 
@@ -106,7 +107,7 @@ declare cutoff timestamptz;
 begin
  if auth.uid() is null or not public.is_meteo_admin() then raise insufficient_privilege; end if;
  if period is null or period not in ('7','30','90','12m') or selected_action is null
-  or selected_action not in ('','user_details_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore')
+  or selected_action not in ('','user_details_view','user_management_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore')
   or page_number is null or page_number not between 1 and 1000000 then raise invalid_parameter_value; end if;
  cutoff := now()-case when period='12m' then interval '12 months' else period::integer*interval '1 day' end;
  return jsonb_build_object('entries',(select coalesce(jsonb_agg(r order by occurred_at desc,id desc),'[]'::jsonb) from

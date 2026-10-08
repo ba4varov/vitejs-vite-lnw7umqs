@@ -4,11 +4,15 @@ async function setup(page:any, options:{missing?:boolean,protected?:boolean,fail
  await page.addInitScript(({admin}:any)=>localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-test-token',refresh_token:'isolated-test-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:admin,email:'admin@example.invalid'}})),{admin})
  await page.route('https://auth.example.invalid/**',(r:any)=>r.fulfill({json:{}}))
  let plan='free', calls:any[]=[], reads:string[]=[], filters:any[]=[]
+ const profileReads:string[]=[]
  const history:any[]=[{id:0,admin_id:admin,action:'user_details_view',occurred_at:'2026-10-08T11:00:00Z',outcome:'success'}]
  const user=()=>({id:target,email:'isolated-user@example.invalid',display_name:'Изолиран тест / Isolated test',created_at:'2026-10-01T12:00:00Z',last_sign_in_at:'2026-10-08T09:00:00Z',providers:['email','google'],plan,blocked:false})
  await page.route('**/api/admin?**',async(r:any)=>{
   const q=new URL(r.request().url()).searchParams, action=q.get('action');reads.push(action!)
   if(action?.startsWith('management-') && options.missing) return r.fulfill({status:503,json:{error:'ADMIN_CONFIGURATION_MISSING'}})
+  if(action==='users' && q.get('id')) profileReads.push('user_details_view')
+  if(action==='management-account') profileReads.push('user_management_view')
+  if(action==='favorites') profileReads.push('user_favorites_view')
   if(action==='management-users') filters.push(Object.fromEntries(q))
   const json=action==='access'?{id:admin,email:'admin@example.invalid',authorized:true}
    : action==='stats'?{total:3,last7:1,last30:2,free:plan==='free'?3:2,pro:plan==='pro'?1:0,favorites:1,registrations:[]}
@@ -28,9 +32,18 @@ async function setup(page:any, options:{missing?:boolean,protected?:boolean,fail
   await new Promise(resolve=>setTimeout(resolve,150))
   return r.fulfill({json:{confirmed:true,plan,changedAt:'2026-10-08T12:00:00Z'}})
  })
- return {calls,reads,filters}
+ return {calls,reads,filters,profileReads}
 }
 async function openUser(page:any) {await page.goto('/admin');await page.getByRole('button',{name:'Потребители',exact:true}).click();await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.getByRole('button',{name:'Предостави ръчно Pro'})).toBeVisible()}
+test('one profile open performs exactly one identity, management and favorites read; reopening is audited again',async({page})=>{
+ const state=await setup(page);await openUser(page);await expect(page.locator('.admin-detail')).toContainText('София')
+ expect([...state.profileReads].sort()).toEqual(['user_details_view','user_favorites_view','user_management_view'])
+ await page.getByRole('button',{name:'EN',exact:true}).click();await page.getByRole('button',{name:'Toggle theme'}).click()
+ expect(state.profileReads).toHaveLength(3)
+ await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.getByRole('button',{name:'Grant manual Pro'})).toBeVisible();await expect(page.locator('.admin-detail')).toContainText('София')
+ expect([...state.profileReads].sort()).toEqual(['user_details_view','user_details_view','user_favorites_view','user_favorites_view','user_management_view','user_management_view'])
+ await page.getByRole('button',{name:'Action log',exact:true}).click();await page.getByRole('combobox',{name:'Action',exact:true}).selectOption('user_management_view')
+})
 test('confirmed changes refresh list, details, history and audit; cancellation and double-click are safe',async({page})=>{
  const state=await setup(page);await openUser(page)
  await expect(page.getByRole('button',{name:'Временно блокирай акаунта'})).toBeDisabled()

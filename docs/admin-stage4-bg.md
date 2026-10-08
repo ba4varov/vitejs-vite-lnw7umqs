@@ -8,6 +8,37 @@
 
 Извършени са само изолирани тестове. Не са проверени Production, реалният Supabase GoTrue или публикуваният Vercel endpoint. Няма deployment, сливане на PR или Production SQL.
 
+## Актуализация на PR №54 — точни видове прочитания
+
+При едно отваряне `AdminUserDetails` извиква `admin_users(selected_id)` за самоличност/регистрация/план и отделно `admin_user_favorites`. `AdminManagement` извиква `admin_management_account(selected_id)` за план, Auth статус, административно членство, произход на ръчния Pro и история. Предишната ревизия означаваше и двата различни прочита като `user_details_view`.
+
+Решението запазва всички независими SQL записи и означава management прочита с точния нов вид `user_management_view`. Не се премахва журнализиране, не се връщат данни през private internal функция, не се добавя клиентски `skip_audit` и няма времеви кеш или глобално потискане на директни RPC прочитания. Старите исторически записи остават непроменени.
+
+| Прочит при едно отваряне | SQL функция | Очакван запис |
+| --- | --- | --- |
+| Основни данни | `admin_users(..., selected_id)` | 1 × `user_details_view` |
+| План, достъп и история | `admin_management_account(selected_id)` | 1 × `user_management_view` |
+| Любими градове | `admin_user_favorites(selected_id)` | 1 × `user_favorites_view` |
+
+Общо: **три смислово различни записа**, всеки с истинския `auth.uid()`, избрания акаунт и резултат. SQL и signed-JWT/PostgREST тестовете проверяват действителния брой редове, типовете, актьора и обекта. Директният management RPC записва по един `user_management_view` и за `success`, и за `not_found`. При отказ на журнала всички три чувствителни RPC отказват да върнат данни. Новият филтър има BG/EN означения и същата защита.
+
+## Vercel deployment — проверено и непотвърдено
+
+Проверен е посоченият deployment **`dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a`**, проект `weather`, team slug `ba4varov-projects`, за първоначалния PR commit `492de8bd83b5c024a45f822f61d8bfa2c33f5f81`.
+
+- [Vercel deployment](https://vercel.com/ba4varov-projects/weather/BHiCrRjEyY7mmMUrK8AWUfPUuA1a) и [Vercel bot съобщението в PR №54](https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/54#issuecomment-6060495333) потвърждават `Error`/GitHub status `failure`.
+- GitHub status description препраща към `npx vercel inspect dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a --logs`; не съдържа първопричината или error code.
+- GitHub check `Vercel Preview Comments` е успешен само за липса на нерешени коментари. Това **не е** успешно build/deployment състояние.
+- Vercel dashboard/build logs не са достъпни чрез наличната връзка. Открит е Vercel plugin, но той още не е свързан с проекта. Средата няма конфигурирана Vercel самоличност/credential; не е започван интерактивен login и не са търсени стойности на секрети.
+- **Точната причина остава непотвърдена.** Няма основание да се приписва на този локално успешен build или да се променят Vercel settings по предположение. Не е потвърден успешен нов Preview deployment.
+
+За завършване собственикът трябва да предостави едно от следните:
+
+1. Свързан Vercel достъп до проекта `weather` в `ba4varov-projects`, позволяващ преглед на deployment details, error code и Build Logs; или
+2. Редактирани Build Logs и точния deployment error code от посочения deployment. Ако собственикът вече е логнат във Vercel CLI, може да изпълни `npx vercel inspect dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a --logs --scope ba4varov-projects` и да предостави изхода без секрети.
+
+При установен кодов проблем ще е нужна доказана корекция и проверка на новия автоматичен GitHub Preview за точния нов commit. Локалните PASS резултати по-долу не заместват такова потвърждение. Не е стартиран ръчен Production deployment.
+
 ## Реализация
 
 - `/api/admin-management`: POST, валиден JWT чрез Supabase Auth `/auth/v1/user`, действително административно членство чрез SQL RPC, UUID и allowlist на входните полета, изрично `confirmed: true`. Няма клиентски `admin_id`, service-role ключ или произволна операция.
@@ -20,7 +51,7 @@
 - `get_my_entitlements()` остава непроменена. Проверена е реалната промяна на плана и `future:premium` след нов RPC прочит. Отворен потребителски екран трябва да обнови профила/правата чрез съществуващия поток; няма push или периодични проверки.
 - `admin_management_account` връща план, статус, ръчен произход и последните 50 журнални записа. Прегледът се журнализира атомарно. Любимите градове продължават да идват от съществуващия защитен RPC, до стария лимит 500.
 - `admin_management_users`: име/имейл, страници по 20, план, `banned_until > now()` и включителни граници на регистрация по UTC. Старият `admin_users` е запазен.
-- Журналът запазва старите записи и филтри и добавя `manual_pro_grant`, `free_restore`, `account_block`, `account_restore`. Последните два са само подготвени видове операции; в този PR няма успешни Auth мутации.
+- Журналът запазва старите записи и филтри и добавя `user_management_view`, `manual_pro_grant`, `free_restore`, `account_block`, `account_restore`. Последните два са само подготвени видове операции; в този PR няма успешни Auth мутации.
 - Началното табло показва реалния брой Auth bans, последните пет действия и точен обхват/време на проверката. Празната регистрационна серия показва компактно обяснение вместо несъразмерна празна графика. Няма фонови или периодични health checks. Липсваща миграция и отказ се показват като липсващи данни, а не като нула.
 - Native `<dialog>`: потвърждение на стара/нова стойност, начален фокус върху „Отказ“, focus trap, Escape, disabled бутони и синхронна защита от двоен submit. Таблицата може да получи клавиатурен фокус за хоризонтално превъртане. BG/EN и двете теми са проверени.
 
@@ -54,7 +85,7 @@
 
 `supabase/migrations/20261008030000_admin_management.sql`
 
-Миграцията е транзакционна и не изпълнява Auth заявки. Добавя четири ограничени nullable audit колони (`reason`, `previous_value`, `new_value`, `request_id`), индекси и четири нови RPC функции, като разширява стария `admin_audit_entries`. Всички нови функции са SECURITY DEFINER с празен search_path и ограничен EXECUTE. Старите миграции са непроменени.
+Миграцията е транзакционна и не изпълнява Auth заявки. В същия несливан PR №54 е коригиран типът на management прочита; Етапи 1–3 остават непроменени. Ако старата ревизия на Етап 4 вече е прилагана в изолирана staging база, не пускайте целия файл повторно: пресъздайте disposable staging база с актуалните миграции. Не се предписва автоматично пренаписване на Production schema или на историческите записи. Добавя четири ограничени nullable audit колони (`reason`, `previous_value`, `new_value`, `request_id`), индекси и четири нови RPC функции, като разширява стария `admin_audit_entries`. Всички нови функции са SECURITY DEFINER с празен search_path и ограничен EXECUTE. Старите миграции са непроменени.
 
 ### Ръчно активиране от отговорен оператор
 
@@ -81,17 +112,17 @@
 
 | Команда/проверка | Резултат и обхват |
 | --- | --- |
-| `npm test` | 177/177 PASS — съществуващи и нови endpoint тестове; Auth отговорите в новите unit тестове са контролирани doubles |
+| `npm test` | 178/178 PASS — съществуващи и нови endpoint тестове; Auth отговорите в новите unit тестове са контролирани doubles |
 | `npm run lint` | PASS |
 | `npm run build` | PASS; съществуващо Vite предупреждение за Vercel insights script |
 | `npm run test:admin:sql` | PASS — истински PostgreSQL 17 + PostgREST 13.0.7 в disposable network-isolated Docker, реалните migrations, JWT подписи/expiry, direct RPC isolation, revoked membership, atomic audit rollback, Free/Pro entitlements, concurrent duplicate requests |
-| `CHROMIUM_PATH=/usr/bin/chromium npm run test:admin:browser` | 66/66 PASS — истински Chromium; API и Auth тестовите данни са изолирани mocks |
+| `CHROMIUM_PATH=/usr/bin/chromium npm run test:admin:browser` | 67/67 PASS — истински Chromium; API и Auth тестовите данни са изолирани mocks |
 | Production/GoTrue/deployed endpoint | Не е тествано и не е променяно |
 | Auth Admin отказ/частичен Auth+SQL отказ | Няма активен Auth mutation поток; block/restore връщат отказ без Auth заявка. Изпълнението на такива recovery тестове е условие за бъдещо активиране |
 
 SQL тестовият runner никога не приема DB URL и създава временна минимална Auth schema. Проверява и паралелни retries с две отделни PostgreSQL връзки. Поправена е стартова надпревара на Docker PostgreSQL: readiness чака крайния TCP listener, а не временния init socket.
 
-Browser покрива cancel, предишна/нова стойност, двоен клик, изпълнение, обновяване, retry със същия UUID, 401/403/503, protected subscription, липсваща миграция, филтри, клавиатура, липса на периодични заявки и регресия на Етапи 1–3. 40 действителни screenshots са в `docs/admin-stage4-screenshots/`: потребител, начално табло и диалог; 320/390/768/1440 px, BG/EN, светла/тъмна тема. Имейлите са `example.invalid`, токените са изолирани тестови стойности и никога не се визуализират.
+Browser проверява точно един identity, management и favorites прочит при отваряне, липса на нови прочити при език/тема, повторно журнализиране при ново отваряне и новия audit филтър. Browser покрива cancel, предишна/нова стойност, двоен клик, изпълнение, обновяване, retry със същия UUID, 401/403/503, protected subscription, липсваща миграция, филтри, клавиатура, липса на периодични заявки и регресия на Етапи 1–3. 40 действителни screenshots са в `docs/admin-stage4-screenshots/`: потребител, начално табло и диалог; 320/390/768/1440 px, BG/EN, светла/тъмна тема. Имейлите са `example.invalid`, токените са изолирани тестови стойности и никога не се визуализират.
 
 ## Променени файлове
 
@@ -100,7 +131,7 @@ Browser покрива cancel, предишна/нова стойност, дв�
 - `api/admin-management.test.mjs`: права, валидиране, грешки, повторения и read parameters.
 - `src/AdminApp.tsx`, `src/AdminRegistrationChart.tsx`, `src/AdminManagement.tsx`, `src/AdminApp.css`, `src/admin-client.ts`, `src/admin-i18n.js`: интерфейс, достъпност, език, тема, заявки и fallback.
 - `supabase/migrations/20261008030000_admin_management.sql`: единствената нова миграция.
-- `scripts/test-admin-sql.mjs`, `tests/sql/admin-bootstrap.sql`, `tests/sql/admin-stage4.sql`: изолирани реални SQL/PostgREST проверки; bootstrap добавя тестовото Auth banned_until.
+- `scripts/test-admin-sql.mjs`, `tests/sql/admin-bootstrap.sql`, `tests/sql/admin-stage4.sql`, `tests/sql/admin-profile-audit.sql`: изолирани реални SQL/PostgREST проверки; bootstrap добавя тестовото Auth banned_until.
 - `tests/admin-stage4.spec.ts`: новите Chromium проверки и screenshots.
 - `tests/admin.spec.ts`, `tests/admin-stage2.spec.ts`: fixtures изрично моделират липсващата Етап 4 миграция в старите deployments.
 - `docs/admin-stage4-bg.md`, `docs/admin-stage4-screenshots/*`: настоящият отчет и действителните Chromium изображения. Историческите screenshots от Етапи 1–3 се запазват.

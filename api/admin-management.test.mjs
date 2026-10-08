@@ -31,3 +31,10 @@ test('filtered user RPC has no frontend-selected actor and preserves all filter 
  await handleAdmin({method:'GET',headers:{authorization:'Bearer test-jwt'},query:{action:'management-users',search:'name',page:'2',status:'blocked',plan:'free',from:'2026-10-01',to:'2026-10-08'}},res,env,async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>url.endsWith('/auth/v1/user')?{id:admin}:url.endsWith('/is_meteo_admin')?true:{users:[],total:0,pageSize:20}}})
  assert.equal(res.code,200);assert.deepEqual(JSON.parse(calls.at(-1).options.body),{search_text:'name',page_number:2,access_status:'blocked',selected_plan:'free',registered_from:'2026-10-01',registered_to:'2026-10-08'})
 })
+
+test('management audit filter reaches protected SQL without an actor or audit suppression parameter',async()=>{
+ const calls=[];const res={setHeader(){},status(code){this.code=code;return this},json(value){this.value=value;return this}}
+ await handleAdmin({method:'GET',headers:{authorization:'Bearer test-jwt'},query:{action:'audit',filter:'user_management_view',period:'30',page:'1'}},res,env,async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>url.endsWith('/auth/v1/user')?{id:admin}:url.endsWith('/is_meteo_admin')?true:{entries:[],total:0,pageSize:20}}})
+ assert.equal(res.code,200);assert.ok(calls.at(-1).url.endsWith('/rpc/admin_audit_entries'))
+ assert.deepEqual(JSON.parse(calls.at(-1).options.body),{period:'30',selected_action:'user_management_view',page_number:1})
+})

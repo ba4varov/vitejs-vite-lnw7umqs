@@ -80,7 +80,7 @@ const stage3 = {
 for (const lang of ["bg", "en"]) Object.assign(adminText[lang], stage3[lang])
 const stage4 = {
   bg: {
-    management: 'Управление на акаунти', search: 'Търсене по имейл или име', accessStatus: 'Статус на достъпа', active: 'Активен', blocked: 'Блокиран', adminAccount: 'Администратор',
+    user_management_view: 'Преглед на план, достъп и история', management: 'Управление на акаунти', search: 'Търсене по имейл или име', accessStatus: 'Статус на достъпа', active: 'Активен', blocked: 'Блокиран', adminAccount: 'Администратор',
     allStatuses: 'Всички статуси', allPlans: 'Всички планове', from: 'Регистрация от (UTC)', to: 'Регистрация до (UTC)',
     stage4Missing: 'Етап 4 още не е активиран. Необходима е миграцията за управление. Досегашните функции остават достъпни; новите филтри и операции са недостъпни.',
     manualPro: 'Ръчно предоставен Pro', manualNote: 'Ръчният Pro е административен достъп, а не доказателство за плащане. Няма автоматично подновяване.',
@@ -98,7 +98,7 @@ const stage4 = {
     manual_access: 'Ръчно предоставяне на достъп', manual_revoke: 'Прекратяване на ръчен достъп', abuse: 'Злоупотреба', security: 'Сигурност', policy: 'Нарушение на правилата',
   },
   en: {
-    management: 'Account management', search: 'Search by email or name', accessStatus: 'Access status', active: 'Active', blocked: 'Blocked', adminAccount: 'Administrator',
+    user_management_view: 'View plan, access and history', management: 'Account management', search: 'Search by email or name', accessStatus: 'Access status', active: 'Active', blocked: 'Blocked', adminAccount: 'Administrator',
     allStatuses: 'All statuses', allPlans: 'All plans', from: 'Registered from (UTC)', to: 'Registered until (UTC)',
     stage4Missing: 'Stage 4 is not activated yet. The management migration is required. Existing features remain available; new filters and operations are unavailable.',
     manualPro: 'Manually granted Pro', manualNote: 'Manual Pro is administrative access, not proof of payment. It does not renew automatically.',

@@ -33,7 +33,7 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
       const selectedAction = req.query?.filter || ''
       const page = Number(req.query?.page || 1)
       if (!['7','30','90','12m'].includes(period) || typeof selectedAction !== 'string' ||
-          !['','user_details_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore'].includes(selectedAction) || (req.query?.page != null && typeof req.query.page !== 'string') || !Number.isInteger(page) || page < 1 || page > 1000000)
+          !['','user_details_view','user_management_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore'].includes(selectedAction) || (req.query?.page != null && typeof req.query.page !== 'string') || !Number.isInteger(page) || page < 1 || page > 1000000)
         return res.status(400).json({ error: 'INVALID_QUERY' })
       return res.status(200).json(await rpc(action === 'analytics' ? 'admin_advanced_statistics' : 'admin_audit_entries',
         action === 'analytics' ? { period } : { period, selected_action: selectedAction, page_number: page }))

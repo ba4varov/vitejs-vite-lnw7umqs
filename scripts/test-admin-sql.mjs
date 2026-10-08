@@ -42,6 +42,7 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage4.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/admin-profile-audit.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
@@ -77,6 +78,20 @@ try {
   assert.ok(request('/admin_audit_log',jwt(admin),JSON.stringify({admin_id:ordinary})).status>=400)
   assert.ok(request('/rpc/admin_audit_entries',jwt(admin),JSON.stringify({admin_id:ordinary})).status>=400)
   console.log('PASS: SQL-coupled audit actor attribution; direct table writes, private bypass and actor parameters rejected over real JWT HTTP')
+  // Exercise precisely the three UI reads through real signed JWT HTTP RPCs.
+  const beforeProfile = request('/rpc/admin_audit_entries',jwt(admin)).body
+  const baseline = Math.max(0,...beforeProfile.entries.map(e=>Number(e.id)))
+  assert.equal(request('/rpc/admin_users',jwt(admin),JSON.stringify({selected_id:ordinary})).status,200)
+  assert.equal(request('/rpc/admin_management_account',jwt(admin),JSON.stringify({selected_id:ordinary})).status,200)
+  assert.equal(request('/rpc/admin_user_favorites',jwt(admin),JSON.stringify({selected_id:ordinary})).status,200)
+  const profileLog=request('/rpc/admin_audit_entries',jwt(admin)).body
+  assert.equal(profileLog.total-beforeProfile.total,3)
+  const profileEntries=profileLog.entries.filter(e=>Number(e.id)>baseline)
+  assert.deepEqual(profileEntries.map(e=>e.action).sort(),['user_details_view','user_favorites_view','user_management_view'])
+  assert.ok(profileEntries.every(e=>e.admin_id===admin && e.object_id===ordinary && e.outcome==='success'))
+  const filteredManagement=request('/rpc/admin_audit_entries',jwt(admin),JSON.stringify({selected_action:'user_management_view'}))
+  assert.equal(filteredManagement.status,200);assert.ok(filteredManagement.body.entries.every(e=>e.action==='user_management_view'))
+  console.log('PASS: real JWT profile open adds exactly 3 records: 1 details, 1 management, 1 favorites; direct RPC remains audited')
   // Two independent database connections retry the same operation concurrently.
   const concurrentSQL = `begin; set local role authenticated; set local request.jwt.claim.sub='${admin}'; select public.admin_set_manual_plan('${ordinary}','pro','free','10000000-0000-0000-0000-000000000010'); select pg_sleep(0.2); commit;`
   const concurrentCall = () => new Promise((resolve,reject) => {
