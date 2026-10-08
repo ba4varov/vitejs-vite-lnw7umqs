@@ -1,3 +1,4 @@
+import { navigate } from './admin-navigation'
 import { test, expect } from '@playwright/test'
 const admin='00000000-0000-0000-0000-000000000001', target='00000000-0000-0000-0000-000000000002'
 async function setup(page:any, options:{missing?:boolean,protected?:boolean,failure?:number,uncertain?:boolean}={}) {
@@ -34,7 +35,7 @@ async function setup(page:any, options:{missing?:boolean,protected?:boolean,fail
  })
  return {calls,reads,filters,profileReads}
 }
-async function openUser(page:any) {await page.goto('/admin');await page.getByRole('button',{name:'Потребители',exact:true}).click();await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.getByRole('button',{name:'Предостави ръчно Pro'})).toBeVisible()}
+async function openUser(page:any) {await page.goto('/admin');await navigate(page,'Потребители');await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.getByRole('button',{name:'Предостави ръчно Pro'})).toBeVisible()}
 test('one profile open performs exactly one identity, management and favorites read; reopening is audited again',async({page})=>{
  const state=await setup(page);await openUser(page);await expect(page.locator('.admin-detail')).toContainText('София')
  expect([...state.profileReads].sort()).toEqual(['user_details_view','user_favorites_view','user_management_view'])
@@ -42,7 +43,7 @@ test('one profile open performs exactly one identity, management and favorites r
  expect(state.profileReads).toHaveLength(3)
  await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.getByRole('button',{name:'Grant manual Pro'})).toBeVisible();await expect(page.locator('.admin-detail')).toContainText('София')
  expect([...state.profileReads].sort()).toEqual(['user_details_view','user_details_view','user_favorites_view','user_favorites_view','user_management_view','user_management_view'])
- await page.getByRole('button',{name:'Action log',exact:true}).click();await page.getByRole('combobox',{name:'Action',exact:true}).selectOption('user_management_view')
+ await navigate(page,'Action log');await page.getByRole('combobox',{name:'Action',exact:true}).selectOption('user_management_view')
 })
 test('confirmed changes refresh list, details, history and audit; cancellation and double-click are safe',async({page})=>{
  const state=await setup(page);await openUser(page)
@@ -56,7 +57,7 @@ test('confirmed changes refresh list, details, history and audit; cancellation a
  await expect(page.locator('.admin-history')).toContainText('Ръчно предоставяне на Pro')
  await page.getByRole('button',{name:'Върни към Free'}).click();await page.getByRole('button',{name:'Потвърди',exact:true}).click()
  await expect(page.locator('tbody')).toContainText('Безплатен план');expect(state.calls).toHaveLength(2)
- await page.getByRole('button',{name:'Журнал на действията',exact:true}).click();await page.getByRole('combobox',{name:'Действие'}).selectOption('manual_pro_grant')
+ await navigate(page,'Журнал на действията');await page.getByRole('combobox',{name:'Действие'}).selectOption('manual_pro_grant')
  await expect(page.locator('.admin-audit-table')).toContainText('Ръчно предоставяне на Pro')
 })
 test('unconfirmed retry reuses request identifier and does not invent success',async({page})=>{
@@ -64,7 +65,7 @@ test('unconfirmed retry reuses request identifier and does not invent success',a
  await expect(page.getByRole('alert')).toContainText('Резултатът не е потвърден');await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Потвърди',exact:true}).click()
  await expect(page.locator('tbody')).toContainText('Pro план');expect(state.calls[0].requestId).toBe(state.calls[1].requestId)
 })
-test('missing migration preserves old functions and hides new mutations',async({page})=>{await setup(page,{missing:true});await page.goto('/admin');await expect(page.locator('.admin-stats strong').first()).toHaveText('3');await expect(page.getByText('Етап 4 още не е активиран.',{exact:false})).toBeVisible();await page.getByRole('button',{name:'Потребители',exact:true}).click();await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.locator('.admin-detail')).toContainText('София');await expect(page.getByRole('button',{name:'Предостави ръчно Pro'})).toHaveCount(0)})
+test('missing migration preserves old functions and hides new mutations',async({page})=>{await setup(page,{missing:true});await page.goto('/admin');await expect(page.locator('.admin-stats strong').first()).toHaveText('3');await expect(page.getByText('Етап 4 още не е активиран.',{exact:false})).toBeVisible();await navigate(page,'Потребители');await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.locator('.admin-detail')).toContainText('София');await expect(page.getByRole('button',{name:'Предостави ръчно Pro'})).toHaveCount(0)})
 test('provider-protected subscription cannot be changed',async({page})=>{await setup(page,{protected:true});await openUser(page);await expect(page.getByRole('button',{name:'Предостави ръчно Pro'})).toBeDisabled()})
 for(const status of [401,403,503])test(`mutation failure ${status} never shows success`,async({page})=>{await setup(page,{failure:status});await openUser(page);await page.getByRole('button',{name:'Предостави ръчно Pro'}).click();await page.getByRole('button',{name:'Потвърди',exact:true}).click();if(status===401||status===403){await expect(page.locator('.admin-management')).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0)}else await expect(page.getByRole('alert')).toContainText('Резултатът не е потвърден');await expect(page.getByText('Промяната на плана е потвърдена. Данните са обновени.')).toHaveCount(0)})
 test('empty registration data has a compact explanation without a blank chart',async({page})=>{await setup(page);await page.goto('/admin');await expect(page.getByText('Няма данни.',{exact:true})).toBeVisible();await expect(page.locator('.admin-chart')).toHaveCount(0)})
@@ -75,11 +76,11 @@ for(const width of [320,390,768,1440])for(const lang of ['bg','en'])for(const da
  if(dark) await page.getByRole('button',{name:lang==='bg'?'Смени темата':'Toggle theme'}).click()
  await expect(page.locator('.admin-management')).toContainText(lang==='bg'?'История за този акаунт':'Account history')
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
- await page.screenshot({path:`docs/admin-stage4-screenshots/users-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:true})
+ await page.screenshot({path:`work/stage5-regressions/admin-stage4-screenshots/users-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:true})
  await page.getByRole('button',{name:lang==='bg'?'Предостави ръчно Pro':'Grant manual Pro'}).click();await expect(page.getByRole('dialog')).toBeVisible();await expect(page.getByRole('button',{name:lang==='bg'?'Отказ':'Cancel',exact:true})).toBeFocused()
  await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:lang==='bg'?'Потвърди':'Confirm',exact:true})).toBeFocused()
- if(width===390||width===1440) await page.screenshot({path:`docs/admin-stage4-screenshots/confirm-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:true})
+ if(width===390||width===1440) await page.screenshot({path:`work/stage5-regressions/admin-stage4-screenshots/confirm-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:true})
  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible()
- await page.getByRole('button',{name:lang==='bg'?'Начално табло':'Dashboard',exact:true}).click();await expect(page.getByRole('heading',{name:lang==='bg'?'Състояние и последни действия':'Status and recent actions'})).toBeVisible();await expect(page.getByText(lang==='bg'?'Акаунти с активно Auth блокиране:':'Accounts with an active Auth ban:',{exact:false})).toBeVisible()
- await page.screenshot({path:`docs/admin-stage4-screenshots/dashboard-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:true})
+ await navigate(page,lang==='bg'?'Начално табло':'Dashboard');await expect(page.getByRole('heading',{name:lang==='bg'?'Състояние и последни действия':'Status and recent actions'})).toBeVisible();await expect(page.getByText(lang==='bg'?'Акаунти с активно Auth блокиране:':'Accounts with an active Auth ban:',{exact:false})).toBeVisible()
+ await page.screenshot({path:`work/stage5-regressions/admin-stage4-screenshots/dashboard-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:true})
 })

@@ -1,7 +1,9 @@
+import { AdminAuditEntry, localDate } from './AdminPresentation'
 import { useEffect, useRef, useState } from 'react'
 import { adminMutation, adminRequest, AdminError } from './admin-client'
 
 export function AdminManagement({ user, session, t, onDenied, onChanged }: any) {
+  const [expandedHistory, setExpandedHistory] = useState(false)
   const [account, setAccount] = useState<any>(null)
   const [state, setState] = useState('loading')
   const [pending, setPending] = useState<any>(null)
@@ -47,12 +49,12 @@ export function AdminManagement({ user, session, t, onDenied, onChanged }: any) 
     {state === 'loading' && <p role="status">{t.loading}</p>}
     {state === 'missing' && <p role="status">{t.stage4Missing}</p>}
     {state === 'error' && <p role="alert">{t.error} <button onClick={() => setRevision(value => value + 1)}>{t.retry}</button></p>}
-    {state === 'ok' && account && <><dl className="admin-detail-grid"><div><dt>{t.accessStatus}</dt><dd>{account.blocked ? t.blocked : t.active}{account.isAdmin && ` · ${t.adminAccount}`}</dd></div><div><dt>{t.plan}</dt><dd>{t[account.plan] || t.unavailable}{account.manualPro && ` · ${t.manualPro}`}</dd></div></dl>
-      {account.bannedUntil && <p>{t.bannedUntil}: {new Date(account.bannedUntil).toISOString()}</p>}
-      <p>{t.manualNote}</p><button disabled={!account.canManagePlan || busy} onClick={begin}>{account.plan === 'free' ? t.grantPro : t.restoreFree}</button>
+    {state === 'ok' && account && <><dl className="admin-detail-grid"><div><dt>{t.accessStatus}</dt><dd>{account.blocked ? t.blocked : t.active}{account.isAdmin && ` · ${t.adminAccount}`}</dd></div><div><dt>{t.plan}</dt><dd><span className={`admin-badge admin-plan-${account.plan}`}>{t[account.plan] || t.unavailable}</span>{account.manualPro && ` · ${t.manualPro}`}</dd></div><div><dt>{t.subscriptionStatus}</dt><dd>{t[account.subscriptionStatus] || account.subscriptionStatus || t.unavailable}</dd></div></dl>
+      {account.bannedUntil && <p>{t.bannedUntil}: {localDate(account.bannedUntil, t)}</p>}
+      <p className="admin-note">{t.manualNote}</p><button disabled={!account.canManagePlan || busy} onClick={begin}>{account.plan === 'free' ? t.grantPro : t.restoreFree}</button>
       {!account.canManagePlan && <p>{t.protectedSubscription}</p>}
-      <div className="admin-blocking"><button disabled aria-describedby={`blocking-${user.id}`}>{account.blocked ? t.restoreAccess : t.blockAccount}</button><p id={`blocking-${user.id}`}>{t.blockUnavailable}</p></div>
-      <h4>{t.accountHistory}</h4><p>{t.historyLimit}</p>{account.history.length ? <ul className="admin-history">{account.history.map((entry: any) => <li key={entry.id}><strong>{t[entry.action] || entry.action}</strong><br/><time>{new Date(entry.occurred_at).toISOString()}</time><br/>{t.actor}: <code>{entry.admin_id}</code><br/>{t[entry.outcome] || entry.outcome}{entry.previous_value && ` · ${t[entry.previous_value]} → ${t[entry.new_value]}`}{entry.reason && ` · ${t[entry.reason] || entry.reason}`}</li>)}</ul> : <p>{t.auditEmpty}</p>}
+      <div className="admin-blocking"><button disabled aria-describedby={`blocking-${user.id}`}>{account.blocked ? t.restoreAccess : t.blockAccount}</button><details id={`blocking-${user.id}`}><summary>{t.blockUnavailableTitle}</summary><p>{t.blockUnavailable}</p></details></div>
+      <h4>{t.accountHistory}</h4><p>{t.historyLimit}</p>{account.history.length ? <><div className="admin-history" id={`history-${user.id}`}>{(expandedHistory ? account.history : account.history.slice(0,3)).map((entry: any) => <AdminAuditEntry key={entry.id} entry={entry} t={t}/>)}</div>{account.history.length > 3 && <button aria-expanded={expandedHistory} aria-controls={`history-${user.id}`} onClick={() => setExpandedHistory(!expandedHistory)}>{expandedHistory ? t.hideHistory : t.showHistory} ({account.history.length})</button>}</> : <p>{t.auditEmpty}</p>}
     </>}
     {!pending && message && <p role="status">{message}</p>}
     <dialog ref={dialog} aria-labelledby={`confirm-${user.id}`} onCancel={event => { if (busy) event.preventDefault(); else setPending(null) }}>
@@ -71,5 +73,5 @@ export function AdminManagementSummary({ session, t, onDenied }: any) {
       .catch(error => { if (!controller.signal.aborted) { setState(error.configurationMissing ? 'missing' : 'error'); if (error instanceof AdminError && [401,403].includes(error.status)) onDenied(error.status) } })
     return () => controller.abort()
   }, [session, onDenied])
-  return <section className="admin-card"><h3>{t.managementSnapshot}</h3>{state !== 'ok' ? <p role="status">{state === 'missing' ? t.stage4Missing : state === 'loading' ? t.loading : t.error}</p> : <><p>{t.blockedCount}: <strong>{data.blocked ?? t.unavailable}</strong></p><p>{t.summaryScope}</p><p>{t.checked}: {new Date(data.asOf).toISOString()}</p><h4>{t.recentActions}</h4>{data.entries?.length ? <ul className="admin-history">{data.entries.map((entry: any) => <li key={entry.id}>{t[entry.action] || entry.action} · {t[entry.outcome]}<br/><time>{new Date(entry.occurred_at).toISOString()}</time><br/>{t.actor}: <code>{entry.admin_id}</code><br/>{t.object}: <code>{entry.object_id}</code></li>)}</ul> : <p>{t.auditEmpty}</p>}</>}</section>
+  return <section className="admin-card"><h3>{t.managementSnapshot}</h3>{state !== 'ok' ? <p role="status">{state === 'missing' ? t.stage4Missing : state === 'loading' ? t.loading : t.error}</p> : <><p>{t.blockedCount}: <strong>{data.blocked ?? t.unavailable}</strong></p><p>{t.summaryScope}</p><p>{t.checked}: {localDate(data.asOf,t)}</p><h4>{t.recentActions}</h4>{data.entries?.length ? <div className="admin-history">{data.entries.slice(0,5).map((entry: any) => <AdminAuditEntry key={entry.id} entry={entry} t={t}/>)}</div> : <p>{t.auditEmpty}</p>}</>}</section>
 }

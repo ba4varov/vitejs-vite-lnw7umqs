@@ -115,3 +115,21 @@ const stage4 = {
   },
 }
 for (const lang of ['bg','en']) Object.assign(adminText[lang], stage4[lang])
+
+Object.assign(adminText.bg, { locale: 'bg-BG', menu: 'Меню', reason: 'Причина', showHistory: 'Още налични записи', hideHistory: 'Покажи по-малко', dashboardIntro: 'Потребители, регистрации и административна активност', systemOverview: 'Достъпност и обхват на проверките' })
+Object.assign(adminText.en, { locale: 'en-GB', menu: 'Menu', reason: 'Reason', showHistory: 'More available entries', hideHistory: 'Show less', dashboardIntro: 'Users, registrations and administrative activity', systemOverview: 'Availability and check coverage' })
+
+Object.assign(adminText.bg, { blockUnavailableTitle: 'Защо блокирането е недостъпно?' })
+Object.assign(adminText.en, { blockUnavailableTitle: 'Why is blocking unavailable?' })
+
+Object.assign(adminText.bg, { seriesScroll: 'Превърти хоризонтално. Избери дата с мишка, докосване или клавиатура за точната стойност.' })
+Object.assign(adminText.en, { seriesScroll: 'Scroll horizontally. Select a date with a mouse, touch or keyboard for the exact value.' })
+
+Object.assign(adminText.bg, { success: 'Успешно', historyLimit: 'Последните 50 журнални записа, включително прегледи. Показани в местната часова зона; оригиналното UTC време е в подробностите.' })
+Object.assign(adminText.en, { success: 'Successful', historyLimit: 'Latest 50 audit entries, including views. Shown in your local timezone; original UTC timestamps are in the details.' })
+
+Object.assign(adminText.bg, { subscriptionStatus: 'Статус на абонамента', inactive: 'Неактивен', canceled: 'Прекратен', cancelled: 'Прекратен', past_due: 'Просрочен', trialing: 'Пробен период', unpaid: 'Неплатен' })
+Object.assign(adminText.en, { subscriptionStatus: 'Subscription status', inactive: 'Inactive', canceled: 'Cancelled', cancelled: 'Cancelled', past_due: 'Past due', trialing: 'Trial', unpaid: 'Unpaid' })
+
+Object.assign(adminText.bg, { entryId: 'Номер на записа', actionCode: 'Код на действието' })
+Object.assign(adminText.en, { entryId: 'Entry ID', actionCode: 'Action code' })
