@@ -78,3 +78,40 @@ const stage3 = {
   }
 }
 for (const lang of ["bg", "en"]) Object.assign(adminText[lang], stage3[lang])
+const stage4 = {
+  bg: {
+    management: 'Управление на акаунти', search: 'Търсене по имейл или име', accessStatus: 'Статус на достъпа', active: 'Активен', blocked: 'Блокиран', adminAccount: 'Администратор',
+    allStatuses: 'Всички статуси', allPlans: 'Всички планове', from: 'Регистрация от (UTC)', to: 'Регистрация до (UTC)',
+    stage4Missing: 'Етап 4 още не е активиран. Необходима е миграцията за управление. Досегашните функции остават достъпни; новите филтри и операции са недостъпни.',
+    manualPro: 'Ръчно предоставен Pro', manualNote: 'Ръчният Pro е административен достъп, а не доказателство за плащане. Няма автоматично подновяване.',
+    grantPro: 'Предостави ръчно Pro', restoreFree: 'Върни към Free', protectedSubscription: 'Промяната е недостъпна: липсва абонамент или има външен, неактивен или непотвърден ръчен Pro абонамент. Необходим е отделен процес.',
+    blockAccount: 'Временно блокирай акаунта', restoreAccess: 'Възстанови достъпа', bannedUntil: 'Auth блокиране до (UTC)',
+    blockUnavailable: 'Блокирането и възстановяването са недостъпни. Преди активиране трябва да се докаже защита на частните API и директните Supabase операции срещу вече издадени JWT токени, както и възстановяване при частичен отказ на Auth и журнала.',
+    accountHistory: 'История за този акаунт', historyLimit: 'Последните 50 журнални записа, включително прегледи. Часовете са в UTC.',
+    confirmPlan: 'Потвърди промяната на плана', cancel: 'Отказ', confirm: 'Потвърди', executing: 'Изпълнява се…', planSuccess: 'Промяната на плана е потвърдена. Данните са обновени.',
+    RESULT_UNCONFIRMED: 'Резултатът не е потвърден. Заявката може да е записана. Повтори в този диалог със същия идентификатор, за да провериш резултата.',
+    STALE_PLAN: 'Планът е променен междувременно. Затвори диалога и обнови данните.', REQUEST_CONFLICT: 'Идентификаторът на заявката е използван с други параметри. Обнови данните.',
+    EXTERNAL_SUBSCRIPTION_PROTECTED: 'Този абонамент е защитен от ръчни промени.', SUBSCRIPTION_MISSING: 'Няма съществуващ абонаментен запис.', PLAN_UNCHANGED: 'Планът вече има тази стойност.', ADMIN_CONFIGURATION_MISSING: 'Приложи ръчно миграцията за Етап 4 преди тази операция.',
+    managementSnapshot: 'Състояние и последни действия', blockedCount: 'Акаунти с активно Auth блокиране', summaryScope: 'Проверени административен JWT, SQL достъп и Auth banned_until. Броят не доказва прекратяване на всички съществуващи сесии. Не са проверени други частни операции или платежни системи.',
+    dashboardScope: 'Връзката е потвърдена за този JWT и административните SQL статистики. Пълната диагностика е в „Състояние на системата“.', recentActions: 'Последни административни действия',
+    manual_pro_grant: 'Ръчно предоставяне на Pro', free_restore: 'Връщане към Free', account_block: 'Временно блокиране', account_restore: 'Възстановяване на достъп',
+    manual_access: 'Ръчно предоставяне на достъп', manual_revoke: 'Прекратяване на ръчен достъп', abuse: 'Злоупотреба', security: 'Сигурност', policy: 'Нарушение на правилата',
+  },
+  en: {
+    management: 'Account management', search: 'Search by email or name', accessStatus: 'Access status', active: 'Active', blocked: 'Blocked', adminAccount: 'Administrator',
+    allStatuses: 'All statuses', allPlans: 'All plans', from: 'Registered from (UTC)', to: 'Registered until (UTC)',
+    stage4Missing: 'Stage 4 is not activated yet. The management migration is required. Existing features remain available; new filters and operations are unavailable.',
+    manualPro: 'Manually granted Pro', manualNote: 'Manual Pro is administrative access, not proof of payment. It does not renew automatically.',
+    grantPro: 'Grant manual Pro', restoreFree: 'Restore Free', protectedSubscription: 'Changes unavailable: missing subscription, external subscription, inactive status or Pro without verified manual provenance. A separate process is required.',
+    blockAccount: 'Temporarily block account', restoreAccess: 'Restore access', bannedUntil: 'Auth ban until (UTC)',
+    blockUnavailable: 'Blocking and restoring access are unavailable. Private APIs and direct Supabase operations must first be proven safe against previously issued JWTs, with recovery from partial Auth and audit failures.',
+    accountHistory: 'Account history', historyLimit: 'Latest 50 audit entries, including views. Times are in UTC.', confirmPlan: 'Confirm plan change', cancel: 'Cancel', confirm: 'Confirm', executing: 'Processing…', planSuccess: 'Plan change confirmed. Data refreshed.',
+    RESULT_UNCONFIRMED: 'Result unconfirmed. The request may have committed. Retry within this dialog using the same identifier to verify the result.',
+    STALE_PLAN: 'The plan changed in the meantime. Close this dialog and refresh the data.', REQUEST_CONFLICT: 'This request identifier was used with different parameters. Refresh the data.',
+    EXTERNAL_SUBSCRIPTION_PROTECTED: 'This subscription is protected from manual changes.', SUBSCRIPTION_MISSING: 'No existing subscription record.', PLAN_UNCHANGED: 'The plan already has this value.', ADMIN_CONFIGURATION_MISSING: 'Apply the stage 4 migration manually before this operation.',
+    managementSnapshot: 'Status and recent actions', blockedCount: 'Accounts with an active Auth ban', summaryScope: 'Checked administrator JWT, SQL access and Auth banned_until. This count does not prove that all existing sessions ended. Other private operations and billing systems were not checked.',
+    dashboardScope: 'Connection confirmed for this JWT and administrative SQL statistics. Full diagnostics are in System status.', recentActions: 'Recent administrative actions',
+    manual_pro_grant: 'Manual Pro grant', free_restore: 'Restore Free', account_block: 'Temporarily block', account_restore: 'Restore access', manual_access: 'Manual access grant', manual_revoke: 'Manual access revocation', abuse: 'Abuse', security: 'Security', policy: 'Policy violation',
+  },
+}
+for (const lang of ['bg','en']) Object.assign(adminText[lang], stage4[lang])

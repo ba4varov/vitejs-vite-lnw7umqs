@@ -11,6 +11,7 @@ async function setup(page: any, status = 200, signedIn = true) {
   await page.route('**/api/admin?**', async route => {
     const url = new URL(route.request().url())
     const action = url.searchParams.get('action')
+    if(action?.startsWith('management-')) return route.fulfill({status:503,json:{error:'ADMIN_CONFIGURATION_MISSING'}})
     const data = action === 'stats' ? { total: 21, last7: 2, last30: 5, favorites: 8, free: 20, pro: 1, registrations: Array.from({length:30},(_,i)=>({date:`2026-09-${String(i+1).padStart(2,'0')}`,count:i%3})) }
       : action === 'users' ? { total: url.searchParams.get('search') ? 1 : 21, pageSize:20, users:[{...user, email:url.searchParams.get('page') === '2' ? 'second@example.invalid' : 'first@example.invalid', created_at:'2026-09-01T10:00:00Z', providers:['email'], plan:'free'}] }
       : action === 'system' ? {supabase:'connected',checkedAt:'2026-10-08T10:00:00Z'} : {...user,authorized:true}

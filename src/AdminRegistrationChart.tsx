@@ -1,10 +1,11 @@
 import { useState } from 'react'
 
 type Registration = { date: string; count: number }
-export function AdminRegistrationChart({ registrations, title, details, scrollHint }: {
-  registrations: Registration[]; title: string; details: string; scrollHint: string
+export function AdminRegistrationChart({ registrations, title, details, scrollHint, emptyLabel }: {
+  registrations: Registration[]; title: string; details: string; scrollHint: string; emptyLabel: string
 }) {
   const [selected, setSelected] = useState<Registration | null>(null)
+  if (!Array.isArray(registrations) || !registrations.length) return <section className="admin-card"><h3>{title}</h3><p>{emptyLabel}</p></section>
   const maximum = Math.max(1, ...registrations.map(day => day.count))
   return <section className="admin-card">
     <h3>{title}</h3>
