@@ -1,6 +1,7 @@
 export const PLACE_LABELS_KEY = 'meteoPulsePlaceLabelsV1'
 
 const normalized = value => String(value || '').normalize('NFKD').replace(/\p{Diacritic}/gu, '').trim().toLocaleLowerCase()
+const normalizedRegion = value => normalized(value).replace(/^(oblast|област|province|region|county)\s+/, '')
 const closeCoordinate = (a, b) => Math.abs(Number(a) - Number(b)) <= 0.02
 const sameValue = (left, right) => left != null && right != null && String(left) === String(right)
 
@@ -8,7 +9,7 @@ function metadataMatches(place, translations) {
   if (place.countryCode && !translations.some(result => normalized(result.country_code) === normalized(place.countryCode))) return false
   if (place.admin1Id != null && !translations.some(result => sameValue(result.admin1_id, place.admin1Id))) return false
   if (place.country && !translations.some(result => normalized(result.country) === normalized(place.country) || normalized(result.country_code) === normalized(place.country))) return false
-  if (place.region && !translations.some(result => normalized(result.admin1) === normalized(place.region))) return false
+  if (place.region && !translations.some(result => normalizedRegion(result.admin1) === normalizedRegion(place.region))) return false
   return true
 }
 

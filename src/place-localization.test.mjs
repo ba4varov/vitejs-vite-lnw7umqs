@@ -34,6 +34,15 @@ test('actual localization resolves a legacy Bulgarian record before requesting i
   assert.match(api.calls.at(-1), /\/get\?id=726050&language=en/)
 })
 
+test('localizes a stored Varna favorite whose region omits the Bulgarian administrative prefix', async () => {
+  const api = geocoder()
+  const place = { name: 'Варна', region: 'Варна', country: 'България', lat: 43.2141, lon: 27.9147 }
+  const localized = await localizePlace(place, 'en', { fetcher: api.fetcher, storage: null })
+
+  assert.deepEqual([localized.name, localized.region, localized.country], ['Varna', 'Varna', 'Bulgaria'])
+  assert.equal(localized.geonameId, 726050)
+})
+
 test('actual localization resolves a legacy English record through Bulgarian metadata', async () => {
   const api = geocoder()
   const place = { name: 'Varna', region: 'Varna', country: 'Bulgaria', lat: 43.2167, lon: 27.9167 }

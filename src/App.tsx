@@ -10,9 +10,10 @@ import { subscribeSession, type AuthSession } from './auth-client'
 import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, setPlaceIdentity, type Place } from './places-client'
 import { placeKey } from './places-core.js'
 import { createPlacesSessionGuard } from './places-session-guard.js'
-import { localizePlaceSelection } from './place-localization'
+import { localizePlace } from './place-localization'
+import { localizeAccountPlaces } from './account-place-localization.js'
 import { createLocalizationGuard } from './place-localization-core.js'
-import { reverseGeocodeLocation } from './reverse-geocoding.js'
+import { localizeCurrentLocation, locationFromReverseGeocode, reverseGeocodeLocation } from './current-location-localization.js'
 
 const translations = {
   bg: {
@@ -381,7 +382,7 @@ const WeatherApp = () => {
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
-  const [deviceLocation, setDeviceLocation] = useState<{ lat: number, lon: number } | null>(null)
+  const [locationSource, setLocationSource] = useState<'default' | 'quick' | 'search' | 'place' | 'geolocation'>('default')
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
@@ -414,16 +415,19 @@ const WeatherApp = () => {
   const searchTimer = useRef<any>(null)
   const searchRequestIdRef = useRef(0)
   const weatherRequestIdRef = useRef(0)
-  const coordsRef = useRef(coords)
   const locationChoiceRef = useRef(false)
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
   const placesGuardRef = useRef(createPlacesSessionGuard())
   const localizationGuardRef = useRef(createLocalizationGuard())
+  const currentLocalizationGuardRef = useRef(createLocalizationGuard())
+  const langRef = useRef(lang)
   const t = translations[lang as keyof typeof translations]
 
-  useEffect(() => { coordsRef.current = coords }, [coords])
+  useEffect(() => {
+    langRef.current = lang
+  }, [lang])
 
   const toggleLanguage = () => {
     const nextLanguage = lang === 'bg' ? 'en' : 'bg'
@@ -434,21 +438,16 @@ const WeatherApp = () => {
   const choosePlace = (place: Place, manual = true) => {
     if (manual) placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
+    setLocationSource('place')
     setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
   }
 
   useEffect(() => {
     const guard = localizationGuardRef.current
     const ticket = guard.begin()
-    const savedSelection = places.find(place => placeKey(place) === placeKey(coordsRef.current))
-    const selectedPlace = savedSelection || { ...placeDetails, name: city, ...coordsRef.current }
-    localizePlaceSelection(places, selectedPlace, lang, { signal: ticket.controller.signal }).then(localized => {
+    Promise.all(places.map(place => localizePlace(place, lang, { signal: ticket.controller.signal }).catch(() => place))).then(next => {
       if (!guard.isCurrent(ticket)) return
-      const next = localized.places
       setLocalizedPlaces(next)
-      const selected = localized.selectedPlace
-      setCity(selected.name)
-      setPlaceDetails({ geonameId: selected.geonameId || undefined, countryCode: selected.countryCode || undefined, admin1Id: selected.admin1Id || undefined, region: selected.region || undefined, country: selected.country || undefined })
       const originalsWithIdentity = places.map((original, index) => ({
         ...original,
         geonameId: next[index].geonameId,
@@ -464,15 +463,40 @@ const WeatherApp = () => {
       }
     })
     return () => guard.invalidate(ticket)
-  }, [lang, places, session?.user.id, coords.lat, coords.lon])
+  }, [lang, places, session?.user.id])
+
+  useEffect(() => {
+    if (locationSource === 'geolocation') return
+    const guard = currentLocalizationGuardRef.current
+    const ticket = guard.begin()
+    const current = { name: city, lat: coords.lat, lon: coords.lon, ...placeDetails }
+    void localizeCurrentLocation(current, lang, t.quickCities, localizePlace, { signal: ticket.controller.signal }).then(localized => {
+      if (!guard.isCurrent(ticket)) return
+      setCity(localized.name)
+      setPlaceDetails(details => ({
+        ...details,
+        geonameId: localized.geonameId ?? details.geonameId,
+        countryCode: localized.countryCode ?? details.countryCode,
+        admin1Id: localized.admin1Id ?? details.admin1Id,
+        region: localized.region ?? undefined,
+        country: localized.country ?? undefined
+      }))
+    }).catch(() => {})
+    return () => guard.invalidate(ticket)
+  }, [lang, coords.lat, coords.lon, placeDetails.geonameId, locationSource])
 
   const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
     setPlacesBusy(true); setPlacesError(false)
     try {
       const snapshot = await fetchPlaces(active)
       if (!placesGuardRef.current.isCurrent(ticket)) return
-      setPlaces(snapshot.places); setDefaultPlaceId(snapshot.defaultPlaceId)
-      const preferred = snapshot.places.find(place => place.id === snapshot.defaultPlaceId)
+      const localized = await localizeAccountPlaces(snapshot.places, snapshot.defaultPlaceId, () => langRef.current,
+        (place, language) => localizePlace(place, language))
+      if (!placesGuardRef.current.isCurrent(ticket)) return
+      setPlaces(snapshot.places)
+      setLocalizedPlaces(localized.localizedPlaces)
+      setDefaultPlaceId(snapshot.defaultPlaceId)
+      const preferred = localized.preferred
       if (placesGuardRef.current.resolveDefault(ticket) && preferred) choosePlace(preferred, false)
       setOfferImport(localPlaces().length > 0)
     } catch { if (placesGuardRef.current.isCurrent(ticket)) setPlacesError(true) }
@@ -481,11 +505,14 @@ const WeatherApp = () => {
 
   useEffect(() => { const unsubscribe = subscribeSession(active => {
     const { accountChanged, ticket } = placesGuardRef.current.changeSession(active?.user.id || null)
-    setSession(active); setPlacesError(false); setPlacesBusy(false)
+    setSession(active)
+    if (!accountChanged && active) return
+    setPlacesError(false); setPlacesBusy(false)
     if (accountChanged) {
       setOfferImport(false); setDefaultPlaceId(null)
       // Clear the prior account immediately; never display it while the next request is pending.
       setPlaces([])
+      setLocalizedPlaces([])
     }
     if (active) loadAccountPlaces(active, ticket)
     else { try { setPlaces(localPlaces()) } catch { setPlaces([]) } }
@@ -639,6 +666,7 @@ const WeatherApp = () => {
   const selectCity = (result: any) => {
     placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
+    setLocationSource('search')
     ++searchRequestIdRef.current
     if (searchTimer.current) clearTimeout(searchTimer.current)
     setCity(result.name)
@@ -894,32 +922,32 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     fetchWeather(coords.lat, coords.lon)
     const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [coords, city, lang])
+  }, [coords.lat, coords.lon])
 
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition((pos) => {
         if (locationChoiceRef.current) return
         const lat = pos.coords.latitude, lon = pos.coords.longitude
-        setDeviceLocation({ lat, lon })
+        setLocationSource('geolocation')
+        setPlaceDetails({})
         setCoords({ lat, lon })
       }, () => {}, { timeout: 5000 })
     }
   }, [])
 
   useEffect(() => {
-    if (!deviceLocation || locationChoiceRef.current) return
+    if (locationSource !== 'geolocation') return
     const controller = new AbortController()
-    reverseGeocodeLocation(deviceLocation.lat, deviceLocation.lon, lang, { signal: controller.signal }).then(location => {
+    void reverseGeocodeLocation(coords, lang, { signal: controller.signal }).then(data => {
       if (controller.signal.aborted || locationChoiceRef.current) return
-      setCity(location.name || t.myLocation)
-      setPlaceDetails({ region: location.region || undefined, country: location.country || undefined })
-      setExactLocation(location.address)
-    }).catch(() => {
-      if (!controller.signal.aborted && !locationChoiceRef.current) setCity(t.myLocation)
-    })
+      const localized = locationFromReverseGeocode(data, t.myLocation)
+      setCity(localized.name)
+      setPlaceDetails({ region: localized.region, country: localized.country })
+      setExactLocation(localized.exactLocation)
+    }).catch(() => { if (!controller.signal.aborted && !locationChoiceRef.current) setCity(t.myLocation) })
     return () => controller.abort()
-  }, [deviceLocation, lang])
+  }, [lang, coords.lat, coords.lon, locationSource])
 
   const activeAlerts = [];
   if (weather) {
@@ -974,7 +1002,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
       <div className="header-row">
         <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h1>{t.title}</h1>
+          <h1><a className="brand-home" href={import.meta.env.BASE_URL} aria-label={lang === 'bg' ? 'Метео Пулс — начална страница' : 'Meteo Pulse — home'}>{t.title}</a></h1>
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
@@ -1028,8 +1056,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {t.quickCities.map((c: any) => {
           return (
             <button key={c.name}
-              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
-              className={placeKey(coords) === placeKey(c) ? 'city-btn active' : 'city-btn'}>
+              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
           )
@@ -1039,7 +1067,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       <section className="my-places" aria-labelledby="my-places-title">
         <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>
         {localizedPlaces.length > 0 ? <div className="my-places-list">{localizedPlaces.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
-          <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} onClick={() => choosePlace(place)}><strong>{place.name}</strong>{(place.region || place.country) && <small>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
+          <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} aria-pressed={placeKey(place) === placeKey(coords)} onClick={() => choosePlace(place)}><strong title={place.name}>{place.name}</strong>{(place.region || place.country) && <small title={[place.region, place.country].filter(Boolean).join(', ')}>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
           {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
         </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}
         {offerImport && session && <div className="places-import"><span>{lang === 'bg' ? 'Имаш места, запазени на това устройство.' : 'You have places saved on this device.'}</span><button onClick={migrateLocalPlaces} disabled={placesBusy}>{lang === 'bg' ? 'Прехвърли към профила' : 'Move to profile'}</button><button onClick={() => setOfferImport(false)}>{lang === 'bg' ? 'Не сега' : 'Not now'}</button></div>}
