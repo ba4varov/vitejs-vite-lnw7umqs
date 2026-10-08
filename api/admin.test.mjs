@@ -73,3 +73,19 @@ test('Supabase probe failure is not reported as connected', async () => {
   assert.equal(res.code,200);assert.equal(res.body.checks[0].available,false)
   for(const membershipFailure of [401,403]) assert.equal((await run({query:{action:'system'},membershipFailure})).res.code,membershipFailure)
 })
+test('stage 3 parameters are bounded and server constructs RPC payloads', async () => {
+  for (const action of ['analytics','audit']) {
+    const {res,calls}=await run({query:{action,period:'12m',filter:'user_details_view',page:'2',admin_id:'spoof'}})
+    assert.equal(res.code,200)
+    assert.deepEqual(JSON.parse(calls[2].options.body),action==='analytics'?{period:'12m'}:{period:'12m',selected_action:'user_details_view',page_number:2})
+    for(const query of [{action,period:'365'},{action,period:['7']},{action,page:'0'},{action,page:['1']},{action,filter:'invented'}]) assert.equal((await run({query})).res.code,400)
+    assert.equal((await run({query:{action},authorized:false})).calls.length,2)
+    for(const failure of [401,403]) assert.equal((await run({query:{action},failure})).res.code,failure)
+  }
+})
+test('missing migration is identified without returning fake data', async () => {
+  const res={setHeader(){},status(code){this.code=code;return this},json(body){this.body=body;return this}}
+  await handleAdmin({method:'GET',headers:{authorization:'Bearer valid'},query:{action:'analytics'}},res,env,async url=>
+    url.endsWith('/user')?{ok:true,json:async()=>({id:'owner'})}:url.endsWith('is_meteo_admin')?{ok:true,json:async()=>true}:{ok:false,status:404,json:async()=>({code:'PGRST202'})})
+  assert.equal(res.code,503);assert.equal(res.body.error,'ADMIN_CONFIGURATION_MISSING')
+})
