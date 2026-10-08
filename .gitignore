@@ -42,3 +42,8 @@ backup-staging/
 supabase/.temp/
 __pycache__/
 *.pyc
+
+# Local verification artifacts
+work/
+playwright-report/
+test-results/

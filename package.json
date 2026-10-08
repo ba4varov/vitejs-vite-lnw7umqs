@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test api/*.test.mjs src/*.test.mjs"
+    "test": "node --test api/*.test.mjs src/*.test.mjs",
+    "test:admin:browser": "playwright test"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.117.3",
@@ -16,6 +17,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

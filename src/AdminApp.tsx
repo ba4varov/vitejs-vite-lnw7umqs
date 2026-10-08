@@ -15,6 +15,7 @@ export default function AdminApp() {
   const [status, setStatus] = useState('loading')
   const [identity, setIdentity] = useState<any>(null)
   const [data, setData] = useState<any>(null)
+  const [loadedSection, setLoadedSection] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<any>(null)
@@ -37,7 +38,7 @@ export default function AdminApp() {
           const result = section === 'profile' ? access : await adminRequest(session,
             section === 'dashboard' ? 'stats' : section === 'users' ? 'users' : 'system',
             section === 'users' ? { search, page: String(page) } : {}, controller.signal)
-          if (!controller.signal.aborted) { setIdentity(access); setData(result); setStatus('ok') }
+          if (!controller.signal.aborted) { setIdentity(access); setData(result); setLoadedSection(section); setStatus('ok') }
         } catch (error) {
           if (!controller.signal.aborted) setStatus(error instanceof AdminError && error.status === 403 ? 'forbidden' : error instanceof AdminError && error.status === 401 ? 'expired' : 'error')
         }
@@ -47,7 +48,7 @@ export default function AdminApp() {
   }, [session, section, search, page, retry])
   const date = (value: string) => value ? new Date(value).toLocaleString(lang === 'bg' ? 'bg-BG' : 'en-GB') : t.unavailable
   const fields = (user: any) => [ [t.email, user.email], [t.name, user.display_name], ['UUID', user.id], [t.created, date(user.created_at)], [t.lastLogin, date(user.last_sign_in_at)], [t.provider, user.providers?.join(', ')], [t.plan, user.plan] ]
-  const permitted = status === 'ok' && identity && session
+  const permitted = status === 'ok' && identity && session && loadedSection === section
   return <div className={`admin-app${dark ? ' admin-dark' : ''}`}>
     <aside><a className="admin-brand" href="/">☀ Meteo Puls</a><p>{t.readonly}</p><nav aria-label={t.title}>
       {['dashboard', 'users', 'system', 'profile'].map(key => <button key={key} aria-current={section === key ? 'page' : undefined} onClick={() => setSection(key)}>{t[key]}</button>)}
