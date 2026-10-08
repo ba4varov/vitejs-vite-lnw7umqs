@@ -6,6 +6,7 @@ import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
+import { AdminLink } from './AdminLink'
 import { loadLanguage, saveLanguage } from './language-storage.js'
 import { subscribeSession, type AuthSession } from './auth-client'
 import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, setPlaceIdentity, type Place } from './places-client'
@@ -996,6 +997,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         </div>
         <div className="header-btns">
           <AuthPanel lang={lang} />
+          <AdminLink lang={lang} />
           <button className="lang-btn" onClick={toggleLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
