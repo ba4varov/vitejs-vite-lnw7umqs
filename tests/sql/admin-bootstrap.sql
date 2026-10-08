@@ -11,6 +11,7 @@ create table auth.users (
   email text,
   created_at timestamptz not null default now(),
   last_sign_in_at timestamptz,
+  banned_until timestamptz,
   raw_app_meta_data jsonb not null default '{}'::jsonb,
   raw_user_meta_data jsonb not null default '{}'::jsonb
 );

@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { authenticate, handleProfile, publicProfile, validDisplayName } from './profile-core.js'
+import { authenticate, handleProfile, publicProfile, validDisplayName } from '../../server/profile-core.js'
 import { readFile } from 'node:fs/promises'
 
-const migration = await readFile(new URL('../supabase/migrations/20260930000000_auth_profiles.sql', import.meta.url), 'utf8')
-const route = await readFile(new URL('./profile.ts', import.meta.url), 'utf8')
-const core = await readFile(new URL('./profile-core.js', import.meta.url), 'utf8')
+const migration = await readFile(new URL('../../supabase/migrations/20260930000000_auth_profiles.sql', import.meta.url), 'utf8')
+const route = await readFile(new URL('../../api/profile.ts', import.meta.url), 'utf8')
+const core = await readFile(new URL('../../server/profile-core.js', import.meta.url), 'utf8')
 
 test('profile only exposes safe user-owned and entitlement fields', () => {
   assert.deepEqual(publicProfile({ id: 'user-1', email: 'a@example.com' }, { display_name: 'Ana', secret: 'no' }, { plan: 'free', permissions: [] }), { id: 'user-1', email: 'a@example.com', name: 'Ana', plan: 'free', permissions: [] })

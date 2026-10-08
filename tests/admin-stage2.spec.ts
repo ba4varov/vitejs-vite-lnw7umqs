@@ -6,6 +6,7 @@ async function setup(page: any) {
   let probes = 0, favoritesStatus = 200
   await page.route('**/api/admin?**', route => {
     const action = new URL(route.request().url()).searchParams.get('action')
+    if(action?.startsWith('management-')) return route.fulfill({status:503,json:{error:'ADMIN_CONFIGURATION_MISSING'}})
     if(action==='system') probes++
     const data = action==='users' ? {total:1,pageSize:20,users:[{id,email:'user@example.invalid',display_name:'Тестов потребител',providers:['email','google'],plan:'free',created_at:'2026-10-01T12:00:00Z'}]}
       : action==='favorites' ? [{id:'city-1',name:'София',country:'България'}]

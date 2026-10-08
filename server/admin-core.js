@@ -33,10 +33,24 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
       const selectedAction = req.query?.filter || ''
       const page = Number(req.query?.page || 1)
       if (!['7','30','90','12m'].includes(period) || typeof selectedAction !== 'string' ||
-          !['','user_details_view','user_favorites_view'].includes(selectedAction) || (req.query?.page != null && typeof req.query.page !== 'string') || !Number.isInteger(page) || page < 1 || page > 1000000)
+          !['','user_details_view','user_management_view','user_favorites_view','manual_pro_grant','free_restore','account_block','account_restore'].includes(selectedAction) || (req.query?.page != null && typeof req.query.page !== 'string') || !Number.isInteger(page) || page < 1 || page > 1000000)
         return res.status(400).json({ error: 'INVALID_QUERY' })
       return res.status(200).json(await rpc(action === 'analytics' ? 'admin_advanced_statistics' : 'admin_audit_entries',
         action === 'analytics' ? { period } : { period, selected_action: selectedAction, page_number: page }))
+    }
+    if (action === 'management-summary') return res.status(200).json(await rpc('admin_management_summary'))
+    if (action === 'management-account') {
+      const id = req.query?.id
+      if (typeof id !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)) return res.status(400).json({ error: 'INVALID_QUERY' })
+      return res.status(200).json(await rpc('admin_management_account', { selected_id: id }))
+    }
+    if (action === 'management-users') {
+      const q = req.query || {}, page = Number(q.page || '1')
+      const validDate = value => value == null || value === '' || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value)
+      if (typeof (q.search || '') !== 'string' || (q.search || '').length > 254 || (q.page != null && typeof q.page !== 'string') || !Number.isInteger(page) || page < 1 || page > 1000000 ||
+          !['','active','blocked'].includes(q.status || '') || !['','free','pro'].includes(q.plan || '') || !validDate(q.from) || !validDate(q.to) || (q.from && q.to && q.from > q.to))
+        return res.status(400).json({ error: 'INVALID_QUERY' })
+      return res.status(200).json(await rpc('admin_management_users', { search_text: q.search || '', page_number: page, access_status: q.status || '', selected_plan: q.plan || '', registered_from: q.from || null, registered_to: q.to || null }))
     }
     if (action === 'stats') return res.status(200).json(await rpc('admin_statistics'))
     if (action === 'system') {

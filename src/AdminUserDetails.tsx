@@ -10,6 +10,7 @@ export function AdminUserDetails({ user, session, t, fields, onDenied }: any) {
     const controller = new AbortController()
     setDetails(null); setFavorites(null); setFailed(false); setCopy('')
     void (async () => {
+      // Audited identity read (user_details_view); management has its own distinct audit event.
       const result = await adminRequest(session as AuthSession, 'users', { id: user.id }, controller.signal)
       if (!result.users?.[0]) throw new Error('USER_NOT_FOUND')
       if (!controller.signal.aborted) setDetails(result.users[0])
