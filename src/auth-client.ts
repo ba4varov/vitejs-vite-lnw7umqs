@@ -194,6 +194,9 @@ export async function consumeGoogleCallback(): Promise<boolean> {
   if (startedAt !== revision) { flow.cancel(); return false }
   return flow.consume((session: AuthSession) => {
     if (revision !== startedAt) throw new Error('GOOGLE_CALLBACK_STALE')
-    saveSession(session)
+    // Do not retain Google provider tokens or profile metadata in browser storage.
+    saveSession({ access_token: session.access_token, refresh_token: session.refresh_token,
+      expires_at: session.expires_at,
+      user: { id: session.user.id, email: session.user.email, email_confirmed_at: session.user.email_confirmed_at } })
   })
 }

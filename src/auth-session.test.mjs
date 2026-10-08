@@ -10,15 +10,18 @@ const dataUrl = source => `data:text/javascript;base64,${Buffer.from(source).toS
 let moduleId = 0
 const session = (seconds = 3600, token = 'old') => ({ access_token: token, refresh_token: `refresh-${token}`, expires_at: Math.floor(Date.now() / 1000) + seconds, user: { id: 'account' } })
 
-async function setup(t, stored = null) {
+async function setup(t, stored = null, google = false) {
   const values = new Map(stored ? [['meteo-pulse-auth', JSON.stringify(stored)]] : [])
+  const pending = new Map()
+  const location = { href: 'https://meteo.example/', origin: 'https://meteo.example', assign: () => {} }
   const window = new EventTarget()
+  window.location = location
   const document = new EventTarget()
   document.visibilityState = 'visible'
   t.mock.method(globalThis, 'setTimeout', globalThis.setTimeout)
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_800_000_000_000 })
   const descriptors = new Map()
-  for (const [name, value] of Object.entries({ window, document, navigator: { locks: { request: async (_name, callback) => callback() } }, localStorage: {
+  for (const [name, value] of Object.entries({ window, document, location, history: { replaceState: (_a, _b, next) => { location.href = `https://meteo.example${next}` } }, sessionStorage: { getItem: key => pending.get(key) ?? null, setItem: (key, value) => pending.set(key, value), removeItem: key => pending.delete(key) }, navigator: { locks: { request: async (_name, callback) => callback() } }, localStorage: {
     getItem: key => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
     removeItem: key => values.delete(key),
@@ -28,11 +31,11 @@ async function setup(t, stored = null) {
   }
   t.after(() => { for (const [name, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, name, descriptor); else delete globalThis[name] } })
   const fetch = t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('offline') })
-  const source = stripTypeScriptTypes(original.replace("'./captcha-payload.js'", JSON.stringify(dataUrl(captcha))).replaceAll('import.meta.env', "({ VITE_SUPABASE_URL: 'https://auth.example', VITE_SUPABASE_ANON_KEY: 'anon' })"))
+  const source = stripTypeScriptTypes(original.replace("'@supabase/auth-js'", JSON.stringify(import.meta.resolve('@supabase/auth-js'))).replace("'./google-oauth.js'", JSON.stringify(new URL('./google-oauth.js', import.meta.url).href)).replace("'./captcha-payload.js'", JSON.stringify(dataUrl(captcha))).replaceAll('import.meta.env', `({ VITE_GOOGLE_AUTH_ENABLED: '${google}', VITE_SUPABASE_URL: 'https://auth.example', VITE_SUPABASE_ANON_KEY: 'anon' })`))
   const auth = await import(`${dataUrl(source)}#${moduleId++}`)
   let active
   auth.subscribeSession(value => { active = value })
-  return { auth, fetch, values, window, document, active: () => active, response: (data, status = 200) => ({ ok: status < 400, status, json: async () => data }), flush: async () => { for (let i = 0; i < 12; i++) await Promise.resolve() } }
+  return { auth, fetch, values, pending, location, window, document, active: () => active, response: (data, status = 200) => ({ ok: status < 400, status, json: async () => data }), flush: async () => { for (let i = 0; i < 12; i++) await Promise.resolve() } }
 }
 
 test('valid stored sessions restore without a network request', async t => {
@@ -176,4 +179,50 @@ test('storage-disabled browsers can refresh the in-memory session', async t => {
   f.auth.saveSession(session(0))
   f.fetch.mock.mockImplementation(async () => f.response(session(3600, 'new')))
   assert.equal((await f.auth.restoreSession()).access_token, 'new')
+})
+
+
+test('real Google callback publishes to shared session, repeat login retains user ID and logout clears it', async t => {
+  const existing = session()
+  const f = await setup(t, existing, true)
+  await f.auth.restoreSession()
+  await f.auth.signInWithGoogle()
+  f.location.href = 'https://meteo.example/?oauth=google&code=code'
+  const google = { ...session(3600, 'google'), expires_in: 3600, token_type: 'bearer', provider_token: 'never-store-google-token' }
+  f.fetch.mock.mockImplementation(async () => new Response(JSON.stringify(google), { headers: { 'Content-Type': 'application/json' } }))
+  assert.equal(await f.auth.consumeGoogleCallback(), true)
+  assert.equal(f.active().user.id, existing.user.id)
+  assert.equal(f.active().access_token, 'google')
+  assert.deepEqual(JSON.parse(f.values.get('meteo-pulse-auth')), f.active())
+  assert.equal(f.pending.size, 0)
+  assert.equal(f.active().provider_token, undefined)
+  assert.ok(!f.values.get('meteo-pulse-auth').includes('never-store-google-token'))
+  await f.auth.signOut(f.active())
+  assert.equal(f.active(), null)
+  assert.equal(f.values.has('meteo-pulse-auth'), false)
+})
+test('logout while Google exchange is in flight cannot resurrect shared session', async t => {
+  const f = await setup(t, null, true)
+  f.auth.saveSession(session())
+  await f.auth.signInWithGoogle()
+  f.location.href = 'https://meteo.example/?oauth=google&code=code'
+  let resolve
+  f.fetch.mock.mockImplementation(url => url.includes('/logout') ? Promise.reject(new Error('offline')) : new Promise(r => { resolve = r }))
+  const exchanging = f.auth.consumeGoogleCallback()
+  for (let i = 0; i < 50 && !resolve; i++) await Promise.resolve()
+  assert.ok(resolve)
+  await f.auth.signOut(f.active())
+  resolve(new Response(JSON.stringify({ ...session(3600, 'late-google'), expires_in: 3600, token_type: 'bearer' }), { headers: { 'Content-Type': 'application/json' } }))
+  await assert.rejects(exchanging, /GOOGLE_CALLBACK_STALE/)
+  assert.equal(f.active(), null)
+  assert.equal(f.pending.size, 0)
+})
+test('Google denial preserves an existing shared session and scrubs callback error', async t => {
+  const f = await setup(t, null, true)
+  const existing = session(); f.auth.saveSession(existing)
+  await f.auth.signInWithGoogle()
+  f.location.href = 'https://meteo.example/?oauth=google&error=access_denied'
+  await assert.rejects(f.auth.consumeGoogleCallback(), /GOOGLE_DENIED/)
+  assert.deepEqual(f.active(), existing)
+  assert.equal(f.location.href, 'https://meteo.example/')
 })
