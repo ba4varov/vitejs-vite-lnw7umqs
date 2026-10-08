@@ -32,10 +32,12 @@
 - Vercel dashboard/build logs не са достъпни чрез наличната връзка. Открит е Vercel plugin, но той още не е свързан с проекта. Средата няма конфигурирана Vercel самоличност/credential; не е започван интерактивен login и не са търсени стойности на секрети.
 - **Точната причина остава непотвърдена.** Няма основание да се приписва на този локално успешен build или да се променят Vercel settings по предположение. Не е потвърден успешен нов Preview deployment.
 
+След корекцията е проверен и автоматичният Preview за commit `0f1724a61cfdfc48f197ab22943d74485a50148c`: **`dpl_FRjakN9r8bzZi6Zh41ETh9hndHwy`** също има GitHub Vercel status **`failure`**. [Новият deployment](https://vercel.com/ba4varov-projects/weather/FRjakN9r8bzZi6Zh41ETh9hndHwy) не е успешен въпреки всички локални PASS проверки. И този status препраща към CLI inspect, без да разкрива error code или Build Logs. Това не установява дали причината е в кода, Vercel конфигурацията или правата; не се прави предположение.
+
 За завършване собственикът трябва да предостави едно от следните:
 
 1. Свързан Vercel достъп до проекта `weather` в `ba4varov-projects`, позволяващ преглед на deployment details, error code и Build Logs; или
-2. Редактирани Build Logs и точния deployment error code от посочения deployment. Ако собственикът вече е логнат във Vercel CLI, може да изпълни `npx vercel inspect dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a --logs --scope ba4varov-projects` и да предостави изхода без секрети.
+2. Редактирани Build Logs и точния deployment error code от първоначалния и новия deployment. Ако собственикът вече е логнат във Vercel CLI, може да изпълни `npx vercel inspect dpl_BHiCrRjEyY7mmMUrK8AWUfPUuA1a --logs --scope ba4varov-projects` и също `npx vercel inspect dpl_FRjakN9r8bzZi6Zh41ETh9hndHwy --logs --scope ba4varov-projects`, като предостави изхода без секрети.
 
 При установен кодов проблем ще е нужна доказана корекция и проверка на новия автоматичен GitHub Preview за точния нов commit. Локалните PASS резултати по-долу не заместват такова потвърждение. Не е стартиран ръчен Production deployment.
 
