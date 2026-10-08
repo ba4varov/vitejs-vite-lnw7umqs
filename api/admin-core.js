@@ -9,7 +9,7 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
   if (!base || !key) return res.status(503).json({ error: 'NOT_CONFIGURED' })
   try {
     const authorization = req.headers.authorization
-    const user = await authenticate(base, key, authorization, fetcher)
+    const user = await authenticate(base, key, authorization, (url, options) => fetcher(url, { ...options, signal: AbortSignal.timeout(10000) }))
     if (!user?.id) return res.status(401).json({ error: 'INVALID_SESSION' })
     const rpc = async (name, body = {}) => {
       const response = await fetcher(`${base}/rest/v1/rpc/${name}`, {
@@ -28,8 +28,30 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
     if (action === 'access') return res.status(200).json({ authorized: true, email: user.email, id: user.id })
     if (action === 'stats') return res.status(200).json(await rpc('admin_statistics'))
     if (action === 'system') {
-      await rpc('is_meteo_admin')
-      return res.status(200).json({ supabase: 'connected', checkedAt: new Date().toISOString() })
+      const probe = async (service, check) => {
+        const start = performance.now()
+        try {
+          await check()
+          return { service, available: true, responseMs: Math.round(performance.now() - start), checkedAt: new Date().toISOString(), problem: null }
+        } catch (error) {
+          if (error.status === 401 || error.status === 403) throw error
+          return { service, available: false, responseMs: Math.round(performance.now() - start), checkedAt: new Date().toISOString(), problem: 'CHECK_FAILED' }
+        }
+      }
+      const checks = await Promise.all([
+        probe('supabase', async () => { if (await rpc('is_meteo_admin') !== true) { const error = new Error('FORBIDDEN'); error.status = 403; throw error } }),
+        probe('admin', async () => { const result = await rpc('admin_users', { search_email: '', page_number: 1, selected_id: user.id }); if (!Array.isArray(result.users)) throw new Error('INVALID_RESPONSE') }),
+        probe('openMeteo', async () => {
+          const response = await fetcher('https://api.open-meteo.com/v1/forecast?latitude=42.7&longitude=23.3&current=temperature_2m', { signal: AbortSignal.timeout(8000) })
+          if (!response.ok || !Number.isFinite((await response.json()).current?.temperature_2m)) throw new Error('INVALID_RESPONSE')
+        }),
+      ])
+      return res.status(200).json({ checks })
+    }
+    if (action === 'favorites') {
+      const id = req.query?.id
+      if (typeof id !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)) return res.status(400).json({ error: 'INVALID_QUERY' })
+      return res.status(200).json(await rpc('admin_user_favorites', { selected_id: id }))
     }
     if (action === 'users') {
       const search = req.query?.search || ''
