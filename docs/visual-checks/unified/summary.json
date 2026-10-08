@@ -1,0 +1,26 @@
+[
+  {
+    "viewport": 1440,
+    "light": "665.8125 \u00d7 414 px",
+    "dark": "665.8125 \u00d7 412 px",
+    "cards": "174 \u00d7 278 px"
+  },
+  {
+    "viewport": 768,
+    "light": "721.9375 \u00d7 390 px",
+    "dark": "721.9375 \u00d7 388 px",
+    "cards": "174 \u00d7 278 px"
+  },
+  {
+    "viewport": 390,
+    "light": "366 \u00d7 386 px",
+    "dark": "366 \u00d7 384 px",
+    "cards": "174 \u00d7 278 px"
+  },
+  {
+    "viewport": 320,
+    "light": "296 \u00d7 386 px",
+    "dark": "296 \u00d7 384 px",
+    "cards": "174 \u00d7 278 px"
+  }
+]
