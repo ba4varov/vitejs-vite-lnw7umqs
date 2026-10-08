@@ -130,6 +130,7 @@ export async function resetPassword(email: string, redirectTo: string, captchaTo
 }
 export async function updatePassword(token: string, password: string) { return request('/user', { password }, token, 'PUT') }
 export async function signOut(session: AuthSession) {
+  googleFlow?.cancel()
   saveSession(null)
   // Local logout is immediate even when server-side revocation fails or times out.
   try { await request('/logout', {}, session.access_token) } catch { /* Already signed out locally. */ }
@@ -154,4 +155,48 @@ export async function profileRequest(session: AuthSession, method = 'GET', name?
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || 'PROFILE_FAILED')
   return data
+}
+
+
+export const googleAuthConfigured = authConfigured && import.meta.env.VITE_GOOGLE_AUTH_ENABLED === 'true'
+let googleFlow: any
+let googleFlowPromise: Promise<any> | undefined
+async function getGoogleFlow() {
+  if (!googleFlowPromise) googleFlowPromise = (async () => {
+    const [{ GoTrueClient }, { createGoogleOAuth, createPKCEStorage }] = await Promise.all([
+      import('@supabase/auth-js'), import('./google-oauth.js'),
+    ])
+    googleFlow = createGoogleOAuth({
+      enabled: googleAuthConfigured, storage: sessionStorage, location, history,
+      createClient: () => new GoTrueClient({
+        url: `${url}/auth/v1`, headers: { apikey: key }, flowType: 'pkce',
+        storageKey: 'meteo-pulse-google',
+        storage: createPKCEStorage(sessionStorage),
+        persistSession: true, autoRefreshToken: false, detectSessionInUrl: false,
+        // SDK requests use the same finite timeout as the REST client.
+        fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10_000) }),
+      }),
+      publish: (session: AuthSession) => saveSession(session),
+    })
+    return googleFlow
+  })().catch(error => { googleFlowPromise = undefined; throw error })
+  return googleFlowPromise
+}
+export async function signInWithGoogle() { return (await getGoogleFlow()).start() }
+export async function consumeGoogleCallback(): Promise<boolean> {
+  // Email confirmation/recovery fragments keep their existing processing.
+  if (new URL(location.href).searchParams.get('oauth') !== 'google') {
+    try { if (!sessionStorage.getItem('meteo-pulse-google-pending')) return false } catch { return false }
+  }
+  const startedAt = revision
+  const flow = await getGoogleFlow()
+  // Logout or another login while loading the SDK invalidates this callback.
+  if (startedAt !== revision) { flow.cancel(); return false }
+  return flow.consume((session: AuthSession) => {
+    if (revision !== startedAt) throw new Error('GOOGLE_CALLBACK_STALE')
+    // Do not retain Google provider tokens or profile metadata in browser storage.
+    saveSession({ access_token: session.access_token, refresh_token: session.refresh_token,
+      expires_at: session.expires_at,
+      user: { id: session.user.id, email: session.user.email, email_confirmed_at: session.user.email_confirmed_at } })
+  })
 }

@@ -713,3 +713,4 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .forecast-dashboard > .hourly-section, .forecast-dashboard > .forecast-section { display: flex; flex-direction: column; }
 .forecast-heading { min-height: 56px; align-items: flex-start; }
 .forecast-heading h3 { margin: 0; }
+.auth-google { width: 100%; padding: 13px !important; margin-bottom: 18px; border-radius: 12px !important; font-weight: 600; }
