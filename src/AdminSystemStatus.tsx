@@ -1,0 +1,3 @@
+export function AdminSystemStatus({ data, t, date, onRetry, lastSuccess }: any) {
+  return <><p>{t.scope}</p><button onClick={onRetry}>{t.checkAgain}</button><div className="admin-health-grid">{data.checks?.map((check: any) => <section className="admin-card admin-health" key={check.service}><h3>{t[check.service]}</h3><p className={check.available ? 'admin-available' : 'admin-problem'}>{check.available ? t.available : t.problem}</p><p>{t[`${check.service}Scope`]}</p><dl><dt>{t.responseTime}</dt><dd>{check.responseMs} ms</dd><dt>{t.checked}</dt><dd>{date(check.checkedAt)}</dd><dt>{t.lastSuccess}</dt><dd>{date(lastSuccess[check.service])}</dd></dl>{check.problem && <p role="alert">{t.checkFailed}</p>}</section>)}</div></>
+}

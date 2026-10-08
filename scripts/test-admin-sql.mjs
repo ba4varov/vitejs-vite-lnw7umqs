@@ -35,10 +35,11 @@ try {
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'pg_isready','-U','postgres'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgreSQL startup timed out')
   console.log(sql(readFileSync(new URL('tests/sql/admin-bootstrap.sql',root),'utf8')))
-  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql']) {
+  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql']) {
     sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
   }
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
@@ -54,6 +55,12 @@ try {
     assert.equal(request(endpoint,jwt(undefined)).status,403,'Valid signed JWT without subject must fail')
   }
   console.log('PASS: real PostgREST direct RPC returns 403 for ordinary users; 401 for missing, malformed, expired and forged JWTs')
+  const favoritesBody=JSON.stringify({selected_id:ordinary})
+  for (const token of [jwt(ordinary),jwt(undefined)]) assert.equal(request('/rpc/admin_user_favorites',token,favoritesBody).status,403)
+  for (const token of [null,'invalid-token',jwt(admin,Math.floor(Date.now()/1000)-120),jwt(admin,undefined,'wrong-test-key')]) assert.equal(request('/rpc/admin_user_favorites',token,favoritesBody).status,401)
+  const favorites=request('/rpc/admin_user_favorites',jwt(admin),favoritesBody); assert.equal(favorites.status,200); assert.equal(favorites.body[0].name,'Test city'); assert.equal(favorites.body.length,1)
+  assert.deepEqual(request('/rpc/admin_user_favorites',jwt(admin),JSON.stringify({selected_id:admin})).body,[])
+  console.log('PASS: real JWT favorites RPC authorization and selected-user isolation')
   const stats=request('/rpc/admin_statistics',jwt(admin)); assert.equal(stats.status,200)
   assert.deepEqual(['total','last7','last30','favorites','free','pro'].map(key=>stats.body[key]),[3,1,2,1,2,1])
   assert.equal(stats.body.registrations.length,30)
@@ -61,6 +68,7 @@ try {
   console.log('PASS: explicit administrator receives real database statistics and filtered users via HTTP RPC')
   sql(`delete from public.admin_memberships where user_id='${admin}';`)
   assert.equal(request('/rpc/admin_statistics',jwt(admin)).status,403)
+  assert.equal(request('/rpc/admin_user_favorites',jwt(admin),favoritesBody).status,403)
   console.log('PASS: revoked membership rejects previously valid administrator JWT')
   console.log('LIMIT: minimal Auth schema + real PostgreSQL/PostgREST; full Supabase GoTrue and deployed Vercel API are not exercised.')
 } finally {
