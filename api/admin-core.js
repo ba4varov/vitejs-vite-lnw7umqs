@@ -17,7 +17,9 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
         body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
       })
       if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
         const error = new Error('RPC_FAILED')
+        error.configurationMissing = payload.code === 'PGRST202'
         error.status = response.status
         throw error
       }
@@ -26,6 +28,16 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
     if (await rpc('is_meteo_admin') !== true) return res.status(403).json({ error: 'FORBIDDEN' })
     const action = req.query?.action || 'access'
     if (action === 'access') return res.status(200).json({ authorized: true, email: user.email, id: user.id })
+    if (action === 'analytics' || action === 'audit') {
+      const period = req.query?.period || '30'
+      const selectedAction = req.query?.filter || ''
+      const page = Number(req.query?.page || 1)
+      if (!['7','30','90','12m'].includes(period) || typeof selectedAction !== 'string' ||
+          !['','user_details_view','user_favorites_view'].includes(selectedAction) || (req.query?.page != null && typeof req.query.page !== 'string') || !Number.isInteger(page) || page < 1 || page > 1000000)
+        return res.status(400).json({ error: 'INVALID_QUERY' })
+      return res.status(200).json(await rpc(action === 'analytics' ? 'admin_advanced_statistics' : 'admin_audit_entries',
+        action === 'analytics' ? { period } : { period, selected_action: selectedAction, page_number: page }))
+    }
     if (action === 'stats') return res.status(200).json(await rpc('admin_statistics'))
     if (action === 'system') {
       const probe = async (service, check) => {
@@ -40,7 +52,7 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
       }
       const checks = await Promise.all([
         probe('supabase', async () => { if (await rpc('is_meteo_admin') !== true) { const error = new Error('FORBIDDEN'); error.status = 403; throw error } }),
-        probe('admin', async () => { const result = await rpc('admin_users', { search_email: '', page_number: 1, selected_id: user.id }); if (!Array.isArray(result.users)) throw new Error('INVALID_RESPONSE') }),
+        probe('admin', async () => { const result = await rpc('admin_users', { search_email: user.email || user.id, page_number: 1, selected_id: null }); if (!Array.isArray(result.users)) throw new Error('INVALID_RESPONSE') }),
         probe('openMeteo', async () => {
           const response = await fetcher('https://api.open-meteo.com/v1/forecast?latitude=42.7&longitude=23.3&current=temperature_2m', { signal: AbortSignal.timeout(8000) })
           if (!response.ok || !Number.isFinite((await response.json()).current?.temperature_2m)) throw new Error('INVALID_RESPONSE')
@@ -64,6 +76,7 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
     }
     return res.status(400).json({ error: 'INVALID_ACTION' })
   } catch (error) {
+    if (error.configurationMissing) return res.status(503).json({ error: 'ADMIN_CONFIGURATION_MISSING' })
     return res.status(error.status === 401 ? 401 : error.status === 403 ? 403 : 503).json({ error: 'ADMIN_UNAVAILABLE' })
   }
 }

@@ -35,18 +35,19 @@ try {
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'pg_isready','-U','postgres'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgreSQL startup timed out')
   console.log(sql(readFileSync(new URL('tests/sql/admin-bootstrap.sql',root),'utf8')))
-  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql']) {
+  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql']) {
     sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
   }
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'bash','-c','exec 3<>/dev/tcp/127.0.0.1/3000'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgREST startup timed out')
   const admin='00000000-0000-0000-0000-000000000001', ordinary='00000000-0000-0000-0000-000000000002'
-  for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users']) {
+  for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users','/rpc/admin_advanced_statistics','/rpc/admin_audit_entries']) {
     assert.equal(request(endpoint,jwt(ordinary)).status,403,'Ordinary direct RPC must fail')
     assert.equal(request(endpoint,null).status,401,'Anonymous direct RPC must fail')
     assert.equal(request(endpoint,'invalid-token').status,401,'Malformed JWT must fail')
@@ -66,9 +67,20 @@ try {
   assert.equal(stats.body.registrations.length,30)
   const users=request('/rpc/admin_users',jwt(admin),JSON.stringify({search_email:'ORDINARY',page_number:1})); assert.equal(users.status,200); assert.equal(users.body.total,1)
   console.log('PASS: explicit administrator receives real database statistics and filtered users via HTTP RPC')
+  const advanced=request('/rpc/admin_advanced_statistics',jwt(admin)); assert.equal(advanced.status,200); assert.equal(advanced.body.buckets.length,30)
+  const details=request('/rpc/admin_users',jwt(admin),JSON.stringify({selected_id:ordinary})); assert.equal(details.status,200)
+  const audit=request('/rpc/admin_audit_entries',jwt(admin)); assert.equal(audit.status,200)
+  assert.ok(audit.body.entries.some(e=>e.action==='user_details_view' && e.admin_id===admin))
+  assert.ok(audit.body.entries.some(e=>e.action==='user_favorites_view' && e.admin_id===admin))
+  assert.ok(request('/rpc/admin_users_internal',jwt(admin),JSON.stringify({selected_id:ordinary})).status>=400)
+  assert.ok(request('/admin_audit_log',jwt(admin),JSON.stringify({admin_id:ordinary})).status>=400)
+  assert.ok(request('/rpc/admin_audit_entries',jwt(admin),JSON.stringify({admin_id:ordinary})).status>=400)
+  console.log('PASS: SQL-coupled audit actor attribution; direct table writes, private bypass and actor parameters rejected over real JWT HTTP')
   sql(`delete from public.admin_memberships where user_id='${admin}';`)
   assert.equal(request('/rpc/admin_statistics',jwt(admin)).status,403)
   assert.equal(request('/rpc/admin_user_favorites',jwt(admin),favoritesBody).status,403)
+  assert.equal(request('/rpc/admin_advanced_statistics',jwt(admin)).status,403)
+  assert.equal(request('/rpc/admin_audit_entries',jwt(admin)).status,403)
   console.log('PASS: revoked membership rejects previously valid administrator JWT')
   console.log('LIMIT: minimal Auth schema + real PostgreSQL/PostgREST; full Supabase GoTrue and deployed Vercel API are not exercised.')
 } finally {
