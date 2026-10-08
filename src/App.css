@@ -397,7 +397,7 @@ canvas {
 .my-places-heading h2 { margin: 0; font-size: 1rem; }
 .my-places-heading span, .places-empty { color: #64748b; font-size: .82rem; }
 .my-places-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 1px; }
-.place-chip { display: flex; flex: 0 0 auto; width: 232px; max-width: 100%; height: 88px; box-sizing: border-box; min-width: 0; overflow: hidden; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; }
+.place-chip { display: flex; flex: 0 0 auto; width: 232px; max-width: 100%; height: 66px; box-sizing: border-box; min-width: 0; overflow: hidden; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; }
 .place-chip button { border: 0; border-radius: 0; }
 .place-select { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; text-align: left; padding: 7px 10px; background: transparent; color: inherit; }
 .place-select strong { width: 100%; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
@@ -556,7 +556,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .city-btn { padding: 8px 15px; border: 1px solid var(--weather-line); border-radius: 999px; box-shadow: none; }
 .city-btn:hover { border-color: #91bdd8; background: var(--weather-blue-soft); }
 .city-btn.active { border-color: var(--weather-blue); background: var(--weather-blue); }
-.my-places { width: fit-content; box-sizing: border-box; max-width: min(1100px, 100%); margin: 0 auto 24px; padding: 15px 18px; border-color: var(--weather-line); background: var(--weather-surface); box-shadow: 0 5px 18px rgba(24,64,94,.045); }
+.my-places { width: 100%; box-sizing: border-box; max-width: min(1100px, 100%); margin: 0 auto 24px; padding: 15px 18px; border-color: var(--weather-line); background: var(--weather-surface); box-shadow: 0 5px 18px rgba(24,64,94,.045); }
 .place-chip { border-color: var(--weather-line); border-radius: 11px; }
 .place-select.active { background: var(--weather-blue); }
 .forecast-dashboard { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
@@ -615,8 +615,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .forecast-dashboard > .alerts-container, .forecast-dashboard > .main-card, .forecast-dashboard > .weather-chat, .forecast-dashboard > .charts-section, .forecast-dashboard > .map-section { grid-column: 1 / -1; }
   .forecast-dashboard > .hourly-section { grid-column: 1; }
   .forecast-dashboard > .forecast-section { grid-column: 2; }
-  .forecast-dashboard > .hourly-section, .forecast-dashboard > .forecast-section { display: flex; min-height: 295px; flex-direction: column; }
-  .forecast-dashboard > .hourly-section .hourly-row, .forecast-dashboard > .forecast-section .daily-grid { flex: 1; }
+  .forecast-dashboard > .hourly-section, .forecast-dashboard > .forecast-section { display: flex; align-self: start; flex-direction: column; }
+  .forecast-dashboard > .hourly-section .hourly-row, .forecast-dashboard > .forecast-section .daily-grid { flex: initial; }
   .aqi-section { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
@@ -639,7 +639,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .main-info-left h2 > span:nth-child(2) { width: 100%; font-size: .85rem !important; }
   .big-temp { margin-top: 18px; font-size: 4.7rem; }
   .big-icon { position: absolute; top: 44px; right: 0; margin: 0; transform: scale(.68); transform-origin: top right; }
-  .stats-grid { grid-template-columns: repeat(2, minmax(130px, 1fr)) !important; overflow: visible; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; overflow: visible; }
   .main-card .stat-box { min-height: 105px; background: rgba(255,255,255,.18); }
   .chat-heading { gap: 10px; }
   .chat-heading h3 { font-size: 1.05rem; }
@@ -700,3 +700,28 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   }
   .charts-section .charts-grid { grid-template-columns: 1fr; }
 }
+
+/* Content determines forecast height; only sibling cards share height. */
+.weather-app .my-places, .weather-app.dark .my-places { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.my-places-heading { justify-content: center; }
+.my-places-list { flex-wrap: wrap; justify-content: center; overflow: visible; gap: 10px; }
+.place-chip { flex: 0 1 220px; width: 220px; min-width: 0; min-height: 66px; background: var(--weather-surface); }
+.place-select { flex: 1; min-width: 0; justify-content: center; text-align: left; }
+.place-select strong { display: block; }
+.place-select strong, .place-select small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.default-place { flex: 0 0 36px; }
+.my-places.my-places-empty, .weather-app.dark .my-places.my-places-empty { padding: 0; border: 0; box-shadow: none; background: transparent; margin-bottom: 18px; }
+.places-empty { margin: 0; text-align: center; color: var(--weather-muted); }
+.hour-box { flex: 0 0 164px; min-width: 0; font: inherit; color: var(--weather-ink); cursor: pointer; gap: 6px; }
+.hour-condition { min-height: 2.5em; font-size: .8rem; line-height: 1.25; color: var(--weather-muted); }
+.hour-metrics { width: 100%; margin: 0; font-size: .75rem; }
+.hour-metrics div { display: flex; justify-content: space-between; gap: 6px; padding-block: 4px; border-bottom: 1px solid var(--weather-line); }
+.hour-metrics dt { text-align: left; overflow-wrap: anywhere; }
+.hour-metrics dd { margin: 0; white-space: nowrap; font-weight: 600; }
+.hour-box:focus-visible, .hourly-row:focus-visible { outline: 2px solid var(--weather-blue); outline-offset: -2px; }
+.hourly-row, .daily-grid { overscroll-behavior-x: contain; }
+@media (max-width: 760px) { .hour-box { min-width: 0; } .main-info-left h2 { overflow-wrap: anywhere; } }
+
+.forecast-heading { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+.forecast-scroll-controls { display: flex; gap: 4px; flex: 0 0 auto; }
+.forecast-scroll-controls button { width: 32px; height: 32px; padding: 0; border: 1px solid var(--weather-line); border-radius: 8px; background: var(--weather-surface-soft); color: var(--weather-ink); cursor: pointer; }

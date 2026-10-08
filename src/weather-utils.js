@@ -11,3 +11,8 @@ export function valuesByTime(hourly, field) {
   if (!Array.isArray(hourly?.time) || !Array.isArray(hourly?.[field])) return new Map()
   return new Map(hourly.time.map((time, index) => [time, hourly[field][index] ?? null]))
 }
+
+// Preserve absent observations instead of coercing null to zero.
+export function hourlyNumber(value, rounded = true) {
+  return typeof value === "number" && Number.isFinite(value) ? (rounded ? Math.round(value) : value) : null
+}

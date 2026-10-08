@@ -18,3 +18,11 @@ test('auxiliary marine and AQI hours align by timestamp and preserve missing val
   assert.equal(values.get('2026-09-02T11:00'), null)
   assert.equal(values.get('2026-09-02T12:00'), undefined)
 })
+
+test('missing hourly observations stay absent while measured zero remains valid', async () => {
+  const { hourlyNumber } = await import('./weather-utils.js')
+  for (const value of [null, undefined, NaN, Infinity, '12']) assert.equal(hourlyNumber(value), null)
+  assert.equal(hourlyNumber(0), 0)
+  assert.equal(hourlyNumber(12.6), 13)
+  assert.equal(hourlyNumber(0.25, false), 0.25)
+})

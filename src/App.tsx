@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
-import { findHourlyStartIndex, valuesByTime } from './weather-utils.js'
+import { hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
@@ -733,7 +733,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
-        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature' + 
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature,precipitation_probability' +
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
 
@@ -838,12 +838,14 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         hr.push({
           time: data.hourly.time[idx],
           hour: data.hourly.time[idx].slice(11, 16),
-          temp: Math.round(data.hourly.temperature_2m[idx]),
-          feelsLike: Math.round(data.hourly.apparent_temperature[idx]),
-          rain: (data.hourly.precipitation[idx] <= 0 ? 0 : data.hourly.precipitation[idx]),
-          wind: Math.round(data.hourly.wind_speed_10m[idx]),
+          temp: hourlyNumber(data.hourly.temperature_2m[idx]),
+          feelsLike: hourlyNumber(data.hourly.apparent_temperature[idx]),
+          rain: hourlyNumber(data.hourly.precipitation[idx], false),
+          rainProbability: hourlyNumber(data.hourly.precipitation_probability?.[idx]),
+          description: code.desc,
+          wind: hourlyNumber(data.hourly.wind_speed_10m[idx]),
           pressure: Math.round(data.hourly.surface_pressure[idx]),
-          humidity: Math.round(data.hourly.relative_humidity_2m[idx]),
+          humidity: hourlyNumber(data.hourly.relative_humidity_2m[idx]),
           visibility: Math.round((data.hourly.visibility[idx] || 0) / 1000),
           dewPoint: Math.round(data.hourly.dew_point_2m[idx]),
           cloudCover: Math.round(data.hourly.cloud_cover[idx]),
@@ -1064,12 +1066,12 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         })}
       </div>
 
-      <section className="my-places" aria-labelledby="my-places-title">
-        <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>
+      <section className={`my-places${localizedPlaces.length ? "" : " my-places-empty"}`} aria-label={lang === 'bg' ? 'Моите места' : 'My places'}>
+        {localizedPlaces.length > 0 && <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>}
         {localizedPlaces.length > 0 ? <div className="my-places-list">{localizedPlaces.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
           <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} aria-pressed={placeKey(place) === placeKey(coords)} onClick={() => choosePlace(place)}><strong title={place.name}>{place.name}</strong>{(place.region || place.country) && <small title={[place.region, place.country].filter(Boolean).join(', ')}>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
           {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
-        </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}
+        </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави любим град със звездата до името му' : 'Add a favorite city with the star next to its name'}</p>}
         {offerImport && session && <div className="places-import"><span>{lang === 'bg' ? 'Имаш места, запазени на това устройство.' : 'You have places saved on this device.'}</span><button onClick={migrateLocalPlaces} disabled={placesBusy}>{lang === 'bg' ? 'Прехвърли към профила' : 'Move to profile'}</button><button onClick={() => setOfferImport(false)}>{lang === 'bg' ? 'Не сега' : 'Not now'}</button></div>}
         {placesError && <p className="places-error" role="alert">{lang === 'bg' ? 'Местата не можаха да се синхронизират.' : 'Places could not be synchronized.'} <button onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
@@ -1217,18 +1219,30 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           </section>
 
           <section className="card hourly-section">
-            <h3>{t.hours24}</h3>
-            <div className="hourly-row">
-              {hourly.map((h, i) => (
-                <div key={i} className="hour-box"
+            <div className="forecast-heading"><h3>{t.hours24}</h3><div className="forecast-scroll-controls">
+              {[-1, 1].map(direction => <button type="button" key={direction} aria-label={lang === 'bg' ? (direction < 0 ? 'Предишни часове' : 'Следващи часове') : (direction < 0 ? 'Previous hours' : 'Next hours')} onClick={event => {
+                const row = event.currentTarget.closest('section')?.querySelector('.hourly-row')
+                row?.scrollBy({ left: direction * row.clientWidth * .8, behavior: 'smooth' })
+              }}>{direction < 0 ? '←' : '→'}</button>)}
+            </div></div>
+            <div className="hourly-row" tabIndex={0} aria-label={t.hours24}>
+              {hourly.map((h) => (
+                <button type="button" key={h.time} className="hour-box"
                   onClick={(e) => { openPopup(e); setSelectedHour(h); setSelectedDay(null) }}
                   style={{ cursor: 'pointer', transform: selectedHour && selectedHour.hour === h.hour ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}>
                   <p className="hour-time">{h.hour}</p>
                   <p className="hour-icon"><AnimatedIcon icon={h.icon} size="1.5rem" /></p>
-                  <p className="hour-temp">{h.temp}°C</p>
-                  <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>
-                  {h.seaTemp !== null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
-                </div>
+                  <p className="hour-temp">{h.temp == null ? '—' : `${h.temp}°C`}</p>
+                  <p className="hour-condition">{h.description}</p>
+                  <dl className="hour-metrics">
+                    {h.feelsLike != null && <div><dt>{t.feelsLike}</dt><dd>{h.feelsLike}°C</dd></div>}
+                    {h.humidity != null && <div><dt>{t.humidity}</dt><dd>{h.humidity}%</dd></div>}
+                    {h.rainProbability != null && <div><dt>{lang === 'bg' ? 'Вероятност за валежи' : 'Rain chance'}</dt><dd>{h.rainProbability}%</dd></div>}
+                    {h.rain != null && <div><dt>{lang === 'bg' ? 'Валежи' : 'Precipitation'}</dt><dd>{h.rain} {t.mm}</dd></div>}
+                  </dl>
+                  {h.wind != null && <p className="hour-wind">🌬️ {h.wind} {t.windUnit}</p>}
+                  {h.seaTemp != null && <p className="hour-sea">🌊 {h.seaTemp}°C</p>}
+                </button>
               ))}
             </div>
           </section>
@@ -1345,9 +1359,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
             <div className="popup-grid">
               {detailTab === 'main' && <>
-                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp}°C</p></div>
-                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike}°C</p></div>
-                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity}%</p></div>
+                <div className="stat-box"><p>🌡️</p><p className="label">{t.temp}</p><p className="value">{selectedHour.temp == null ? '—' : `${selectedHour.temp}°C`}</p></div>
+                <div className="stat-box"><p>🤔</p><p className="label">{t.feelsLike}</p><p className="value">{selectedHour.feelsLike == null ? '—' : `${selectedHour.feelsLike}°C`}</p></div>
+                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{selectedHour.humidity == null ? '—' : `${selectedHour.humidity}%`}</p></div>
                 <div className="stat-box"><p>☁️</p><p className="label">Време</p><p className="value"><AnimatedIcon icon={selectedHour.icon} size="1.2rem" /></p></div>
               </>}
               {detailTab === 'atmosphere' && <>
@@ -1357,8 +1371,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 <div className="stat-box"><p>🌿</p><p className="label">{t.dewPoint}</p><p className="value">{selectedHour.dewPoint}°C</p></div>
               </>}
               {detailTab === 'water' && <>
-                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind} {t.windUnit}</p></div>
-                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain} {t.mm}</p></div>
+                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{selectedHour.wind == null ? '—' : `${selectedHour.wind} ${t.windUnit}`}</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.rain}</p><p className="value">{selectedHour.rain == null ? '—' : `${selectedHour.rain} ${t.mm}`}</p></div>
                 {selectedHour.seaTemp !== null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
                 ) : (
