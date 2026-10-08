@@ -505,7 +505,9 @@ const WeatherApp = () => {
 
   useEffect(() => { const unsubscribe = subscribeSession(active => {
     const { accountChanged, ticket } = placesGuardRef.current.changeSession(active?.user.id || null)
-    setSession(active); setPlacesError(false); setPlacesBusy(false)
+    setSession(active)
+    if (!accountChanged && active) return
+    setPlacesError(false); setPlacesBusy(false)
     if (accountChanged) {
       setOfferImport(false); setDefaultPlaceId(null)
       // Clear the prior account immediately; never display it while the next request is pending.
