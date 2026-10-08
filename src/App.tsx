@@ -1002,7 +1002,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
       <div className="header-row">
         <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h1>{t.title}</h1>
+          <h1><a className="brand-home" href={import.meta.env.BASE_URL} aria-label={lang === 'bg' ? 'Метео Пулс — начална страница' : 'Meteo Pulse — home'}>{t.title}</a></h1>
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <div className="header-btns">
@@ -1067,7 +1067,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       <section className="my-places" aria-labelledby="my-places-title">
         <div className="my-places-heading"><h2 id="my-places-title">{lang === 'bg' ? 'Моите места' : 'My places'}</h2>{placesBusy && <span aria-live="polite">{t.loading}</span>}</div>
         {localizedPlaces.length > 0 ? <div className="my-places-list">{localizedPlaces.map(place => <div className="place-chip" key={place.id || placeKey(place)}>
-          <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} onClick={() => choosePlace(place)}><strong>{place.name}</strong>{(place.region || place.country) && <small>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
+          <button className={placeKey(place) === placeKey(coords) ? 'place-select active' : 'place-select'} aria-pressed={placeKey(place) === placeKey(coords)} onClick={() => choosePlace(place)}><strong title={place.name}>{place.name}</strong>{(place.region || place.country) && <small title={[place.region, place.country].filter(Boolean).join(', ')}>{[place.region, place.country].filter(Boolean).join(', ')}</small>}</button>
           {session && <button className="default-place" disabled={placesBusy} aria-pressed={place.id === defaultPlaceId} title={lang === 'bg' ? 'Място по подразбиране' : 'Default place'} onClick={() => changeDefault(place)}>{place.id === defaultPlaceId ? '🏠' : '⌂'}</button>}
         </div>)}</div> : <p className="places-empty">{lang === 'bg' ? 'Добави място със звездата до името му.' : 'Add a place with the star next to its name.'}</p>}
         {offerImport && session && <div className="places-import"><span>{lang === 'bg' ? 'Имаш места, запазени на това устройство.' : 'You have places saved on this device.'}</span><button onClick={migrateLocalPlaces} disabled={placesBusy}>{lang === 'bg' ? 'Прехвърли към профила' : 'Move to profile'}</button><button onClick={() => setOfferImport(false)}>{lang === 'bg' ? 'Не сега' : 'Not now'}</button></div>}
