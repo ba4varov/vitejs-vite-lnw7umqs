@@ -51,7 +51,7 @@ test('confirmed changes refresh list, details, history and audit; cancellation a
  await page.getByRole('button',{name:'Предостави ръчно Pro'}).click();await expect(page.getByRole('dialog')).toContainText('Безплатен план → Pro план')
  await page.getByRole('button',{name:'Отказ',exact:true}).click();expect(state.calls).toHaveLength(0)
  await page.getByRole('button',{name:'Предостави ръчно Pro'}).click();await page.getByRole('button',{name:'Потвърди',exact:true}).dblclick()
- await expect(page.getByText('Промяната на плана е потвърдена. Данните са обновени.')).toBeVisible();expect(state.calls).toHaveLength(1)
+ await expect(page.locator('main > p[role="status"]').filter({hasText:'Промяната на плана е потвърдена. Данните са обновени.'})).toBeVisible();expect(state.calls).toHaveLength(1)
  await expect(page.locator('tbody')).toContainText('Pro план')
  await page.getByRole('button',{name:'isolated-user@example.invalid'}).click();await expect(page.locator('.admin-management')).toContainText('Ръчно предоставен Pro')
  await expect(page.locator('.admin-history')).toContainText('Ръчно предоставяне на Pro')

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCallback, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
+import { ActivityConsent } from './ActivityConsent'
 import { Turnstile } from './Turnstile'
 
 type View = 'closed' | 'login' | 'register' | 'forgot' | 'profile' | 'password'
@@ -95,6 +96,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       {!authConfigured && <p className="auth-error">{t.unavailable}</p>}
       {view === 'profile' && profile && <><p className="profile-email">{profile.email}</p><p><strong>{t.plan}:</strong> {t.free}</p></>}
       {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
+      {view === 'profile' && session && <ActivityConsent key={session.user.id} session={session} lang={lang} />}
       <form onSubmit={submit}>
         {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>}
         {(view === 'login' || view === 'register' || view === 'password') && <PasswordField label={view === 'password' ? t.newPassword : t.password} value={password} onChange={e => setPassword(e.target.value)} autoComplete={view === 'login' ? 'current-password' : 'new-password'} showLabel={t.showPassword} hideLabel={t.hidePassword} />}

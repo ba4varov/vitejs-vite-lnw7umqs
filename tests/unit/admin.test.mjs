@@ -89,3 +89,15 @@ test('missing migration is identified without returning fake data', async () => 
     url.endsWith('/user')?{ok:true,json:async()=>({id:'owner'})}:url.endsWith('is_meteo_admin')?{ok:true,json:async()=>true}:{ok:false,status:404,json:async()=>({code:'PGRST202'})})
   assert.equal(res.code,503);assert.equal(res.body.error,'ADMIN_CONFIGURATION_MISSING')
 })
+
+test('activity is administrator-only with strict 7/30/90 day periods', async () => {
+  for (const period of ['7','30','90']) {
+    const {res,calls} = await run({query:{action:'activity',period}})
+    assert.equal(res.code,200)
+    assert.ok(calls[2].url.endsWith('/rpc/admin_user_activity'))
+    assert.deepEqual(JSON.parse(calls[2].options.body),{period:Number(period)})
+  }
+  for (const period of ['12m','0','91',['30']]) assert.equal((await run({query:{action:'activity',period}})).res.code,400)
+  const denied=await run({authorized:false,query:{action:'activity'}})
+  assert.equal(denied.res.code,403);assert.equal(denied.calls.length,2)
+})

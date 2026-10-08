@@ -1,3 +1,4 @@
+import { trackActivity } from './activity-client'
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
@@ -437,8 +438,30 @@ const WeatherApp = () => {
     setLang(nextLanguage)
   }
 
+  const forecastIntent = useRef(0)
+  const forecastSeen = useRef(-1)
+  const [forecastReady, setForecastReady] = useState(-1)
+  useEffect(() => {
+    if (loading || !weather || forecastReady !== forecastIntent.current || forecastSeen.current === forecastReady) return
+    const element = document.querySelector('.weather-forecast-view')
+    if (!element) return
+    let visible = false
+    const recordView = () => {
+      if (!visible || document.visibilityState !== 'visible' || forecastSeen.current === forecastReady) return
+      forecastSeen.current = forecastReady
+      trackActivity('forecast_view')
+    }
+    const observer = new IntersectionObserver(entries => {
+      visible = entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= 0.25)
+      recordView()
+    }, { threshold: 0.25 })
+    observer.observe(element)
+    document.addEventListener('visibilitychange', recordView)
+    return () => { observer.disconnect(); document.removeEventListener('visibilitychange', recordView) }
+  }, [loading, Boolean(weather), forecastReady])
+
   const choosePlace = (place: Place, manual = true) => {
-    if (manual) placesGuardRef.current.manualSelection()
+    if (manual) { forecastIntent.current++; placesGuardRef.current.manualSelection() }
     locationChoiceRef.current = true
     setLocationSource('place')
     setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
@@ -577,6 +600,7 @@ const WeatherApp = () => {
       const data = await result.json()
       if (!result.ok || typeof data.answer !== 'string') throw new Error('chat failed')
       if (requestId !== chatRequestIdRef.current || controller.signal.aborted) return
+      trackActivity('chat_use')
       setChatMessages(previous => [...previous, { role: 'bot', text: data.answer }])
     } catch {
       if (controller.signal.aborted || requestId !== chatRequestIdRef.current) return
@@ -601,11 +625,13 @@ const WeatherApp = () => {
         const next = places.filter(place => placeKey(place) !== placeKey(currentFavorite))
         if (!session) saveLocalPlaces(next)
         setPlaces(next)
+        trackActivity('favorite_remove')
         if (currentFavorite.id === defaultPlaceId) setDefaultPlaceId(null)
       } else {
         const nextPlace = { geonameId: placeDetails.geonameId, countryCode: placeDetails.countryCode, admin1Id: placeDetails.admin1Id, name: city.trim().slice(0, 120), region: placeDetails.region, country: placeDetails.country, lat: coords.lat, lon: coords.lon }
         const saved = session ? await addPlace(session, nextPlace) : nextPlace
         if (!placesGuardRef.current.isCurrent(ticket)) return
+        trackActivity('favorite_add')
         const next = [...places, saved]
         if (!session) saveLocalPlaces(next)
         setPlaces(next)
@@ -666,6 +692,8 @@ const WeatherApp = () => {
   }
 
   const selectCity = (result: any) => {
+    forecastIntent.current++
+    trackActivity('search_complete')
     placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
     setLocationSource('search')
@@ -728,6 +756,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     }
   }
   const fetchWeather = async (lat: number, lon: number) => {
+    const viewIntent = forecastIntent.current
     const requestId = ++weatherRequestIdRef.current
     setLoading(true)
     setError(null)
@@ -895,6 +924,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       }
       setForecast(days)
       setLoading(false)
+      setForecastReady(viewIntent)
       setLastUpdated(new Date())
 
       const randomId = Math.floor(Math.random() * 1000) + 1;
@@ -1047,7 +1077,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {t.quickCities.map((c: any) => {
           return (
             <button key={c.name}
-              onClick={() => { placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              onClick={() => { forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -1087,7 +1117,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
           )}
 
-          <div className="card main-card" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
+          <div className="card main-card weather-forecast-view" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
             
             {bgImageUrl && (
               <img 

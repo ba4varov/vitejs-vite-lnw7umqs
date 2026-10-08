@@ -714,3 +714,15 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .forecast-heading { min-height: 56px; align-items: flex-start; }
 .forecast-heading h3 { margin: 0; }
 .auth-google { width: 100%; padding: 13px !important; margin-bottom: 18px; border-radius: 12px !important; font-weight: 600; }
+
+.activity-consent { margin: 1rem 0; padding: 1rem; border: 1px solid currentColor; border-radius: 12px; }
+.activity-consent label { display: flex; align-items: flex-start; gap: .6rem; }
+.activity-consent input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 3px; }
+.activity-consent p { font-size: .85rem; line-height: 1.5; }
+
+.auth-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.auth-dialog .activity-consent label { display: flex; font-weight: 600; }
+.dark .auth-dialog { background: #0f172a; color: #e2e8f0; }
+.dark .auth-dialog input { background: #1e293b; color: #e2e8f0; border-color: #475569; }
+.dark .auth-dialog .auth-close { color: #e2e8f0; }
+.dark .auth-dialog h2 { color: #e2e8f0; }

@@ -61,3 +61,12 @@
 @media(max-width:767px){.admin-stats p{min-height:68px}}
 .admin-app{color-scheme:light}.admin-app.admin-dark{color-scheme:dark}
 .admin-metric-time strong{background:var(--panel);color:var(--text);padding:1px 4px;border-radius:4px}
+
+.admin-activity { margin: 1rem 0; min-width: 0; }
+.admin-activity > p { max-width: 85ch; line-height: 1.5; }
+
+.activity-summary-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.activity-summary-value { min-width: 0; }
+.activity-summary-value p { font-size: 12px; margin: 0 0 8px; }
+.activity-summary-value strong { font-size: 24px; }
+@media (max-width: 600px) { .activity-summary-values { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
