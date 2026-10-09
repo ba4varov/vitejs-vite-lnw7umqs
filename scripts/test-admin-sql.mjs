@@ -35,7 +35,7 @@ try {
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'pg_isready','-h','127.0.0.1','-U','postgres'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgreSQL startup timed out')
   console.log(sql(readFileSync(new URL('tests/sql/admin-bootstrap.sql',root),'utf8')))
-  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql','20261008040000_user_activity.sql']) {
+  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql','20261008040000_user_activity.sql','20261009000000_planner_entitlement.sql']) {
     sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
   }
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
@@ -44,6 +44,7 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage4.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-profile-audit.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/user-activity.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/planner-entitlement.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
@@ -142,7 +143,7 @@ try {
   const changed=request('/rpc/admin_set_manual_plan',jwt(admin),planBody); assert.equal(changed.status,200); assert.equal(changed.body.confirmed,true)
   const replay=request('/rpc/admin_set_manual_plan',jwt(admin),planBody); assert.equal(replay.body.replayed,true); assert.equal(replay.body.changedAt,changed.body.changedAt)
   assert.equal(request('/rpc/get_my_entitlements',jwt(ordinary)).body[0].plan,'pro')
-  assert.deepEqual(request('/rpc/get_my_entitlements',jwt(ordinary)).body[0].permissions,['future:premium'])
+  assert.deepEqual(request('/rpc/get_my_entitlements',jwt(ordinary)).body[0].permissions,['future:premium','planner:advanced'])
   const restored=request('/rpc/admin_set_manual_plan',jwt(admin),JSON.stringify({target_id:ordinary,desired_plan:'free',expected_plan:'pro',operation_id:'10000000-0000-0000-0000-000000000002'}));assert.equal(restored.status,200)
   assert.equal(request('/rpc/get_my_entitlements',jwt(ordinary)).body[0].plan,'free')
   assert.deepEqual(request('/rpc/get_my_entitlements',jwt(ordinary)).body[0].permissions,[])

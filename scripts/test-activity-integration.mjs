@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { handleActivity } from '../server/activity-core.js'
 import { handleAdmin } from '../server/admin-core.js'
+import { handlePlanner } from '../server/planner-core.js'
+import { handleAdminManagement } from '../server/admin-management-core.js'
 import { handleProfile } from '../server/profile-core.js'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -88,6 +90,8 @@ try {
       }
       req.body=data?JSON.parse(data):undefined;req.query=Object.fromEntries(url.searchParams)
       res.status=code=>{res.statusCode=code;return res};res.json=value=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));return res}
+      if(url.pathname==='/api/planner')return await handlePlanner(req,res,appEnv)
+      if(url.pathname==='/api/admin-management')return await handleAdminManagement(req,res,appEnv)
       if(url.pathname==='/api/activity')return await handleActivity(req,res,appEnv)
       if(url.pathname==='/api/admin')return await handleAdmin(req,res,appEnv)
       if(url.pathname==='/api/profile')return await handleProfile(req,res,appEnv)
@@ -116,6 +120,35 @@ try {
   const refreshed=await json(base+'/auth/v1/token?grant_type=refresh_token','POST',undefined,{refresh_token:owner.refresh_token},{apikey:anon})
   assert.equal(refreshed.status,200);Object.assign(owner,refreshed.body)
   pass('Actual GoTrue refresh-token rotation')
+  // Stage 6B: actual GoTrue JWT, actual entitlement RPC, actual manual grants and audit.
+  const plannerBody={activity:'walk',timeZone:'UTC',hours:Array.from({length:72},(_,i)=>({time:new Date(Math.ceil(Date.now()/3600000)*3600000+i*3600000).toISOString().slice(0,16),feelsLike:20,rainProbability:10,rain:0,wind:5,code:1}))}
+  assert.equal((await api('/api/planner',null,'POST',plannerBody)).status,401)
+  assert.equal((await api('/api/planner',{access_token:'invalid'},'POST',plannerBody)).status,401)
+  assert.equal((await api('/api/planner',{access_token:owner.access_token.slice(0,-8)+'tampered'},'POST',plannerBody)).status,401)
+  const jwtHeader=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')
+  const jwtPayload=Buffer.from(JSON.stringify({role:'authenticated',sub:owner.user.id,aud:'authenticated',exp:Math.floor(Date.now()/1000)-120})).toString('base64url')
+  const jwtData=jwtHeader+'.'+jwtPayload
+  const expired=jwtData+'.'+createHmac('sha256',secret).update(jwtData).digest('base64url')
+  assert.equal((await api('/api/planner',{access_token:expired},'POST',plannerBody)).status,401)
+  assert.equal((await api('/api/planner',owner,'POST',plannerBody)).status,403)
+  const grant=await api('/api/admin-management',admin,'POST',{action:'plan',targetId:owner.user.id,plan:'pro',expectedPlan:'free',requestId:randomUUID(),confirmed:true})
+  assert.equal(grant.status,200)
+  const proProfile=await api('/api/profile',owner)
+  assert.ok(proProfile.body.permissions.includes('planner:advanced'))
+  const recommendations=await api('/api/planner',owner,'POST',plannerBody)
+  assert.equal(recommendations.status,200);assert.equal(recommendations.body.windows.length,3)
+  assert.equal((await api('/api/planner',other,'POST',{...plannerBody,plan:'pro'})).status,403)
+  assert.equal((await api('/api/planner',owner,'POST',{...plannerBody,activity:'swim'})).status,400)
+  // Missing new entitlement (old migration function) safely denies even a Pro account.
+  sql(readFileSync(`${root}/supabase/migrations/20260930000000_auth_profiles.sql`,'utf8').split('create or replace function public.get_my_entitlements()')[1].split('revoke all on function public.get_my_entitlements()')[0].replace(/^/, 'create or replace function public.get_my_entitlements()'))
+  assert.equal((await api('/api/planner',owner,'POST',plannerBody)).status,403)
+  sql(readFileSync(`${root}/supabase/migrations/20261009000000_planner_entitlement.sql`,'utf8'))
+  const revoke=await api('/api/admin-management',admin,'POST',{action:'plan',targetId:owner.user.id,plan:'free',expectedPlan:'pro',requestId:randomUUID(),confirmed:true})
+  assert.equal(revoke.status,200)
+  assert.equal((await api('/api/planner',owner,'POST',plannerBody)).status,403)
+  assert.equal(Number(sql(`select count(*) from public.admin_audit_log where object_id='${owner.user.id}' and action in ('manual_pro_grant','free_restore');`)),2)
+  assert.equal(Number(sql('select count(*) from public.activity_daily;')),0)
+  pass('Stage 6B: real Free/Pro/guest authorization, missing migration, invalid/expired/tampered JWT, manual grant/revoke with same JWT and two audit entries; no analytics')
   const initial=await api('/api/activity',owner);assert.equal(initial.body.enabled,false)
   const denied=await api('/api/activity',owner,'POST',{action:'favorite_add',operationId:randomUUID(),revision:randomUUID()});assert.equal(denied.body.reason,'NO_CONSENT')
   assert.equal(Number(sql('select count(*) from public.activity_daily;')),0)
@@ -172,8 +205,8 @@ try {
   pass('Withdrawal deletes stored analytics; stale consent rejected; actual admin UI shows no data; favorite preserved')
   mkdirSync(`${root}/work`,{recursive:true})
   const imageDigests=Object.fromEntries(Object.entries(images).map(([name,image])=>[name,docker(['image','inspect',image,'--format','{{index .RepoDigests 0}}']).stdout.trim()]))
-  writeFileSync(`${root}/work/activity-real-integration.json`,JSON.stringify({checkedAt:new Date().toISOString(),status:'PASS',images:imageDigests,isolation:'Disposable dedicated Docker bridge network; ephemeral database; loopback-only HTTP; synthetic .invalid accounts; no production credentials',mocks:false,results,limits:['Local GoTrue password authentication/refresh only; Google provider, SMTP confirmation/recovery and Vercel-hosted API runtime are not exercised','Favorite action is a real database mutation followed by application activity API; public weather providers are not used','Chromium uses actual admin UI and real local Auth/API; external requests are aborted']},null,2)+'\n')
-  console.log(`PASS: ${results.length} real integration checks; safe JSON report in work/activity-real-integration.json`)
+  writeFileSync(`${root}/work/stage6b-real-integration.json`,JSON.stringify({checkedAt:new Date().toISOString(),status:'PASS',images:imageDigests,isolation:'Disposable dedicated Docker bridge network; ephemeral database; loopback-only HTTP; synthetic .invalid accounts; no production credentials',mocks:false,results,limits:['Local GoTrue password authentication/refresh only; Google provider, SMTP confirmation/recovery and Vercel-hosted API runtime are not exercised','Favorite action is a real database mutation followed by application activity API; public weather providers are not used','Chromium uses actual admin UI and real local Auth/API; external requests are aborted']},null,2)+'\n')
+  console.log(`PASS: ${results.length} real integration checks; safe JSON report in work/stage6b-real-integration.json`)
 } catch(error) {
   console.error(`FAIL: ${error.message}`);process.exitCode=1
 } finally {

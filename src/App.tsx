@@ -7,6 +7,7 @@ import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
+import { WeatherPlanner } from './WeatherPlanner'
 import { AdminLink } from './AdminLink'
 import { loadLanguage, saveLanguage } from './language-storage.js'
 import { subscribeSession, type AuthSession } from './auth-client'
@@ -394,6 +395,7 @@ const WeatherApp = () => {
   const [error, setError] = useState<string | null>(null)
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
+  const [plannerForecast, setPlannerForecast] = useState<any>(null)
   const [forecast, setForecast] = useState<any[]>([])
   const [places, setPlaces] = useState<Place[]>([])
   const [localizedPlaces, setLocalizedPlaces] = useState<Place[]>([])
@@ -756,6 +758,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     }
   }
   const fetchWeather = async (lat: number, lon: number) => {
+    setPlannerForecast(null)
     const viewIntent = forecastIntent.current
     const requestId = ++weatherRequestIdRef.current
     setLoading(true)
@@ -857,6 +860,16 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       }, requestId);
 
       const startIdx = findHourlyStartIndex(data.hourly.time, data.current.time)
+      setPlannerForecast(typeof data.timezone === 'string' ? {
+        timeZone: data.timezone,
+        hours: data.hourly.time.slice(startIdx, startIdx + 72).map((time: string, i: number) => ({
+          time, feelsLike: hourlyNumber(data.hourly.apparent_temperature?.[startIdx + i]),
+          rainProbability: hourlyNumber(data.hourly.precipitation_probability?.[startIdx + i]),
+          rain: hourlyNumber(data.hourly.precipitation?.[startIdx + i], false),
+          wind: hourlyNumber(data.hourly.wind_speed_10m?.[startIdx + i]),
+          code: data.hourly.weather_code?.[startIdx + i] ?? null,
+        })),
+      } : null)
 
       const hr: any[] = []
       for (let i = 0; i < 24; i++) {
@@ -1272,6 +1285,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           </section>
 
           <Chart hourly={hourly} darkMode={darkMode} t={t} />
+          <WeatherPlanner lang={lang} session={session} forecast={plannerForecast} city={city} />
 
           <section className="card map-section">
             <h3>🌍 {t.interactiveMap}</h3>
