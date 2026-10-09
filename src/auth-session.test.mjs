@@ -46,6 +46,26 @@ test('valid stored sessions restore without a network request', async t => {
   assert.equal(f.fetch.mock.callCount(), 0)
 })
 
+test('profile GET bypasses cache and observes plan changes with the same bearer token', async t => {
+  const f = await setup(t)
+  const active = session()
+  let plan = 'free'
+  f.fetch.mock.mockImplementation(async () => f.response({ plan }))
+  for (const nextPlan of ['free', 'pro', 'free']) {
+    plan = nextPlan
+    assert.equal((await f.auth.profileRequest(active)).plan, nextPlan)
+  }
+  for (const call of f.fetch.mock.calls) {
+    const [url, options] = call.arguments
+    assert.equal(url, '/api/profile')
+    assert.equal(options.method, 'GET')
+    assert.equal(options.cache, 'no-store')
+    assert.equal(options.headers.Authorization, `Bearer ${active.access_token}`)
+  }
+  f.fetch.mock.mockImplementation(async () => f.response({ error: 'PROFILE_FAILED' }, 503))
+  await assert.rejects(f.auth.profileRequest(active), /PROFILE_FAILED/)
+})
+
 test('refresh starts before expiry and publishes the rotated token', async t => {
   const f = await setup(t)
   f.auth.saveSession(session(120))

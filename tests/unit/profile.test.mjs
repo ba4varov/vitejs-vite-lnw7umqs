@@ -32,6 +32,28 @@ const responseRecorder = () => ({
   json(payload) { this.payload = payload; return this },
 })
 
+test('profile re-reads administrative plan changes with the same authenticated session', async () => {
+  let plan = 'free'
+  const tokens = []
+  const fetcher = async (url, options) => {
+    if (url.endsWith('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'owner', email: 'owner@example.com' }) }
+    if (url.endsWith('/rpc/get_my_entitlements')) {
+      tokens.push(options.headers.Authorization)
+      return { ok: true, json: async () => [{ plan, permissions: [] }] }
+    }
+    return { ok: true, json: async () => [{ display_name: 'Owner' }] }
+  }
+  for (const nextPlan of ['free', 'pro', 'free']) {
+    plan = nextPlan
+    const res = responseRecorder()
+    await handleProfile({ method: 'GET', headers: { authorization: 'Bearer same-session' } }, res,
+      { SUPABASE_URL: 'https://isolated.invalid', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service' }, fetcher)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.payload.plan, nextPlan)
+  }
+  assert.deepEqual(tokens, Array(3).fill('Bearer same-session'))
+})
+
 for (const method of ['GET', 'PATCH']) test(`${method} handler filters every profile request by authenticated user_id`, async () => {
   const calls = []
   const userId = 'user/with unsafe?characters'
