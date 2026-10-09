@@ -1,0 +1,6 @@
+# Custom operator authentication is enforced before any database access.
+# User JWTs / anon keys are never sufficient. Deployment alone cannot enable delivery.
+project_id = "meteo-puls"
+
+[functions.push-test]
+verify_jwt = false

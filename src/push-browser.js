@@ -19,7 +19,13 @@ export async function enrollPush({scope=window,registration,key,persist}) {
  const permission=await scope.Notification.requestPermission()
  if(permission!=='granted')throw Error(permission==='denied'?'DENIED':'DISMISSED')
  const existing=await registration.pushManager.getSubscription()
- const subscription=existing||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:vapidBytes(key)})
+ const expected=vapidBytes(key)
+ if(existing) {
+  const actual=new Uint8Array(existing.options?.applicationServerKey || [])
+  // Never relabel a subscription bound to the old VAPID key as a new one.
+  if(actual.length!==expected.length || actual.some((byte,i)=>byte!==expected[i]))throw Error('KEY_ROTATION_REQUIRED')
+ }
+ const subscription=existing||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:expected})
  try {return await persist(subscription.toJSON())}
  catch(error) {if(!existing)await subscription.unsubscribe().catch(()=>{});throw error}
 }
