@@ -6,11 +6,12 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}))
   const scope:any=window;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
   let permissionValue='default',subscription:any=null
+  scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
   Object.defineProperty(navigator.serviceWorker,'register',{value:async()=>({pushManager:{
    getSubscription:async()=>subscription,
-   subscribe:async()=>{scope.pushSubscribes++;subscription={endpoint:'https://fcm.googleapis.com/wp/isolated',toJSON:()=>({endpoint:'https://fcm.googleapis.com/wp/isolated',expirationTime:null,keys:{p256dh:publicKey,auth:'AQEBAQEBAQEBAQEBAQEBAQ'}}),unsubscribe:async()=>{scope.pushUnsubscribes++;subscription=null;return true}};return subscription},
+   subscribe:async()=>{scope.pushSubscribes++;subscription={options:{applicationServerKey:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},endpoint:'https://fcm.googleapis.com/wp/isolated',toJSON:()=>({endpoint:'https://fcm.googleapis.com/wp/isolated',expirationTime:null,keys:{p256dh:publicKey,auth:'AQEBAQEBAQEBAQEBAQEBAQ'}}),unsubscribe:async()=>{scope.pushUnsubscribes++;subscription=null;return true}};return subscription},
   }})})
  },{permission,publicKey})
  const origin=new URL(process.env.PUSH_PREVIEW_URL||'http://127.0.0.1:4173').origin
@@ -62,6 +63,23 @@ async function choose(page:any) {
  await panel.getByLabel('Име на това устройство').fill('Моят телефон')
  return panel
 }
+for(const lang of ['bg','en'])test(`key rotation asks for explicit resubscription ${lang}`,async({page})=>{
+ const state=await setup(page)
+ await choose(page)
+ if(lang==='en'){
+  page.once('dialog',d=>d.accept())
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await page.locator('button.lang-btn').click()
+  await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click()
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+  await page.locator('.push-settings').getByLabel('Name of this device').fill('Test device')
+ }
+ await page.evaluate(()=>(window as any).stalePushSubscription())
+ await page.locator('.push-settings').getByRole('button',{name:lang==='bg'?'Разреши и регистрирай това устройство':'Allow and register this device'}).click()
+ await expect(page.locator('.push-settings').getByRole('status')).toContainText(lang==='bg'?'Ключът е обновен':'The key has changed')
+ expect(state.calls.filter(c=>c.method==='POST')).toHaveLength(0)
+ expect(await page.evaluate(()=>(window as any).pushUnsubscribes)).toBe(0)
+})
 test('real Chromium PWA manifest, PNG sizes, root worker, no cache or fetch interception',async({page})=>{
  await page.addInitScript(()=>{(window as any).initialPushPermission=Notification.permission;Notification.requestPermission=()=>{throw Error('Unexpected automatic permission prompt')}})
  await page.route('**/*',(r:any)=>new URL(r.request().url()).hostname==='127.0.0.1'?r.fallback():r.abort())

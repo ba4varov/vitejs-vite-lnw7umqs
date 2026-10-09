@@ -59,6 +59,29 @@ test('server unsubscribe precedes browser cleanup and cannot unsubscribe a diffe
  events.length=0;await removePushDevice({registration,device:{id:'other',fingerprint:'other'},persist:async()=>events.push('server')});assert.deepEqual(events,['server'])
  await assert.rejects(removePushDevice({registration,device:{id:'one',fingerprint},persist:async()=>{throw Error('offline')}}))
 })
+test('VAPID rotation refuses to relabel old or unknown browser subscriptions; never silently unsubscribes',async()=>{
+ let writes=0,removed=0
+ const existing={options:{applicationServerKey:Buffer.concat([Buffer.from([4]),Buffer.alloc(64,2)])},toJSON:()=>sub,unsubscribe:async()=>removed++}
+ const registration={pushManager:{getSubscription:async()=>existing}}
+ const scope={Notification:{requestPermission:async()=>'granted'}}
+ await assert.rejects(enrollPush({scope,registration,key,persist:async()=>writes++}),/KEY_ROTATION_REQUIRED/)
+ delete existing.options
+ await assert.rejects(enrollPush({scope,registration,key,persist:async()=>writes++}),/KEY_ROTATION_REQUIRED/)
+ assert.equal(writes,0);assert.equal(removed,0)
+ existing.options={applicationServerKey:Buffer.from(key,'base64url')}
+ await enrollPush({scope,registration,key,persist:async()=>writes++})
+ assert.equal(writes,1);assert.equal(removed,0)
+})
+test('registration public key must agree with DB gate; caller cannot choose a different VAPID key',async()=>{
+ const settings={PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key}
+ const off=await api('GET',null,settings)
+ assert.equal(off.res.data.registrationEnabled,false)
+ const on=await api('GET',null,settings,200,{contractVersion:1,registrationPublicKey:key})
+ assert.equal(on.res.data.registrationEnabled,true)
+ assert.equal((await api('POST',{subscription:sub,label:'Phone',vapidPublicKey:'caller-key'},settings)).res.code,400)
+ const saved=await api('POST',{subscription:sub,label:'Phone'},settings)
+ assert.equal(JSON.parse(saved.calls[1].opts.body).payload.vapidPublicKey,key)
+})
 const now=Date.parse('2026-10-09T00:00Z')
 const forecastData=()=>({timezone:'UTC',current:{time:now/1000},hourly_units:{time:'unixtime',apparent_temperature:'°C',precipitation_probability:'%',precipitation:'mm',wind_speed_10m:'km/h'},hourly:{time:Array.from({length:72},(_,i)=>now/1000+i*3600),apparent_temperature:Array(72).fill(20),precipitation_probability:Array(72).fill(0),precipitation:Array(72).fill(0),wind_speed_10m:Array(72).fill(65),weather_code:Array(72).fill(0)}})
 test('forecast fetched server side from fixed provider; malformed, stale, oversized data rejected',async()=>{

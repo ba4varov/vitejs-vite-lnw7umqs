@@ -14,7 +14,7 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   if(req.method==='POST') {
    if(env.PUSH_REGISTRATION_ENABLED!=='true'||!(/^[A-Za-z0-9_-]{87}$/.test(env.PUSH_VAPID_PUBLIC_KEY||''))||Buffer.from(env.PUSH_VAPID_PUBLIC_KEY,'base64url')[0]!==4)return res.status(503).json({error:'PUSH_REGISTRATION_DISABLED'})
    if(!exactObject(req.body,['subscription','label'])||!validPushSubscription(req.body.subscription)||typeof req.body.label!=='string'||!req.body.label.trim()||req.body.label.length>80)return res.status(400).json({error:'INVALID_BODY'})
-   payload={operation:'register',...req.body}
+   payload={operation:'register',...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
   }
   if(req.method==='PATCH') {
    if(!validPushPreferences(req.body))return res.status(400).json({error:'INVALID_BODY'})
@@ -34,7 +34,7 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   const data=await response.json()
   if(data.contractVersion!==1)return res.status(503).json({error:'PUSH_MIGRATION_REQUIRED'})
   const publicKey=env.PUSH_VAPID_PUBLIC_KEY||''
-  const registrationEnabled=env.PUSH_REGISTRATION_ENABLED==='true' && /^[A-Za-z0-9_-]{87}$/.test(publicKey) && Buffer.from(publicKey,'base64url')[0]===4
+  const registrationEnabled=env.PUSH_REGISTRATION_ENABLED==='true' && data.registrationPublicKey===publicKey && /^[A-Za-z0-9_-]{87}$/.test(publicKey) && Buffer.from(publicKey,'base64url')[0]===4
   return res.status(200).json({...data,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false})
  }catch{return res.status(503).json({error:'PUSH_UNAVAILABLE'})}
 }

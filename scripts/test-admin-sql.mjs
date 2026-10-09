@@ -43,6 +43,8 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/daily-pro-migration-after.sql',root),'utf8')))
   sql(readFileSync(new URL('supabase/migrations/20261009040000_web_push_preparation.sql',root),'utf8'))
   console.log(sql(readFileSync(new URL('tests/sql/web-push.sql',root),'utf8')))
+  sql(readFileSync(new URL('supabase/migrations/20261009050000_web_push_test_delivery.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/web-push-delivery.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
