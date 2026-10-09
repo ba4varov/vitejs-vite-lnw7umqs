@@ -22,4 +22,13 @@ export function forecastRisks(forecast, now=Date.now()) {
 export function activityAlerts(forecast, enabled, now) {
   return activityKinds.filter(k=>enabled.includes(k)).flatMap(kind=>calculatePlanner({...forecast,activity:kind},now).windows.map(window=>({kind,...window})))
 }
-export const alertKey=(city,zone,event)=>JSON.stringify([city,zone,event.kind,event.start])
+export function localAlertDate(epoch, zone) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(epoch).map(part => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+// User isolation is supplied by SQL's (user_id, event_key) primary key.
+// Risks remain distinct events; only personal activities have daily identity.
+export const alertKey=(location,zone,event)=>JSON.stringify([location,zone,event.kind,
+  activityKinds.includes(event.kind) ? localAlertDate(event.start, zone) : event.start])

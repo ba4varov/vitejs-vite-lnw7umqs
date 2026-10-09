@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {forecastRisks,activityAlerts,alertKey} from '../../server/alerts-logic.js'
+import {forecastRisks,activityAlerts,alertKey,localAlertDate} from '../../server/alerts-logic.js'
 import {calculatePlanner} from '../../server/planner-logic.js'
 import {handleAlerts,validAlertScope} from '../../server/alerts-core.js'
 const now=Date.parse('2026-10-09T00:00Z')
@@ -25,6 +25,21 @@ test('city zone, midnight, DST ambiguity; repeated refresh keys stable',()=>{
 test('personal activity events use exactly the existing planner windows',()=>{
  for(const activity of ['walk','garden','sport'])assert.deepEqual(activityAlerts(forecast(),[activity],now),calculatePlanner({...forecast(),activity},now).windows.map(w=>({kind:activity,...w})))
  assert.deepEqual(activityAlerts(forecast(),[],now),[])
+})
+test('personal keys survive disjoint time shifts; kind, place, zone and local date remain separate',()=>{
+ const a={kind:'garden',start:Date.parse('2026-10-09T05:00Z')}
+ const b={...a,start:Date.parse('2026-10-09T14:00Z')}
+ assert.equal(alertKey('432:279','Europe/Sofia',a),alertKey('432:279','Europe/Sofia',b))
+ for(const [location,zone,event] of [['427:233','Europe/Sofia',a],['432:279','UTC',a],['432:279','Europe/Sofia',{...a,kind:'walk'}],['432:279','Europe/Sofia',{...a,start:Date.parse('2026-10-10T05:00Z')}]])
+  assert.notEqual(alertKey('432:279','Europe/Sofia',a),alertKey(location,zone,event))
+ assert.notEqual(alertKey('432:279','UTC',{...a,kind:'wind'}),alertKey('432:279','UTC',{...b,kind:'wind'}))
+})
+test('local date identity uses IANA zones across midnight, fractional offsets and DST folds',()=>{
+ assert.equal(localAlertDate(Date.parse('2026-10-08T21:00Z'),'Europe/Sofia'),'2026-10-09')
+ assert.equal(localAlertDate(Date.parse('2026-10-08T20:59Z'),'Europe/Sofia'),'2026-10-08')
+ assert.equal(localAlertDate(Date.parse('2026-10-08T18:15Z'),'Asia/Kathmandu'),'2026-10-09')
+ for(const time of ['2026-10-25T00:30Z','2026-10-25T01:30Z'])assert.equal(localAlertDate(Date.parse(time),'Europe/Sofia'),'2026-10-25')
+ for(const time of ['2026-03-29T00:30Z','2026-03-29T01:30Z'])assert.equal(localAlertDate(Date.parse(time),'Europe/Sofia'),'2026-03-29')
 })
 const env={SUPABASE_URL:'https://isolated.invalid',SUPABASE_ANON_KEY:'anon'}
 async function run(method='GET',body,auth=true,rpc=true,query={},contractVersion=2) {
@@ -79,4 +94,30 @@ test('generation budget denial is a retryable HTTP 429, without an extra write',
   rpc++;return rpc===1?{ok:true,json:async()=>({contractVersion:2,pro:false,enabled:[],alerts:[]})}:{ok:false,status:400,json:async()=>({message:'ALERTS_RATE_LIMITED'})}
  },now)
  assert.equal(res.code,429);assert.equal(res.headers['Retry-After'],'3');assert.equal(rpc,2)
+})
+
+test('code-first rollout never generates personal windows against old SQL; Free risks remain available',async()=>{
+ for(const dailyActivityVersion of [undefined,1]) {
+  const calls=[],res={setHeader(){},status(code){this.code=code;return this},json(data){this.data=data;return this}}
+  await handleAlerts({method:'POST',headers:{authorization:'Bearer isolated'},body:{city:'City',locationKey:'432:279',forecast:forecast({rain:12})}},res,env,async(url,opts)=>{
+   calls.push([url,opts]);return {ok:true,json:async()=>url.endsWith('/user')?{id:'owner'}:{contractVersion:2,dailyActivityVersion,pro:true,enabled:['garden','rain'],alerts:[]}}
+  },now)
+  assert.equal(res.code,200)
+  const generated=JSON.parse(calls.at(-1)[1].body).payload.events
+  assert.equal(generated.some(e=>e.kind==='rain'),true)
+  // Heavy rain itself has no suitable garden windows. Use the unchanged payload
+  // plus a safe forecast below to explicitly exercise the personal capability gate.
+  assert.equal(Boolean(res.data.personalUnavailable),dailyActivityVersion!==1)
+ }
+})
+
+test('personal capability permits suitable windows only after the daily migration',async()=>{
+ for(const dailyActivityVersion of [undefined,1]) {
+  const calls=[],res={setHeader(){},status(code){this.code=code;return this},json(data){this.data=data;return this}}
+  await handleAlerts({method:'POST',headers:{authorization:'Bearer isolated'},body:{city:'City',locationKey:'432:279',forecast:forecast()}},res,env,async(url,opts)=>{
+   calls.push([url,opts]);return {ok:true,json:async()=>url.endsWith('/user')?{id:'owner'}:{contractVersion:2,dailyActivityVersion,pro:true,enabled:['garden'],alerts:[]}}
+  },now)
+  assert.equal(res.code,200)
+  assert.equal(JSON.parse(calls.at(-1)[1].body).payload.events.length,dailyActivityVersion===1?3:0)
+ }
 })

@@ -19,6 +19,6 @@ const {FileFsRef}=require(path.join(process.cwd(),'work/vercel-builder/node_modu
   functions.push({entrypoint,type:result.output.type,runtime:result.output.runtime,files:names})
  }
  assert.equal(functions.length,8);assert.ok(functions.length<=12)
- await fs.writeFile('docs/vercel-functions-stage6c.json',JSON.stringify({builder:'@vercel/node 23.0.0',verification:'Local official builder using installed dependencies; no deployment performed',count:functions.length,hobbyLimit:12,functions},null,2)+'\n')
+ await fs.writeFile(process.argv[2]||'docs/vercel-functions-stage6c.json',JSON.stringify({builder:'@vercel/node 23.0.0',verification:'Local official builder using installed dependencies; no deployment performed',count:functions.length,hobbyLimit:12,functions},null,2)+'\n')
  console.log(`PASS: ${functions.length} official Lambda bundles`)
 })().catch(e=>{console.error(e);process.exitCode=1})

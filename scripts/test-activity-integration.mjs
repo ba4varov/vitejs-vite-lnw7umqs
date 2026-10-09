@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { handleActivity } from '../server/activity-core.js'
 import { handleAdmin } from '../server/admin-core.js'
 import { handleAlerts } from '../server/alerts-core.js'
+import { localAlertDate, activityAlerts } from '../server/alerts-logic.js'
 import { handlePlanner } from '../server/planner-core.js'
 import { handleAdminManagement } from '../server/admin-management-core.js'
 import { handleProfile } from '../server/profile-core.js'
@@ -194,7 +195,7 @@ try {
   assert.equal((await api('/api/alerts',owner,'PATCH',{enabled:['walk']})).status,200)
     sql(`update public.alert_generation_state set last_generated=now()-interval '31 seconds' where user_id='${owner.user.id}' and location_key='427:233';`)
   const proAlerts=await api('/api/alerts',owner,'POST',{city:'Isolated Pro city',locationKey:'427:233',forecast:{timeZone:plannerBody.timeZone,hours:plannerBody.hours}})
-  assert.equal(proAlerts.status,200);assert.equal(proAlerts.body.alerts.length,3)
+  assert.equal(proAlerts.status,200);assert.equal(proAlerts.body.alerts.length,new Set(activityAlerts(plannerBody,['walk'],Date.now()).map(e=>localAlertDate(e.start,plannerBody.timeZone))).size)
   const recommendations=await api('/api/planner',owner,'POST',plannerBody)
   assert.equal(recommendations.status,200);assert.equal(recommendations.body.windows.length,3)
   assert.equal((await api('/api/planner',other,'POST',{...plannerBody,plan:'pro'})).status,403)
@@ -209,7 +210,7 @@ try {
   assert.equal((await api(alertsB,owner)).body.alerts.length,0)
   assert.equal((await api('/api/alerts',owner,'PATCH',{enabled:['walk']})).status,403)
   sql(`update public.subscriptions set plan='pro',status='active' where user_id='${owner.user.id}';`)
-  assert.equal((await api(alertsB,owner)).body.alerts.length,3)
+  assert.equal((await api(alertsB,owner)).body.alerts.length,proAlerts.body.alerts.length)
   sql(`update public.subscriptions set plan='free' where user_id='${owner.user.id}';`)
   pass('Stage 6C: same active GoTrue JWT Pro generation, revocation and restoration without relogin')
   assert.equal(Number(sql(`select count(*) from public.admin_audit_log where object_id='${owner.user.id}' and action in ('manual_pro_grant','free_restore');`)),2)
@@ -269,47 +270,98 @@ try {
   await page.reload();await page.locator('.admin-activity').getByText('Все още няма измерена активност за периода.',{exact:false}).waitFor()
   assert.equal(Number(sql('select count(*) from public.favorite_places;')),1,'Withdrawal must preserve core user feature data')
   pass('Withdrawal deletes stored analytics; stale consent rejected; actual admin UI shows no data; favorite preserved')
-  // Real main-page profile and notification panel with persisted isolated history.
+  // The regression uses real GoTrue, real HTTP/API, PostgREST and PostgreSQL.
+  // Only the external weather forecast is a fixture; Auth/API responses are never fulfilled.
   sql(`update public.subscriptions set plan='pro',status='active' where user_id='${owner.user.id}';`)
   const ownerContext=await browser.newContext({viewport:{width:390,height:1000}}),ownerPage=await ownerContext.newPage()
   await ownerContext.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort())
-  const daily={time:[plannerBody.hours[0].time.slice(0,10)],sunrise:[plannerBody.hours[0].time],sunset:[plannerBody.hours[0].time]}
-  for(const key of ['temperature_2m_min','temperature_2m_max','weather_code','precipitation_sum','precipitation_probability_max','wind_speed_10m_max','uv_index_max','apparent_temperature_max'])daily[key]=[key==='weather_code'?0:20]
-  const hourly={time:plannerBody.hours.map(h=>h.time)}
-  for(const key of ['temperature_2m','apparent_temperature','weather_code','precipitation','precipitation_probability','wind_speed_10m','surface_pressure','relative_humidity_2m','visibility','dew_point_2m','cloud_cover'])hourly[key]=plannerBody.hours.map(()=>key==='weather_code'||key==='precipitation'?0:key==='wind_speed_10m'?5:key==='precipitation_probability'?10:20)
-  await ownerContext.route('https://api.open-meteo.com/**',route=>route.fulfill({json:{timezone:'UTC',current:{time:plannerBody.hours[0].time,temperature_2m:20,weather_code:0,wind_speed_10m:5,relative_humidity_2m:50,apparent_temperature:20,surface_pressure:1010,uv_index:2},hourly,daily}}))
-  sql(`update public.alert_generation_state set last_generated=now()-interval '31 seconds' where user_id='${owner.user.id}' and location_key='432:279' and zone='UTC';`)
+  const tomorrow=Date.parse(new Date(Date.now()+86400000).toISOString().slice(0,10)+'T00:00Z')
+  let gardenHour=7
+  const weather=()=>{
+    const time=Array.from({length:72},(_,i)=>new Date(tomorrow+i*3600000).toISOString().slice(0,16))
+    const daily={time:[time[0].slice(0,10),time[24].slice(0,10),time[48].slice(0,10)]}
+    for(const key of ['temperature_2m_min','temperature_2m_max','weather_code','precipitation_sum','precipitation_probability_max','wind_speed_10m_max','uv_index_max','apparent_temperature_max'])daily[key]=daily.time.map(()=>key==='weather_code'?0:20)
+    daily.sunrise=daily.time.map(d=>d+'T07:00');daily.sunset=daily.time.map(d=>d+'T19:00')
+    const hourly={time}
+    for(const key of ['temperature_2m','apparent_temperature','weather_code','precipitation','precipitation_probability','wind_speed_10m','surface_pressure','relative_humidity_2m','visibility','dew_point_2m','cloud_cover'])
+      hourly[key]=time.map((_,i)=>key==='weather_code'||key==='precipitation'?0:key==='wind_speed_10m'?(i===gardenHour||i===gardenHour+1?5:50):key==='precipitation_probability'?10:20)
+    return {timezone:'UTC',current:{time:time[0],temperature_2m:20,weather_code:0,wind_speed_10m:5,relative_humidity_2m:50,apparent_temperature:20,surface_pressure:1010,uv_index:2},hourly,daily}
+  }
+  await ownerContext.route('https://api.open-meteo.com/**',route=>route.fulfill({json:weather()}))
+  const cooldown=()=>sql(`update public.alert_generation_state set last_generated=now()-interval '31 seconds' where user_id='${owner.user.id}';`)
+  await ownerPage.clock.install({time:new Date()})
   await ownerPage.goto(site+'/');await ownerPage.locator('.auth-nav').getByRole('button',{name:'Вход',exact:true}).click()
   await ownerPage.getByLabel('Имейл',{exact:true}).fill(owner.email)
   await ownerPage.locator('input[autocomplete="current-password"]').fill(password)
   await ownerPage.locator('form').getByRole('button',{name:'Вход',exact:true}).click()
   await ownerPage.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
-  await ownerPage.locator('.notification-settings input').nth(7).waitFor()
-  await ownerPage.locator('.notification-settings').getByText('Време за градинарство',{exact:false}).click()
-  await ownerPage.waitForFunction(()=>document.querySelector('.notification-settings input:nth-of-type(1)')!==null)
-  assert.ok((await api('/api/alerts',owner)).body.enabled.includes('garden'))
-  assert.equal((await api('/api/activity',owner)).body.enabled,false,'Notification preferences must not enable analytics')
-  mkdirSync(`${root}/docs/alerts-screenshots`,{recursive:true})
-  await ownerPage.locator('.notification-settings').screenshot({path:`${root}/docs/alerts-screenshots/real-gotrue-pro-settings-390-bg.png`})
-  await ownerPage.getByRole('button',{name:'Затвори',exact:true}).click()
+  const settings=ownerPage.locator('.notification-settings')
+  await settings.getByRole('button',{name:'Изключи всички',exact:true}).click()
+  await settings.getByRole('button',{name:'Изключи всички',exact:true}).waitFor({state:'visible'})
+  await settings.getByText('Време за градинарство',{exact:false}).click()
+  await ownerPage.waitForFunction(()=>Array.from(document.querySelectorAll('.notification-settings input')).filter(e=>e.checked).length===1)
+  assert.deepEqual((await api('/api/alerts',owner)).body.enabled,['garden'])
+  assert.equal((await api('/api/activity',owner)).body.enabled,false)
+  cooldown();await ownerPage.getByRole('button',{name:'Затвори',exact:true}).click()
+  const generateResponse=()=>ownerPage.waitForResponse(r=>r.url().includes('/api/alerts')&&r.request().method()==='POST')
+  const initialGeneration=generateResponse();await ownerPage.reload();await initialGeneration
   await ownerPage.getByRole('button',{name:'Известия',exact:true}).click()
-  await ownerPage.locator('.notification-panel li').nth(2).waitFor()
-  await ownerPage.locator('.notification-panel').screenshot({path:`${root}/docs/alerts-screenshots/real-gotrue-pro-history-390-bg.png`})
+  const panel=ownerPage.locator('.notification-panel'),{expect}=await import('@playwright/test')
+  await expect(panel.locator('li')).toHaveCount(1);await expect(panel.locator('.notification-window')).toHaveCount(1)
+  const scopePath='/api/alerts?locationKey=432:279&zone=UTC'
+  const original=(await api(scopePath,owner)).body.alerts[0]
+  await panel.getByRole('button',{name:'Прочетено',exact:true}).click();await expect(ownerPage.locator('.notification-count')).toHaveCount(0)
+  gardenHour=11;cooldown();const readRefresh=generateResponse();await ownerPage.reload();await readRefresh
+  await ownerPage.getByRole('button',{name:'Известия',exact:true}).click();await expect(panel.locator('li')).toHaveCount(1)
+  const shifted=(await api(scopePath,owner)).body.alerts[0]
+  assert.equal(shifted.key,original.key);assert.equal(shifted.read,true);assert.ok(shifted.event.start>=original.event.end)
+  await expect(panel.locator('li')).toHaveClass('notification-read')
+  await panel.getByRole('button',{name:'Скрий',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
+  gardenHour=17;cooldown();const hiddenRefresh=generateResponse();await ownerPage.reload();await hiddenRefresh
+  await ownerPage.getByRole('button',{name:'Известия',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
+  assert.equal((await api(scopePath,owner)).body.alerts.length,0)
+  const stored=JSON.parse(sql(`select row_to_json(a) from public.weather_alerts a where user_id='${owner.user.id}' and location_key='432:279' and zone='UTC' and kind='garden' and not superseded;`))
+  assert.equal(stored.event_key,original.key);assert.equal(stored.hidden,true);assert.equal(stored.is_read,true)
+  assert.equal(stored.event.start,tomorrow+17*3600000)
+  assert.equal(Number(sql(`select count(*) from public.weather_alerts where user_id='${owner.user.id}' and location_key='432:279' and zone='UTC' and kind='garden' and not superseded;`)),1)
+  // Real city switches exercise view guards; a different city's recommendation is independent.
+  await ownerPage.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await expect(panel.locator('li')).toHaveCount(1)
+  await panel.getByRole('button',{name:'Скрий',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
+  await ownerPage.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click()
+  await ownerPage.locator('.city-row').getByRole('button',{name:'София',exact:true}).click()
+  await ownerPage.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click()
+  await expect(panel.locator('li')).toHaveCount(0)
+  gardenHour=9;cooldown();const automatic=generateResponse();await ownerPage.clock.fastForward(15*60000+1000);await automatic
+  await expect(panel.locator('li')).toHaveCount(0);await expect(ownerPage.locator('.notification-count')).toHaveCount(0)
+  const unreadCityRefresh=generateResponse();await ownerPage.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await unreadCityRefresh
+  await expect(panel.locator('li')).toHaveCount(0);await expect(ownerPage.locator('.notification-count')).toHaveCount(0)
+  const hiddenUnread=JSON.parse(sql(`select row_to_json(a) from public.weather_alerts a where user_id='${owner.user.id}' and location_key='427:233' and zone='UTC' and kind='garden' and not superseded;`))
+  assert.equal(hiddenUnread.hidden,true);assert.equal(hiddenUnread.is_read,false);assert.equal(hiddenUnread.event.start,tomorrow+9*3600000)
+  await ownerPage.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
+  // Concurrent real GoTrue HTTP requests cannot revive the hidden day.
+  cooldown()
+  const w=weather(),forecast={timeZone:'UTC',hours:w.hourly.time.map((time,i)=>({time,feelsLike:w.hourly.apparent_temperature[i],rainProbability:10,rain:0,wind:w.hourly.wind_speed_10m[i],code:0}))}
+  const batch=await Promise.all(Array.from({length:4},()=>api('/api/alerts',owner,'POST',{city:'Synthetic Varna',locationKey:'432:279',forecast})))
+  assert.ok(batch.every(r=>r.status===200&&r.body.alerts.length===0))
+  const freshLogin=await json(base+'/auth/v1/token?grant_type=password','POST',undefined,{email:owner.email,password},{apikey:anon})
+  assert.equal((await api(scopePath,freshLogin.body)).body.alerts.length,0)
+  assert.equal((await api(scopePath,other)).body.alerts.length,0)
   sql(`update public.subscriptions set plan='free' where user_id='${owner.user.id}';`)
-  await ownerPage.locator('.notification-panel').getByRole('button',{name:'Скрий',exact:true}).first().click()
-  await ownerPage.locator('.notification-panel').getByText('Няма нови известия.',{exact:true}).waitFor()
-  sql(`update public.subscriptions set plan='pro',status='active' where user_id='${owner.user.id}';`)
-  await ownerPage.reload();await ownerPage.getByRole('button',{name:'Известия',exact:true}).click();await ownerPage.locator('.notification-panel li').nth(2).waitFor()
+  assert.equal((await api(scopePath,owner)).body.alerts.length,0)
+  sql(`update public.subscriptions set plan='pro' where user_id='${owner.user.id}';`)
+  cooldown();assert.equal((await api('/api/alerts',owner,'POST',{city:'Synthetic Varna',locationKey:'432:279',forecast})).body.alerts.length,0)
+  mkdirSync(`${root}/work`,{recursive:true})
+  await panel.screenshot({path:`${root}/work/daily-pro-real-gotrue-hidden.png`})
   await ownerContext.close()
-  pass('Stage 6C Chromium: real password login, persisted Pro settings without analytics consent, real history screenshots and live-session revoke/restore; weather fixture, real Auth/API and current Varna/UTC scope')
+  pass('Daily Pro Chromium + actual GoTrue/JWT/SQL: read → disjoint forecast → same read key; hide → disjoint forecast → reload → no unread; 15-minute update, rapid A/B/A, concurrent POST, new login, isolation and Free/Pro restoration')
   sql('alter function public.my_alerts(jsonb) rename to my_alerts_temporarily_missing;')
   assert.equal((await api('/api/alerts',owner)).status,503)
   sql('alter function public.my_alerts_temporarily_missing(jsonb) rename to my_alerts;')
   pass('Stage 6C: absent migration/RPC safely fails without altering core forecast or profile APIs')
   mkdirSync(`${root}/work`,{recursive:true})
   const imageDigests=Object.fromEntries(Object.entries(images).map(([name,image])=>[name,docker(['image','inspect',image,'--format','{{index .RepoDigests 0}}']).stdout.trim()]))
-  writeFileSync(`${root}/work/stage6c-real-integration.json`,JSON.stringify({checkedAt:new Date().toISOString(),status:'PASS',images:imageDigests,isolation:'Disposable dedicated Docker bridge network; ephemeral database; loopback-only HTTP; synthetic .invalid accounts; no production credentials',mocks:false,results,limits:['Local GoTrue password authentication/refresh only; Google provider, SMTP confirmation/recovery and Vercel-hosted API runtime are not exercised','Favorite action is a real database mutation followed by application activity API; public weather providers are not used','Chromium uses real local Auth/API for admin and notifications; notification weather is an isolated Open-Meteo fixture; other external requests are aborted']},null,2)+'\n')
-  console.log(`PASS: ${results.length} real integration checks; safe JSON report in work/stage6c-real-integration.json`)
+  writeFileSync(`${root}/work/daily-pro-real-integration.json`,JSON.stringify({checkedAt:new Date().toISOString(),status:'PASS',images:imageDigests,isolation:'Disposable dedicated Docker bridge network; ephemeral database; loopback-only HTTP; synthetic .invalid accounts; no production credentials',mocks:{auth:false,api:false,weather:true},results,limits:['Local GoTrue password authentication/refresh only; Google provider, SMTP confirmation/recovery and Vercel-hosted API runtime are not exercised','Favorite action is a real database mutation followed by application activity API; public weather providers are not used','Chromium uses real local Auth/API for admin and notifications; notification weather is an isolated Open-Meteo fixture; other external requests are aborted']},null,2)+'\n')
+  console.log(`PASS: ${results.length} real integration checks; safe JSON report in work/daily-pro-real-integration.json`)
 } catch(error) {
   console.error(`FAIL: ${error.message}`);process.exitCode=1
 } finally {

@@ -50,15 +50,19 @@ export async function handleAlerts(req,res,env=process.env,fetcher=fetch,now=Dat
     if(!snapshot.ok)return respondFailure(snapshot)
     const settings=await snapshot.json()
     if(settings.contractVersion!==2)return res.status(503).json({error:'ALERTS_MIGRATION_REQUIRED'})
-    if(req.method==='GET')return res.status(200).json(settings)
+    // During a code-first rollout, keep Free risks available but do not generate
+    // personal events against SQL that still deduplicates by overlapping hours.
+    const personalUnavailable=settings.pro && settings.enabled.some(k=>activityKinds.includes(k)) && settings.dailyActivityVersion!==1
+    const compatible=data=>personalUnavailable?{...data,personalUnavailable:true,alerts:data.alerts.filter(row=>!activityKinds.includes(row.event.kind))}:data
+    if(req.method==='GET')return res.status(200).json(compatible(settings))
     if(req.method==='POST') {
       const b=req.body
-      const activities=settings.pro?activityAlerts(b.forecast,settings.enabled.filter(k=>activityKinds.includes(k)),now):[]
+      const activities=settings.pro&&!personalUnavailable?activityAlerts(b.forecast,settings.enabled.filter(k=>activityKinds.includes(k)),now):[]
       payload={operation:'generate',city:b.city.trim(),events:[...forecastRisks(b.forecast,now),...activities]}
     }
     // SQL rechecks current rights and serializes scope generation/mutations.
     const response=await rpc({...payload,...scope})
     if(!response.ok)return respondFailure(response)
-    return res.status(200).json(await response.json())
+    return res.status(200).json(compatible(await response.json()))
   }catch{return res.status(503).json({error:'ALERTS_UNAVAILABLE'})}
 }
