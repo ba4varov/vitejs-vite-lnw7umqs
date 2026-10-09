@@ -1,0 +1,31 @@
+[WebServer] (node:18338) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:18351) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 13 tests using 2 workers
+
+(node:18371) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18370) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 bg light (4.1s)
+  ✓   1 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 bg dark (4.2s)
+  ✓   4 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 en dark (3.8s)
+  ✓   3 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 en light (3.9s)
+  ✓   5 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 bg light (3.9s)
+  ✓   6 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 bg dark (4.2s)
+  ✓   7 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 en light (4.1s)
+  ✓   8 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 en dark (4.2s)
+  ✓   9 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 bg light (4.4s)
+  ✓  10 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 bg dark (4.7s)
+  ✓  11 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 en light (4.3s)
+  ✓  12 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 en dark (4.3s)
+  ✓  13 tests/profile-redesign.spec.ts:53:1 › focus trap, backdrop cancellation, failed weather save retains draft, compact auth (2.1s)
+
+  13 passed (29.2s)
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

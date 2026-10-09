@@ -1,0 +1,15 @@
+
+> vite-react-typescript-starter@0.0.0 build
+> tsc -b && vite build
+
+vite v8.1.1 building client environment for production...
+[2Ktransforming...✓ 84 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                         2.78 kB │ gzip:   1.06 kB
+dist/assets/index-d7g8Hij3.css         61.07 kB │ gzip:  13.10 kB
+dist/assets/google-oauth-B6EOnn-a.js    1.60 kB │ gzip:   0.83 kB
+dist/assets/module-BhKvEe30.js        103.77 kB │ gzip:  24.26 kB
+dist/assets/index-CzWllIKy.js         369.61 kB │ gzip: 114.31 kB
+
+✓ built in 598ms

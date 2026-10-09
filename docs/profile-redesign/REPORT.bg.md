@@ -37,7 +37,7 @@ X, Escape и клик върху фона използват общо затва
 | `npm run typecheck` | Успешен |
 | `npm run build` | Успешен |
 | Пълна Chromium регресия, `CHROMIUM_PATH=/usr/bin/chromium npm run test:admin:browser -- --workers=4` | 277/277 успешни |
-| Нови UX тестове, 390/768/1440 px × BG/EN × светла/тъмна тема, плюс фокус/затваряне/грешки | Резултатът е в приложените логове |
+| Нови UX тестове, 390/768/1440 px × BG/EN × светла/тъмна тема, плюс фокус/затваряне/грешки | 13/13 успешни |
 | Vercel deployment на клиентската промяна `217c507` | `success` чрез GitHub status |
 | Браузърна проверка на Vercel Preview | Блокирана от мрежовата политика: proxy CONNECT връща HTTP 403 |
 
