@@ -95,4 +95,13 @@ do $$ declare claim jsonb;cid uuid;begin
  perform public.finish_push_test('b2000000-0000-0000-0000-000000000002',cid,'expired',0);
  if exists(select 1 from public.push_devices where id='b1000000-0000-0000-0000-000000000001') then raise exception '410 invalidation';end if;
 end $$;
+-- Approval records must not block deletion of an administrator account.
+insert into public.push_test_permits(user_id,device_id,approved_by,device_revision,preferences_revision,category,expires_at)
+ select d.user_id,d.id,'b0000000-0000-0000-0000-000000000003',d.updated_at,p.updated_at,'walk',clock_timestamp()+interval '5 minutes'
+ from public.push_devices d join public.push_preferences p on p.user_id=d.user_id where d.endpoint='https://fcm.googleapis.com/wp/registered';
+delete from auth.users where id='b0000000-0000-0000-0000-000000000003';
+do $$ begin
+ if exists(select 1 from public.push_test_permits where approved_by='b0000000-0000-0000-0000-000000000003') then raise exception 'deleted approver authorization retained';end if;
+ if not exists(select 1 from public.push_devices where endpoint='https://fcm.googleapis.com/wp/registered') then raise exception 'approver deletion removed owner device';end if;
+end $$;
 rollback;

@@ -42,7 +42,7 @@ create table public.push_test_permits (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references auth.users(id) on delete cascade,
  device_id uuid not null references public.push_devices(id) on delete cascade,
- approved_by uuid not null references auth.users(id),
+ approved_by uuid not null references auth.users(id) on delete cascade,
  device_revision timestamptz not null,
  preferences_revision timestamptz not null,
  category text not null check(category in ('rain','storm','wind','cold','heat','walk','garden','sport')),

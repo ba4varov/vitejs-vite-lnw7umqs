@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-09",
+  "baseMainCommit": "5e5bb7811a5c2d9660337678f856b0578fb90009",
+  "implementationCommit": "ee7eb0f55b89a9e986501029f490391b1850ec96",
+  "pullRequest": "https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/63",
+  "unit": {"passed": 269, "failed": 0, "command": "node --test --test-isolation=none tests/unit/*.test.mjs src/*.test.mjs"},
+  "deno": {"version": "2.9.6", "edgeTypecheck": "passed", "passed": 8, "failed": 0},
+  "chromium": {
+    "dev": {"passed": 305, "skipped": 1, "skipReason": "Compiled-asset test requires build configuration"},
+    "rotationBgEn": {"passed": 2},
+    "compiledBuild": {"passed": 64, "skipped": 0},
+    "accountAndWeatherApis": "isolated fixtures"
+  },
+  "sql": {"command": "npm run test:admin:sql", "result": "passed", "database": "disposable local PostgreSQL 17 / PostgREST", "fullSupabaseAuth": false},
+  "edgeRuntime": {
+    "version": "1.76.2",
+    "imageDigest": "sha256:edd22bef4477b900d5c300e287ce9b18bff9b81a0291bee14ee0b7c7b71a2899",
+    "network": "none",
+    "projectSecrets": false,
+    "defaultOff": "503 PUSH_TEST_DISABLED",
+    "simulation": "passed: encryption, single send, duplicate refusal, native Deno TLS, redirect refusal, certificate hostname mismatch refusal",
+    "command": "npm run test:push:edge"
+  },
+  "lint": "passed without warnings",
+  "typecheck": "passed",
+  "build": "passed",
+  "vercelBuilder": {"version": "@vercel/node 23.0.0", "functions": 9, "newFunctions": 0},
+  "preview": {
+    "url": "https://weather-git-feat-stage6gb-secure-push-test-ba4varov-projects.vercel.app/",
+    "githubVercelStatus": "success",
+    "deployment": "https://vercel.com/ba4varov-projects/weather/38JAehRuX9huX8QdhrJ9UXtv1WkC",
+    "botStatus": "Ready",
+    "hostedVerified": false,
+    "reason": "Proxy CONNECT rejected with HTTP 403; web tool also cannot access origin",
+    "assetsDownloaded": 0,
+    "environmentSecretBindingsInspected": false
+  },
+  "productionSqlExecuted": false,
+  "productionSecretsChangedOrGenerated": false,
+  "realDevicesOrUserSettingsChanged": false,
+  "registrationOrDeliveryActivated": false,
+  "cronActivated": false,
+  "realPushSent": false,
+  "merged": false
+}
