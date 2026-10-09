@@ -4,6 +4,7 @@ import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCa
 import { authCallbackView } from './auth-flow.js'
 import { profilePlanLabel } from './profile-plan.js'
 import { NotificationSettings } from './NotificationSettings'
+import { PushSettings } from './PushSettings'
 import { ActivityConsent } from './ActivityConsent'
 import { Turnstile } from './Turnstile'
 
@@ -99,6 +100,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       {view === 'profile' && <>{profile && <p className="profile-email">{profile.email}</p>}<p className="profile-plan"><strong>{t.plan}:</strong> {profilePlanLabel(profile?.plan, lang, busy, Boolean(error))}</p></>}
       {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
       {view === 'profile' && session && <NotificationSettings key={'notifications-'+session.user.id} session={session} lang={lang} />}
+      {view === 'profile' && session && <PushSettings key={'push-'+session.user.id} session={session} lang={lang} />}
       {view === 'profile' && session && <ActivityConsent key={session.user.id} session={session} lang={lang} />}
       <form onSubmit={submit}>
         {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>}

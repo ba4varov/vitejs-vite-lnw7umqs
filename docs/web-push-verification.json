@@ -1,0 +1,26 @@
+{
+  "checkedOn": "2026-10-09",
+  "baseMain": "63a683000af8731b353abb2fd5a83ea535ea9f6f",
+  "deliveryEnabled": false,
+  "productionSqlExecuted": false,
+  "productionAccountsChanged": false,
+  "productionCronCreated": false,
+  "realPushSent": false,
+  "checks": {
+    "build": "PASS: TypeScript project references and Vite production bundle",
+    "lint": "PASS: oxlint",
+    "unit": "PASS: 29 test modules including OAuth, Free/Pro, planner, alerts and push",
+    "chromium": "PASS: 117 tests (19 new push checks + existing alerts/planner/profile-plan regressions)",
+    "sql": "PASS: disposable PostgreSQL 17 + PostgREST; current migrations and push SQL ownership/default gate/dedup/delete/cascade/rate limit; existing SQL/HTTP regressions",
+    "vercelBuilder": "PASS: @vercel/node 23.0.0, 9 official Lambda bundles; see vercel-functions-stage6ga.json",
+    "preview": "Pending PR deployment check"
+  },
+  "limits": [
+    "Chromium permission/PushManager lifecycle uses isolated fixtures; no real provider delivery",
+    "Android/Windows/iOS compatibility detection is simulated in Chromium; physical OS and APNs delivery remain manual",
+    "Google OAuth unit regressions passed; no real Google account login performed",
+    "SQL uses disposable minimal Auth schema and real PostgREST; no Production or hosted Supabase migration",
+    "Edge Function is a permanent 503 scaffold; no scheduler, sender or VAPID private key exists",
+    "Costs are explicit scenario estimates, not measured Production traffic"
+  ]
+}

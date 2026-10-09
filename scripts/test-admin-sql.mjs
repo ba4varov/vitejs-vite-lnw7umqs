@@ -41,6 +41,8 @@ try {
   sql(readFileSync(new URL('tests/sql/daily-pro-migration-before.sql',root),'utf8'))
   sql(readFileSync(new URL('supabase/migrations/20261009030000_daily_pro_recommendations.sql',root),'utf8'))
   console.log(sql(readFileSync(new URL('tests/sql/daily-pro-migration-after.sql',root),'utf8')))
+  sql(readFileSync(new URL('supabase/migrations/20261009040000_web_push_preparation.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/web-push.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
