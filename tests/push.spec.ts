@@ -33,12 +33,14 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false}})
  })
  await page.goto('/');await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+ await page.getByRole('tab',{name:'Push известия',exact:true}).click()
  await expect(page.locator('.push-settings')).toBeVisible()
  return {calls,preferences:()=>prefs}
 }
 for(const width of [390,1440])for(const lang of ['bg','en'])test(`push section visible without SQL migration ${width} ${lang}`,async({page})=>{
  await page.setViewportSize({width,height:1000});const state=await setup(page,{missingMigration:true})
  if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('button.lang-btn').click();await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click()}
+ await page.getByRole('tab',{name:lang==='en'?'Push notifications':'Push известия',exact:true}).click()
  const panel=page.locator('.push-settings')
  await panel.scrollIntoViewIfNeeded();await expect(panel).toBeVisible()
  await expect(panel.getByRole('heading',{level:3})).toHaveText(lang==='bg'?'Push известия при затворен сайт':'Push notifications when the site is closed')
@@ -129,6 +131,7 @@ for(const [name,ua,installed] of [
 for(const width of [390,768,1440])for(const lang of ['bg','en'])test(`push layout ${width} ${lang}`,async({page})=>{
  await page.setViewportSize({width,height:1000});await setup(page)
  if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('button.lang-btn').click();await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click()}
+ await page.getByRole('tab',{name:lang==='en'?'Push notifications':'Push известия',exact:true}).click()
  const panel=page.locator('.push-settings');await expect(panel).toBeVisible()
  const overflow=await panel.evaluate((e:any)=>e.scrollWidth>e.clientWidth+1);expect(overflow).toBe(false)
 })

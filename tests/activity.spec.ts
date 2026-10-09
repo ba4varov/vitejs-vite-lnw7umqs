@@ -72,6 +72,7 @@ for(const width of [390,768,1440]) for(const lang of ['bg','en'] as const) for(c
   await page.goto('/');await page.getByRole('button',{name:'Моят профил',exact:true}).click()
   if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('button.lang-btn').click();await page.getByRole('button',{name:'My profile',exact:true}).click()}
   if(dark){await page.getByRole('button',{name:lang==='bg'?'Затвори':'Close',exact:true}).click();await page.getByRole('button',{name:'🌙',exact:true}).click();await page.getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true}).click()}
+  await page.getByRole('tab',{name:lang==='bg'?'Поверителност':'Privacy',exact:true}).click()
   const checkbox=page.locator('.activity-consent input')
   await expect(checkbox).toBeEnabled();await expect(checkbox).not.toBeChecked();expect(fixture.events).toHaveLength(0)
   await page.screenshot({path:`docs/activity-screenshots/consent-${width}-${lang}-${dark?'dark':'light'}.png`,fullPage:false})

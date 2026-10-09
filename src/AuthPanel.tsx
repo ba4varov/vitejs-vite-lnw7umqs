@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCallback, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
@@ -8,6 +8,9 @@ import { PushSettings } from './PushSettings'
 import { ActivityConsent } from './ActivityConsent'
 import { Turnstile } from './Turnstile'
 
+type ProfileTab = 'account' | 'weather' | 'push' | 'privacy'
+const profileTabs = { bg: ['Моят профил', 'Метео известия', 'Push известия', 'Поверителност'], en: ['My profile', 'Weather notifications', 'Push notifications', 'Privacy'] }
+const tabIds: ProfileTab[] = ['account', 'weather', 'push', 'privacy']
 type View = 'closed' | 'login' | 'register' | 'forgot' | 'profile' | 'password'
 const copy = {
   bg: { google: 'Продължи с Google', googleFailure: 'Входът с Google е отказан, прекъснат или неуспешен. Опитай отново.', login: 'Вход', register: 'Регистрация', profile: 'Моят профил', logout: 'Изход', email: 'Имейл', password: 'Парола', confirm: 'Потвърди паролата', showPassword: 'Покажи паролата', hidePassword: 'Скрий паролата', name: 'Име (незадължително)', forgot: 'Забравена парола?', send: 'Изпрати', save: 'Запази', plan: 'Текущ план', free: 'Безплатен', close: 'Затвори', mismatch: 'Паролите не съвпадат.', verify: 'Провери имейла си, за да потвърдиш регистрацията.', resent: 'Писмото за потвърждение е изпратено отново.', reset: 'Изпратихме инструкции за нова парола.', success: 'Промяната е запазена.', loading: 'Зареждане…', resend: 'Изпрати потвърждението отново', unavailable: 'Регистрацията още не е настроена. Виж README за необходимите настройки.', failure: 'Операцията е неуспешна. Провери данните и опитай отново.', newPassword: 'Нова парола', signedOut: 'Излязохте успешно.', captchaRequired: 'Потвърдете, че сте човек, преди да изпратите.', captcha: { loading: 'Зареждане на проверката…', ready: 'Проверката е успешна.', expired: 'Проверката изтече. Потвърдете отново.', error: 'Проверката не се зареди или възникна грешка.', retry: 'Опитай отново' } },
@@ -26,6 +29,49 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const [profile, setProfile] = useState<any>(null), [name, setName] = useState('')
   const [busy, setBusy] = useState(true), [message, setMessage] = useState(''), [error, setError] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null), [captchaReset, setCaptchaReset] = useState(0)
+  const [tab, setTab] = useState<ProfileTab>('account')
+  const [weatherDirty, setWeatherDirty] = useState(false), [pushDirty, setPushDirty] = useState(false)
+  const [weatherBusy, setWeatherBusy] = useState(false), [pushBusy, setPushBusy] = useState(false), [privacyBusy, setPrivacyBusy] = useState(false)
+  const settingsBusy = weatherBusy || pushBusy || privacyBusy
+  const dialog = useRef<HTMLElement>(null)
+  const dirty = view === 'profile' && (name !== (profile?.name ?? '') || weatherDirty || pushDirty)
+  const close = () => {
+    if (busy || settingsBusy) return
+    if (dirty && !window.confirm(lang === 'bg' ? 'Има незапазени промени. Да ги отхвърлим и затворим профила?' : 'You have unsaved changes. Discard them and close your profile?')) return
+    changeView('closed')
+  }
+  const closeRef = useRef(close); closeRef.current = close
+  useEffect(() => {
+    if (view === 'closed') return
+    const previous = document.activeElement as HTMLElement | null
+    const bodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const hidden: HTMLElement[] = []
+    let node: HTMLElement | null = dialog.current?.parentElement ?? null
+    while (node && node !== document.body) {
+      for (const sibling of node.parentElement?.children ?? []) if (sibling !== node && sibling instanceof HTMLElement && !sibling.inert) { sibling.inert = true; hidden.push(sibling) }
+      node = node.parentElement
+    }
+    dialog.current?.focus()
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); return }
+      if (event.key !== 'Tab') return
+      const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), summary, [tabindex="0"], a[href]') ?? []).filter(el => el.getClientRects().length > 0)
+      const first = items[0], last = items.at(-1)
+      if (!first) { event.preventDefault(); dialog.current?.focus(); return }
+      if (event.shiftKey && (document.activeElement === first || !dialog.current?.contains(document.activeElement))) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => { document.removeEventListener('keydown', keydown); document.body.style.overflow = bodyOverflow; hidden.forEach(el => { el.inert = false }); if (previous?.isConnected) previous.focus() }
+  }, [view === 'closed'])
+  useEffect(() => { dialog.current?.querySelector('.auth-dialog-content')?.scrollTo(0, 0) }, [tab])
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
   const redirect = `${location.origin}${location.pathname}`
   const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
   const protectedView = view === 'login' || view === 'register' || view === 'forgot'
@@ -77,10 +123,10 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       if (view === 'login') { captchaSent = true; const active = await signIn(email, password, captchaToken || undefined); setSession(active); changeView('closed') }
       if (view === 'forgot') { captchaSent = true; await resetPassword(email, redirect, captchaToken || undefined); setMessage(t.reset) }
       if (view === 'password' && session) { await updatePassword(session.access_token, password); setPassword(''); setMessage(t.success) }
-      if (view === 'profile' && session) { const data = await profileRequest(session, 'PATCH', name); setProfile(data); setMessage(t.success) }
+      if (view === 'profile' && session) { const data = await profileRequest(session, 'PATCH', name); setProfile(data); setName(data.name); setMessage(t.success) }
     } catch (reason: any) { if (reason.message === 'mismatch') setError(t.mismatch); else fail(reason) } finally { if (captchaSent) { setCaptchaToken(null); setCaptchaReset(value => value + 1) }; setBusy(false) }
   }
-  const openProfile = async () => { if (busy) return; setProfile(null); setView('profile'); setError(''); setMessage(''); if (!session) return; setBusy(true); try { const data = await profileRequest(session); setProfile(data); setName(data.name) } catch (reason) { fail(reason) } finally { setBusy(false) } }
+  const openProfile = async () => { if (busy) return; setProfile(null); setTab('account'); setWeatherDirty(false); setPushDirty(false); setView('profile'); setError(''); setMessage(''); if (!session) return; setBusy(true); try { const data = await profileRequest(session); setProfile(data); setName(data.name) } catch (reason) { fail(reason) } finally { setBusy(false) } }
   const logout = async () => { if (!session) return; const active = session; setSession(null); setProfile(null); setView('closed'); setMessage(t.signedOut); setBusy(false); await signOut(active) }
   const resend = async () => {
     if (busy) return
@@ -91,28 +137,36 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     finally { setCaptchaToken(null); setCaptchaReset(value => value + 1); setBusy(false) }
   }
 
-  return <div id="planner-auth" className="auth-nav" aria-live="polite">
+  return <div id="planner-auth" className="auth-nav">
     {busy && view === 'closed' ? <span>{t.loading}</span> : session ? <><button onClick={openProfile}>{t.profile}</button><button onClick={logout} disabled={busy}>{t.logout}</button></> : <><button onClick={() => changeView('login')}>{t.login}</button><button className="primary" onClick={() => changeView('register')}>{t.register}</button></>}
-    {view !== 'closed' && <div className="auth-backdrop" onMouseDown={e => e.target === e.currentTarget && changeView('closed')}><section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-      <button className="auth-close" aria-label={t.close} onClick={() => changeView('closed')}>×</button>
+    {view !== 'closed' && <div className="auth-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}><section ref={dialog} tabIndex={-1} className={`auth-dialog ${view === 'profile' ? 'profile-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <header className="auth-dialog-header"><button className="auth-close" aria-label={t.close} disabled={busy || settingsBusy} onClick={close}>×</button>
       <h2 id="auth-title">{view === 'profile' ? t.profile : view === 'register' ? t.register : view === 'forgot' ? t.forgot : view === 'password' ? t.newPassword : t.login}</h2>
+      </header>
+      {view === 'profile' && <nav className="profile-tabs" role="tablist" aria-label={t.profile}>{tabIds.map((id, index) => <button key={id} id={`profile-tab-${id}`} role="tab" aria-selected={tab === id} aria-controls={`profile-panel-${id}`} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)} onKeyDown={event => { const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End']; if (!keys.includes(event.key)) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 3 : (index + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + 4) % 4; setTab(tabIds[next]); document.getElementById(`profile-tab-${tabIds[next]}`)?.focus() }}>{profileTabs[lang][index]}</button>)}</nav>}
+      <div className="auth-dialog-content">
+      {dirty && <p className="profile-draft-note" role="status">{lang === 'bg' ? 'Има незапазени промени. Те се запазват при смяна на раздела.' : 'You have unsaved changes. They are kept when switching sections.'}</p>}
       {!authConfigured && <p className="auth-error">{t.unavailable}</p>}
-      {view === 'profile' && <>{profile && <p className="profile-email">{profile.email}</p>}<p className="profile-plan"><strong>{t.plan}:</strong> {profilePlanLabel(profile?.plan, lang, busy, Boolean(error))}</p></>}
       {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
-      {view === 'profile' && session && <NotificationSettings key={'notifications-'+session.user.id} session={session} lang={lang} />}
-      {view === 'profile' && session && <PushSettings key={'push-'+session.user.id} session={session} lang={lang} />}
-      {view === 'profile' && session && <ActivityConsent key={session.user.id} session={session} lang={lang} />}
+      {view === 'profile' && session && <>
+        <section id="profile-panel-weather" role="tabpanel" aria-labelledby="profile-tab-weather" hidden={tab !== 'weather'}><NotificationSettings key={'notifications-'+session.user.id} session={session} lang={lang} onDirtyChange={setWeatherDirty} onBusyChange={setWeatherBusy} /></section>
+        <section id="profile-panel-push" role="tabpanel" aria-labelledby="profile-tab-push" hidden={tab !== 'push'}><PushSettings key={'push-'+session.user.id} session={session} lang={lang} onDirtyChange={setPushDirty} onBusyChange={setPushBusy} /></section>
+        <section id="profile-panel-privacy" role="tabpanel" aria-labelledby="profile-tab-privacy" hidden={tab !== 'privacy'}><h3>{profileTabs[lang][3]}</h3><ActivityConsent key={session.user.id} session={session} lang={lang} onBusyChange={setPrivacyBusy} /></section>
+      </>}
+      <section id="profile-panel-account" role={view === 'profile' ? 'tabpanel' : undefined} aria-labelledby={view === 'profile' ? 'profile-tab-account' : undefined} hidden={view === 'profile' && tab !== 'account'}>
+      {view === 'profile' && <><h3>{t.profile}</h3>{profile && <p className="profile-email"><span>{t.email}</span><strong>{profile.email}</strong></p>}<p className="profile-plan"><strong>{t.plan}:</strong> {profilePlanLabel(profile?.plan, lang, busy, Boolean(error))}</p></>}
       <form onSubmit={submit}>
         {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>}
         {(view === 'login' || view === 'register' || view === 'password') && <PasswordField label={view === 'password' ? t.newPassword : t.password} value={password} onChange={e => setPassword(e.target.value)} autoComplete={view === 'login' ? 'current-password' : 'new-password'} showLabel={t.showPassword} hideLabel={t.hidePassword} />}
         {view === 'register' && <PasswordField label={t.confirm} value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="new-password" showLabel={t.showPassword} hideLabel={t.hidePassword} />}
-        {view === 'profile' && <label>{t.name}<input maxLength={80} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>}
+        {view === 'profile' && <label>{t.name}<input disabled={busy || !profile} maxLength={80} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>}
         {protectedView && captchaConfigured && <Turnstile key={view} siteKey={captchaSiteKey} lang={lang} resetKey={captchaReset} onTokenChange={onCaptchaTokenChange} labels={t.captcha} />}
         {error && <p className="auth-error" role="alert">{error}</p>}{message && <p className="auth-success" role="status">{message}</p>}
-        <button className="auth-submit" disabled={busy || !authConfigured || (protectedView && captchaConfigured && !captchaToken)}>{busy ? t.loading : view === 'profile' ? t.save : view === 'login' ? t.login : view === 'register' ? t.register : t.send}</button>
+        <button className="auth-submit" disabled={busy || !authConfigured || (view === 'profile' && !profile) || (protectedView && captchaConfigured && !captchaToken)}>{busy ? t.loading : view === 'profile' ? t.save : view === 'login' ? t.login : view === 'register' ? t.register : t.send}</button>
       </form>
       {view === 'login' && <button className="auth-link" onClick={() => changeView('forgot')}>{t.forgot}</button>}
       {view === 'register' && <button className="auth-link" disabled={!email || busy || (captchaConfigured && !captchaToken)} onClick={resend}>{t.resend}</button>}
+      </section></div>
     </section></div>}
   </div>
 }

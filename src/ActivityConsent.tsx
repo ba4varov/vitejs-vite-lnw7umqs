@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { AuthSession } from './auth-client'
 import { loadActivityConsent, setActivityConsent } from './activity-client'
-export function ActivityConsent({ session, lang }: {session:AuthSession;lang:'bg'|'en'}) {
+export function ActivityConsent({ session, lang, onBusyChange }: {session:AuthSession;lang:'bg'|'en';onBusyChange?:(busy:boolean)=>void}) {
   const [value,setValue] = useState<any>(null), [busy,setBusy] = useState(true), [failed,setFailed] = useState(false)
+  useEffect(() => { onBusyChange?.(busy) }, [busy, onBusyChange])
   const bg = lang === 'bg'
   useEffect(() => { let live=true; setValue(null); setBusy(true); setFailed(false)
     void loadActivityConsent(session).then(result => {if(live)setValue(result)}).catch(() => {if(live)setFailed(true)}).finally(() => {if(live)setBusy(false)})

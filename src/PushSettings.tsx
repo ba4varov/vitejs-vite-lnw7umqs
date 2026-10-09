@@ -5,7 +5,7 @@ import {pushSupport,preparePushWorker,enrollPush,removePushDevice} from './push-
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
 const presets:PushCity[]=[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'},{name:'Пловдив',latitude:42.1354,longitude:24.7453,zone:'Europe/Sofia'},{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'},{name:'Бургас',latitude:42.5048,longitude:27.4626,zone:'Europe/Sofia'}]
-export function PushSettings({session,lang}:{session:AuthSession;lang:'bg'|'en'}) {
+export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:AuthSession;lang:'bg'|'en';onDirtyChange?:(dirty:boolean)=>void;onBusyChange?:(busy:boolean)=>void}) {
  const bg=lang==='bg',support=pushSupport()
  const [data,setData]=useState<PushSnapshot|null>(null),[draft,setDraft]=useState<PushPreferences>({enabled:false,cities:[],categories:[]}),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[worker,setWorker]=useState<ServiceWorkerRegistration|null>(null)
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
@@ -25,6 +25,9 @@ export function PushSettings({session,lang}:{session:AuthSession;lang:'bg'|'en'}
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
  const dirty=!!data&&JSON.stringify(draft)!==JSON.stringify(data.preferences)
+ const unsavedInputs=Boolean(city.name.trim() || (label.trim() && !data?.devices.some(device=>device.label===label.trim())))
+ useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
+ useEffect(()=>{onBusyChange?.(busy)},[busy,onBusyChange])
  const add=(c:PushCity)=>{
   if(!c.name.trim()||!Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||!Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||draft.cities.length>=5)return
   try{new Intl.DateTimeFormat('en',{timeZone:c.zone}).format(0)}catch{return}
