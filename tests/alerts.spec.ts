@@ -115,22 +115,23 @@ test('rapid A/B/A switch keeps separate read/hidden/cleared histories and curren
 for(const method of ['GET','PATCH','DELETE'])test(`late ${method} response cannot replace the newly selected city`,async({page})=>{
  await alertFixture(page,'free');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
  await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(1)
- let release:()=>void,started:()=>void;const pending=new Promise<void>(resolve=>{release=resolve}),received=new Promise<void>(resolve=>{started=resolve})
+ let release:()=>void,started:()=>void,finished:()=>void;const pending=new Promise<void>(resolve=>{release=resolve}),received=new Promise<void>(resolve=>{started=resolve}),completed=new Promise<void>(resolve=>{finished=resolve})
  await page.route('**/api/alerts**',async r=>{
-  if(r.request().method()!==method)return r.fallback();started!();await pending
-  await r.fulfill({json:{contractVersion:2,pro:false,enabled:['wind'],alerts:[]}}).catch(()=>{})
+  if(r.request().method()!==method||new URL(r.request().url()).searchParams.get('locationKey')!=='432:279')return r.fallback();started!();await pending
+  await r.fulfill({json:{contractVersion:2,pro:false,enabled:['wind'],alerts:[]}}).catch(()=>{});finished!()
  })
  if(method==='GET')await page.clock.fastForward(60000);else await panel.getByRole('button',{name:method==='PATCH'?'Прочетено':'Изчисти известията',exact:true}).click();await received
- await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await expect(panel).toContainText('София');release!()
+ await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await expect(panel).toContainText('София');release!();await completed;await page.evaluate(()=>new Promise(requestAnimationFrame))
  await expect(panel.locator('li')).toHaveCount(1);await expect(panel).not.toContainText('Варна')
 })
 test('client rejects mixed location or time-zone rows even in a malformed scoped response',async({page})=>{
  await alertFixture(page,'free')
  await page.route('**/api/alerts**',r=>r.fulfill({json:{contractVersion:2,pro:false,enabled:['wind'],alerts:[
+  {key:'current-city',locationKey:'432:279',zone:'Europe/Sofia',city:'CURRENT CITY',read:false,updated:1791504000000,event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65}},
   {key:'foreign-city',locationKey:'427:233',zone:'Europe/Sofia',city:'FOREIGN CITY',read:false,updated:1791504000000,event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65}},
   {key:'foreign-zone',locationKey:'432:279',zone:'UTC',city:'FOREIGN ZONE',read:false,updated:1791504000000,event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65}}
  ]}}))
  await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible();await page.getByRole('button',{name:'Известия',exact:true}).click()
- await expect(page.locator('.notification-panel li')).toHaveCount(0);await expect(page.locator('.notification-count')).toHaveCount(0)
+ await expect(page.locator('.notification-panel')).toContainText('CURRENT CITY');await expect(page.locator('.notification-panel li')).toHaveCount(1);await expect(page.locator('.notification-count')).toContainText('1')
  await expect(page.locator('.notification-panel')).not.toContainText('FOREIGN')
 })
