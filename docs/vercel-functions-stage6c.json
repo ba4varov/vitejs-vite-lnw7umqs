@@ -49,8 +49,8 @@
         "api/alerts.js",
         "package.json",
         "server/alerts-core.js",
-        "server/profile-core.js",
         "server/planner-logic.js",
+        "server/profile-core.js",
         "server/alerts-logic.js"
       ]
     },

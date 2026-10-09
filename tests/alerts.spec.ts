@@ -26,17 +26,23 @@ async function fixture(page:any, plan='pro') {
 async function alertFixture(page:any,plan:string){
  await fixture(page,plan)
  let enabled=plan==='pro'?['wind','walk']:['wind'], rows:any[]=[],pro=plan==='pro', unavailable=false
- await page.route('**/api/alerts',r=>{
+ const requests:any[]=[]
+ await page.route('**/api/alerts**',r=>{
   if(unavailable)return r.fulfill({status:503,json:{error:'UNAVAILABLE'}})
-  const method=r.request().method(),b=method==='GET'||method==='DELETE'?{}:r.request().postDataJSON()
-  if(method==='POST')for(const event of [...forecastRisks(b.forecast,Date.parse('2026-10-09T00:00Z')),...(pro&&enabled.includes('walk')?calculatePlanner({...b.forecast,activity:'walk'},Date.parse('2026-10-09T00:00Z')).windows.map((w:any)=>({kind:'walk',...w})):[])]){const key=JSON.stringify([b.locationKey,event.kind,event.start]);if(!rows.some(row=>row.key===key))rows.push({key,city:b.city,zone:b.forecast.timeZone,event,updated:Date.parse('2026-10-09T00:00Z'),read:false})}
-  if(method==='DELETE')rows=[]
-  if(b.readKey)rows=rows.map(row=>row.key===b.readKey?{...row,read:true}:row)
-  if(b.hideKey)rows=rows.filter(row=>row.key!==b.hideKey)
+  const method=r.request().method(),b=method==='GET'||method==='DELETE'?{}:r.request().postDataJSON(),url=new URL(r.request().url())
+  const scope=method==='POST'?{locationKey:b.locationKey,zone:b.forecast.timeZone}:{locationKey:url.searchParams.get('locationKey'),zone:url.searchParams.get('zone')}
+  const inScope=(row:any)=>row.locationKey===scope.locationKey&&row.zone===scope.zone
+  requests.push({method,scope,b})
+  if(method==='POST')for(const event of [...forecastRisks(b.forecast,Date.parse('2026-10-09T00:00Z')),...(pro&&enabled.includes('walk')?calculatePlanner({...b.forecast,activity:'walk'},Date.parse('2026-10-09T00:00Z')).windows.map((w:any)=>({kind:'walk',...w})):[])]){
+   const key=JSON.stringify([b.locationKey,scope.zone,event.kind,event.start]);if(!rows.some(row=>row.key===key))rows.push({key,locationKey:b.locationKey,city:b.city,zone:scope.zone,event,updated:Date.parse('2026-10-09T00:00Z'),read:false,hidden:false})
+  }
+  if(method==='DELETE')rows=rows.map(row=>inScope(row)?{...row,hidden:true}:row)
+  if(b.readKey)rows=rows.map(row=>inScope(row)&&row.key===b.readKey?{...row,read:true}:row)
+  if(b.hideKey)rows=rows.map(row=>inScope(row)&&row.key===b.hideKey?{...row,hidden:true}:row)
   if(b.enabled)enabled=b.enabled
-  return r.fulfill({json:{pro,enabled,alerts:rows.filter(row=>pro||!['walk','garden','sport'].includes(row.event.kind))}})
+  return r.fulfill({json:{contractVersion:2,scope,pro,enabled,alerts:rows.filter(row=>inScope(row)&&!row.hidden&&enabled.includes(row.event.kind)&&(pro||!['walk','garden','sport'].includes(row.event.kind)))}})
  })
- return {offline:()=>{unavailable=true},revoke:()=>{pro=false}}
+ return {requests,history:()=>rows,offline:()=>{unavailable=true},revoke:()=>{pro=false},restore:()=>{pro=true}}
 }
 for(const plan of ['guest','free','pro'])for(const width of [390,768,1440])for(const lang of ['bg','en'])for(const dark of [false,true])test(`alerts ${plan} ${width} ${lang} ${dark?'dark':'light'}`,async({page})=>{
  await page.setViewportSize({width,height:1000});await alertFixture(page,plan);await page.goto('/')
@@ -71,21 +77,60 @@ test('same active session loses Pro notifications on rights refresh and regains 
  const state=await alertFixture(page,'pro');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
  await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(4)
  state.revoke();await page.clock.fastForward(60000);await expect(panel.locator('li')).toHaveCount(1)
+ state.restore();await page.clock.fastForward(60000);await expect(panel.locator('li')).toHaveCount(4)
 })
 
 test('late notification request after city change is discarded; guest hides survive refresh',async({page})=>{
  await alertFixture(page,'free');let release:()=>void;const pending=new Promise<void>(resolve=>{release=resolve});let count=0
- await page.route('**/api/alerts',async r=>{
+ await page.route('**/api/alerts**',async r=>{
   if(r.request().method()!=='POST')return r.fallback()
   count++
-  if(count===1){await pending;return r.fulfill({json:{pro:false,enabled:['wind'],alerts:[{key:'stale',city:'STALE SECRET CITY',zone:'UTC',event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65},updated:1791504000000,read:false}]}}).catch(()=>{})}
+  if(count===1){await pending;return r.fulfill({json:{contractVersion:2,pro:false,enabled:['wind'],alerts:[{key:'stale',locationKey:'432:279',city:'STALE SECRET CITY',zone:'UTC',event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65},updated:1791504000000,read:false}]}}).catch(()=>{})}
   return r.fallback()
  })
  await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible();await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();release!()
  await page.getByRole('button',{name:'Известия',exact:true}).click();await expect(page.locator('.notification-panel')).not.toContainText('STALE SECRET CITY');await expect(page.locator('.notification-panel')).toContainText('София')
 })
 test('guest read and hide state survives automatic forecast refresh without server history',async({page})=>{
- await alertFixture(page,'guest');let requests=0;await page.route('**/api/alerts',r=>{requests++;return r.fulfill({status:401,json:{}})})
+ await alertFixture(page,'guest');let requests=0;await page.route('**/api/alerts**',r=>{requests++;return r.fulfill({status:401,json:{}})})
  await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible();await page.getByRole('button',{name:'Известия',exact:true}).click()
  const panel=page.locator('.notification-panel');await panel.getByRole('button',{name:'Скрий',exact:true}).click();await page.clock.fastForward(15*60000);await expect(panel.locator('li')).toHaveCount(0);expect(requests).toBe(0)
+})
+
+test('rapid A/B/A switch keeps separate read/hidden/cleared histories and current-city polling',async({page})=>{
+ const state=await alertFixture(page,'free');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
+ await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel')
+ await expect(panel.locator('li')).toHaveCount(1);await expect(panel).toContainText('Варна')
+ await panel.getByRole('button',{name:'Прочетено',exact:true}).click();await expect(page.locator('.notification-count')).toHaveCount(0)
+ await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await expect(panel.locator('li')).toHaveCount(1);await expect(panel).toContainText('София');await expect(panel).not.toContainText('Варна')
+ await expect(page.locator('.notification-count')).toContainText('1');await panel.getByRole('button',{name:'Изчисти известията',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
+ await page.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click();await expect(panel.locator('li')).toHaveCount(1);await expect(panel).toContainText('Варна');await expect(page.locator('.notification-count')).toHaveCount(0)
+ await page.clock.fastForward(60000);await expect(panel.locator('li')).toHaveCount(1)
+ expect(state.requests.at(-1).scope).toEqual({locationKey:'432:279',zone:'Europe/Sofia'})
+ await panel.screenshot({path:'docs/alerts-screenshots/review-city-varna-read.png'})
+ await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
+ await page.clock.fastForward(15*60000);await expect(panel.locator('li')).toHaveCount(0)
+ expect(state.history().filter(row=>!row.hidden)).toHaveLength(1)
+})
+for(const method of ['GET','PATCH','DELETE'])test(`late ${method} response cannot replace the newly selected city`,async({page})=>{
+ await alertFixture(page,'free');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
+ await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(1)
+ let release:()=>void,started:()=>void;const pending=new Promise<void>(resolve=>{release=resolve}),received=new Promise<void>(resolve=>{started=resolve})
+ await page.route('**/api/alerts**',async r=>{
+  if(r.request().method()!==method)return r.fallback();started!();await pending
+  await r.fulfill({json:{contractVersion:2,pro:false,enabled:['wind'],alerts:[]}}).catch(()=>{})
+ })
+ if(method==='GET')await page.clock.fastForward(60000);else await panel.getByRole('button',{name:method==='PATCH'?'Прочетено':'Изчисти известията',exact:true}).click();await received
+ await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click();await expect(panel).toContainText('София');release!()
+ await expect(panel.locator('li')).toHaveCount(1);await expect(panel).not.toContainText('Варна')
+})
+test('client rejects mixed location or time-zone rows even in a malformed scoped response',async({page})=>{
+ await alertFixture(page,'free')
+ await page.route('**/api/alerts**',r=>r.fulfill({json:{contractVersion:2,pro:false,enabled:['wind'],alerts:[
+  {key:'foreign-city',locationKey:'427:233',zone:'Europe/Sofia',city:'FOREIGN CITY',read:false,updated:1791504000000,event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65}},
+  {key:'foreign-zone',locationKey:'432:279',zone:'UTC',city:'FOREIGN ZONE',read:false,updated:1791504000000,event:{kind:'wind',start:1791504000000,end:1791511200000,min:65,max:65}}
+ ]}}))
+ await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible();await page.getByRole('button',{name:'Известия',exact:true}).click()
+ await expect(page.locator('.notification-panel li')).toHaveCount(0);await expect(page.locator('.notification-count')).toHaveCount(0)
+ await expect(page.locator('.notification-panel')).not.toContainText('FOREIGN')
 })

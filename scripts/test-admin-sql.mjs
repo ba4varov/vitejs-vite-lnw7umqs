@@ -35,7 +35,7 @@ try {
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'pg_isready','-h','127.0.0.1','-U','postgres'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgreSQL startup timed out')
   console.log(sql(readFileSync(new URL('tests/sql/admin-bootstrap.sql',root),'utf8')))
-  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql','20261008040000_user_activity.sql','20261009000000_planner_entitlement.sql','20261009010000_weather_alerts.sql']) {
+  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql','20261008040000_user_activity.sql','20261009000000_planner_entitlement.sql','20261009010000_weather_alerts.sql','20261009020000_alert_location_scope.sql']) {
     sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
   }
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
@@ -46,6 +46,7 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/user-activity.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/planner-entitlement.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/weather-alerts.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/alert-location-scope.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
@@ -153,6 +154,22 @@ try {
   for(const token of [undefined,'malformed',jwt(ordinary,Math.floor(Date.now()/1000)-120),jwt(ordinary,Math.floor(Date.now()/1000)+600,'wrong-signing-key')])assert.equal(request('/rpc/my_alerts',token,JSON.stringify({payload:{operation:'load'}})).status,401)
   assert.equal(request('/rpc/my_alerts',jwt(ordinary),JSON.stringify({payload:{operation:'load'}})).status,200)
   assert.equal(request('/rpc/my_alerts',jwt(ordinary),JSON.stringify({payload:{operation:'settings',enabled:['walk']}})).status,403)
+  const alertRpc=p=>request('/rpc/my_alerts',jwt(ordinary),JSON.stringify({payload:p}))
+  assert.equal(alertRpc({operation:'settings',enabled:['rain']}).status,200)
+  const alertEvents=[{kind:'rain',start:Date.now()+3600000,end:Date.now()+7200000,min:12,max:12}]
+  const cityA={operation:'generate',locationKey:'432:279',zone:'UTC',city:'JWT city A',events:alertEvents},cityB={...cityA,locationKey:'427:233',city:'JWT city B'}
+  const generatedA=alertRpc(cityA),generatedB=alertRpc(cityB)
+  assert.equal(generatedA.status,200);assert.equal(generatedB.status,200)
+  assert.equal(generatedA.body.alerts.length,1);assert.equal(generatedB.body.alerts.length,1)
+  assert.ok(generatedB.body.alerts.every(row=>row.locationKey==='427:233'))
+  assert.equal(alertRpc({operation:'read',locationKey:'432:279',zone:'UTC',key:generatedA.body.alerts[0].key}).body.alerts[0].read,true)
+  assert.equal(alertRpc({operation:'load',locationKey:'427:233',zone:'UTC'}).body.alerts[0].read,false)
+  assert.equal(alertRpc({operation:'clear',locationKey:'432:279',zone:'UTC'}).body.alerts.length,0)
+  assert.equal(alertRpc(cityA).body.alerts.length,0)
+  assert.equal(alertRpc({operation:'load',locationKey:'427:233',zone:'UTC'}).body.alerts.length,1)
+  assert.equal(alertRpc({operation:'clear'}).status,400)
+  assert.equal(request('/rpc/my_alerts',jwt(admin),JSON.stringify({payload:{operation:'load',locationKey:'427:233',zone:'UTC'}})).body.alerts.length,0)
+  console.log('PASS: real JWT HTTP immediate A/B generation, scoped read/clear/history, tombstone replay and account isolation')
   console.log('PASS: alerts RPC rejects missing/invalid/expired/forged JWT; Free cannot enable Pro activity')
   console.log('PASS: real JWT HTTP Free → Pro → Free, entitlement refresh, replay and account isolation')
   sql(`delete from public.admin_memberships where user_id='${admin}';`)

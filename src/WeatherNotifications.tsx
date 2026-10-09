@@ -3,31 +3,37 @@ import type {AuthSession} from './auth-client'
 import {alertsRequest,alertNames} from './alerts-client'
 import {forecastRisks,alertKey} from '../server/alerts-logic.js'
 export function WeatherNotifications({session,lang,forecast,city,locationKey}:{session:AuthSession|null;lang:string;forecast:any;city:string;locationKey:string}) {
- const bg=lang==='bg',[open,setOpen]=useState(false),[rows,setRows]=useState<any[]>([]),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0)
- const guestRows=useRef<any[]>([])
+ const bg=lang==='bg',[open,setOpen]=useState(false),[loaded,setLoaded]=useState<{view:string;rows:any[]}>({view:'',rows:[]}),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0)
+ const guestRows=useRef<any[]>([]),requestVersion=useRef(0),controllerRef=useRef<AbortController|null>(null)
  const [guestState,setGuestState]=useState<Record<string,string>>({})
- const accountRef=useRef(session?.user.id);accountRef.current=session?.user.id
- const id=session?.user.id,token=session?.access_token
+ const id=session?.user.id,token=session?.access_token,zone=forecast?.timeZone
+ const scope=zone?{locationKey,zone}:undefined
+ const view=JSON.stringify([id||'guest',locationKey,zone||null])
+ // Update on render: even before effect cleanup an old mutation cannot enter a new view.
+ const viewRef=useRef(view);viewRef.current=view
  useEffect(()=>{const change=()=>setRevision(v=>v+1);window.addEventListener('meteo-alert-settings',change);return()=>window.removeEventListener('meteo-alert-settings',change)},[])
  useEffect(()=>{
-  let live=true;const controller=new AbortController();setRows([]);setFailed(false)
-  if(!session){const risks=forecast?forecastRisks(forecast):[];const next=risks.map((event:any)=>{const previous=guestRows.current.find(row=>row.locationKey===locationKey&&row.zone===forecast.timeZone&&row.event.kind===event.kind&&row.event.start<event.end&&row.event.end>event.start);return {key:previous?.key||alertKey(locationKey,forecast.timeZone,event),locationKey,city,zone:forecast.timeZone,event,updated:Date.now(),read:false}});if(forecast)guestRows.current=next;setRows(next);if(forecast)setGuestState(s=>Object.fromEntries(next.filter(r=>s[r.key]).map(r=>[r.key,s[r.key]])));return()=>{live=false}}
+  let live=true;const controller=new AbortController();controllerRef.current=controller;requestVersion.current++;setLoaded({view,rows:[]});setFailed(false)
+  if(!session){const risks=forecast?forecastRisks(forecast):[];const next=risks.map((event:any)=>{const previous=guestRows.current.find(row=>row.locationKey===locationKey&&row.zone===zone&&row.event.kind===event.kind&&row.event.start<event.end&&row.event.end>event.start);return {key:previous?.key||alertKey(locationKey,zone,event),locationKey,city,zone,event,updated:Date.now(),read:false}});if(forecast)guestRows.current=next;setLoaded({view,rows:next});if(forecast)setGuestState(s=>Object.fromEntries(next.filter(r=>s[r.key]).map(r=>[r.key,s[r.key]])));return()=>{live=false;controller.abort();requestVersion.current++}}
   const refresh=async(generate=true)=>{
+   const ticket=++requestVersion.current
    try{
-    const data=await alertsRequest(session,forecast&&generate?'POST':'GET',forecast&&generate?{city,locationKey,forecast:{timeZone:forecast.timeZone,hours:forecast.hours}}:undefined,controller.signal)
-    if(live){setRows(data.alerts);setFailed(false)}
-   }catch{if(live){setRows([]);setFailed(true)}}
+    const data=await alertsRequest(session,forecast&&generate?'POST':'GET',forecast&&generate?{city,locationKey,forecast:{timeZone:zone,hours:forecast.hours}}:undefined,controller.signal,forecast&&generate?undefined:scope)
+    if(live&&viewRef.current===view&&ticket===requestVersion.current){setLoaded({view,rows:data.alerts});setFailed(false)}
+   }catch{if(live&&viewRef.current===view&&ticket===requestVersion.current){setLoaded({view,rows:[]});setFailed(true)}}
   }
   void refresh()
-  // Revalidate active-session rights; no forecast fetching or background delivery.
+  // Revalidate only this location's history and current rights while the site is visible.
   const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh(false)},60000)
-  return()=>{live=false;controller.abort();clearInterval(timer)}
+  return()=>{live=false;controller.abort();requestVersion.current++;clearInterval(timer)}
  },[id,token,forecast,city,locationKey,revision])
- const visible=rows.filter(row=>(session||guestState[row.key]!=='hidden')&&row.event.end>Date.now())
+ const rows=loaded.view===view?loaded.rows:[]
+ const visible=rows.filter(row=>row.locationKey===locationKey&&row.zone===zone&&(session||guestState[row.key]!=='hidden')&&row.event.end>Date.now())
  const unread=visible.filter(row=>!row.read && (session||guestState[row.key]!=='read')).length
  const mutate=async(method:string,body?:object)=>{
-  const account=id
-  try{const data=await alertsRequest(session!,method,body);if(account===accountRef.current)setRows(data.alerts)}catch{if(account===accountRef.current){setRows([]);setFailed(true)}}
+  if(!scope||!session)return
+  const ticket=++requestVersion.current,controller=controllerRef.current
+  try{const data=await alertsRequest(session,method,body,controller?.signal,scope);if(viewRef.current===view&&!controller?.signal.aborted&&ticket===requestVersion.current){setLoaded({view,rows:data.alerts});setFailed(false)}}catch{if(viewRef.current===view&&!controller?.signal.aborted&&ticket===requestVersion.current){setLoaded({view,rows:[]});setFailed(true)}}
  }
  const format=(row:any,epoch:number)=>new Intl.DateTimeFormat(bg?'bg-BG':'en-GB',{timeZone:row.zone,day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(epoch)
  const explanation=(e:any)=>['walk','garden','sport'].includes(e.kind)?`${e.feelsLikeMin}–${e.feelsLikeMax} °C · ${bg?'вятър':'wind'} ≤ ${e.wind} km/h · ${e.rain} mm (${e.rainProbability}%)`:`${e.min}–${e.max} ${e.kind==='storm'?'WMO':e.kind==='rain'?'mm/h':e.kind==='wind'?'km/h':'°C'}`

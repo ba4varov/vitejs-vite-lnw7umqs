@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-09T04:43:36.473Z",
+  "checkedAt": "2026-10-09T05:10:47.983Z",
   "status": "PASS",
   "images": {
     "postgres": "postgres@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826",
@@ -22,7 +22,15 @@
       "status": "PASS"
     },
     {
+      "name": "Stage 6C review: immediate A/B switch, concurrent generations, separate location+zone histories, read/hide/clear, replay tombstones, relogin settings and account isolation",
+      "status": "PASS"
+    },
+    {
       "name": "Stage 6C: real JWT denial, Free settings, concurrent deduplication, read/clear tombstones, durable settings and account isolation",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C review: actual GoTrue/API HTTP 429 budget denial, no rejected scope persistence, cached scope and refill",
       "status": "PASS"
     },
     {
@@ -54,7 +62,7 @@
       "status": "PASS"
     },
     {
-      "name": "Stage 6C Chromium: real password login, persisted Pro settings without analytics consent, real history screenshots and live-session revoke/restore; external weather aborted",
+      "name": "Stage 6C Chromium: real password login, persisted Pro settings without analytics consent, real history screenshots and live-session revoke/restore; weather fixture, real Auth/API and current Varna/UTC scope",
       "status": "PASS"
     },
     {
@@ -65,6 +73,6 @@
   "limits": [
     "Local GoTrue password authentication/refresh only; Google provider, SMTP confirmation/recovery and Vercel-hosted API runtime are not exercised",
     "Favorite action is a real database mutation followed by application activity API; public weather providers are not used",
-    "Chromium uses actual admin UI and real local Auth/API; external requests are aborted"
+    "Chromium uses real local Auth/API for admin and notifications; notification weather is an isolated Open-Meteo fixture; other external requests are aborted"
   ]
 }
