@@ -829,3 +829,18 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .statistics-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
 .statistics-actions button { flex: 1 1 180px; min-height: 48px; padding: .75rem; border: 1px solid #64748b; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-weight: 600; }
 .signup-activity-choice summary { cursor: pointer; text-decoration: underline; line-height: 1.5; }
+.auth-dialog .signup-activity-choice { margin: 0; padding: 12px; border: 0; border-radius: 10px; background: #f1f5f9; }
+.auth-dialog .signup-activity-choice label { font-weight: 500; font-size: .85rem; line-height: 1.4; gap: 8px; }
+.signup-activity-choice p { margin: 0 0 6px; font-size: .8rem; line-height: 1.4; }
+.signup-activity-choice label + p { margin-top: 5px; }
+.signup-activity-choice summary { font-size: .8rem; color: #1d4ed8; }
+.signup-activity-choice details p { margin: 8px 0 0; }
+.dark .auth-dialog .signup-activity-choice { background: #1e293b; }
+.dark .signup-activity-choice summary { color: #93c5fd; }
+.registration-dialog.auth-dialog { padding: 22px; }
+.registration-dialog h2 { margin: 0 0 14px; }
+.registration-dialog form { gap: 12px; margin-top: 12px; }
+.registration-dialog input:not([type="checkbox"]) { padding-top: 11px; padding-bottom: 11px; }
+.statistics-dialog .statistics-actions { margin-bottom: 0; }
+.registration-dialog .auth-google { margin-bottom: 6px; }
+.registration-dialog .auth-link { margin-top: 8px; }

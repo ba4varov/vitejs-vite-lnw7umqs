@@ -169,7 +169,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
 
   return <div id="planner-auth" className="auth-nav">
     {busy && view === 'closed' ? <span>{t.loading}</span> : session ? <><button onClick={openProfile}>{t.profile}</button><button onClick={logout} disabled={busy}>{t.logout}</button></> : <><button onClick={() => changeView('login')}>{t.login}</button><button className="primary" onClick={() => changeView('register')}>{t.register}</button></>}
-    {view !== 'closed' && <div className="auth-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}><section ref={dialog} tabIndex={-1} className={`auth-dialog ${view === 'profile' ? 'profile-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    {view !== 'closed' && <div className="auth-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}><section ref={dialog} tabIndex={-1} className={`auth-dialog ${view === 'profile' ? 'profile-dialog' : view === 'register' ? 'registration-dialog' : view === 'statistics' ? 'statistics-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <header className="auth-dialog-header"><button className="auth-close" aria-label={t.close} disabled={busy || settingsBusy} onClick={close}>×</button>
       <h2 id="auth-title">{view === 'statistics' ? stats.title : view === 'profile' ? t.profile : view === 'register' ? t.register : view === 'forgot' ? t.forgot : view === 'password' ? t.newPassword : t.login}</h2>
       </header>
