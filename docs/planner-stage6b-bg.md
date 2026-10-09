@@ -57,6 +57,10 @@ IANA зоната на града се използва за преобразу�
 
 Локалните проверки не потвърждават реални Google OAuth consent/redirect, SMTP confirmation/recovery или пълния hosted Supabase/Vercel runtime. Съществуващите Auth/OAuth unit регресии са изпълнени; реалните Google/SMTP потоци изискват отделна операторска проверка. Не се представят mocks или старите screenshots като такава проверка.
 
+## PR и Preview
+
+[PR #57 към main](https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/57) е отворен за одобрение, без сливане. Автоматичният Vercel Preview на приложния комит `dfb43042d6cf82de82ebea9b55e6cdb9258156db` е потвърден като **success / Ready** чрез GitHub status и Vercel bot. [Preview](https://weather-git-feat-weather-planner-stage6b-ba4varov-projects.vercel.app), [deployment details](https://vercel.com/ba4varov-projects/weather/B73Z5DbcKXbGP369TTn26HiQ3fLY). Това потвърждава успешно Preview внедряване; hosted Auth/Pro smoke с реален акаунт не е изпълняван. Новата SQL миграция не е прилагана там или в Production.
+
 ## Screenshots
 
 36 изображения в `docs/planner-screenshots`: guest/free/pro × 390/768/1440 px × BG/EN × светла/тъмна тема. Всяко показва реално рендерирания планер и разгънатите планове. Pro screenshots съдържат резултат от детерминистичната логика с изолирана прогноза.
