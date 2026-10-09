@@ -35,7 +35,7 @@ try {
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'pg_isready','-h','127.0.0.1','-U','postgres'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgreSQL startup timed out')
   console.log(sql(readFileSync(new URL('tests/sql/admin-bootstrap.sql',root),'utf8')))
-  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql']) {
+  for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql','20261008040000_user_activity.sql']) {
     sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
   }
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
@@ -43,13 +43,14 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage4.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-profile-audit.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/user-activity.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'bash','-c','exec 3<>/dev/tcp/127.0.0.1/3000'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgREST startup timed out')
   const admin='00000000-0000-0000-0000-000000000001', ordinary='00000000-0000-0000-0000-000000000002'
-  for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users','/rpc/admin_advanced_statistics','/rpc/admin_audit_entries','/rpc/admin_management_users','/rpc/admin_management_summary']) {
+  for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users','/rpc/admin_advanced_statistics','/rpc/admin_audit_entries','/rpc/admin_management_users','/rpc/admin_management_summary','/rpc/admin_user_activity']) {
     assert.equal(request(endpoint,jwt(ordinary)).status,403,'Ordinary direct RPC must fail')
     assert.equal(request(endpoint,null).status,401,'Anonymous direct RPC must fail')
     assert.equal(request(endpoint,'invalid-token').status,401,'Malformed JWT must fail')
@@ -57,6 +58,36 @@ try {
     assert.equal(request(endpoint,jwt(admin,undefined,'wrong-test-key')).status,401,'Forged admin JWT must fail')
     assert.equal(request(endpoint,jwt(undefined)).status,403,'Valid signed JWT without subject must fail')
   }
+  const consent=request('/rpc/set_activity_consent',jwt(ordinary),JSON.stringify({desired:true}));assert.equal(consent.status,200)
+  const revision=consent.body.revision
+  const event=JSON.stringify({selected_action:'forecast_view',operation_id:'60000000-0000-0000-0000-000000000001',consent_revision:revision})
+  for(const token of [null,'invalid-token',jwt(ordinary,Math.floor(Date.now()/1000)-120),jwt(ordinary,undefined,'wrong-key')]) assert.equal(request('/rpc/record_activity',token,event).status,401)
+  assert.equal(request('/rpc/record_activity',jwt(ordinary),event).body.recorded,true)
+  assert.equal(request('/rpc/record_activity',jwt(ordinary),event).body.reason,'DUPLICATE')
+  assert.ok(request('/rpc/record_activity',jwt(ordinary),JSON.stringify({...JSON.parse(event),user_id:admin})).status>=400)
+  for(const table of ['activity_daily','activity_consent']) for(const token of [jwt(ordinary),jwt(admin),null]) assert.ok(request('/'+table,token,'{}').status>=400)
+  assert.equal(request('/rpc/set_activity_consent',jwt(ordinary),JSON.stringify({desired:false})).status,200)
+  assert.equal(request('/rpc/record_activity',jwt(ordinary),event).body.reason,'NO_CONSENT')
+  assert.match(sql("select count(*) from public.activity_daily;"), /\n\s+0\s*\n/)
+  // Concurrent duplicate action: two separate PostgreSQL connections, one accepted count.
+  const newConsent=request('/rpc/set_activity_consent',jwt(ordinary),JSON.stringify({desired:true})).body
+  const activitySQL=`begin; set local role authenticated; set local request.jwt.claim.sub='${ordinary}'; select public.record_activity('forecast_view','60000000-0000-0000-0000-000000000002','${newConsent.revision}'); select pg_sleep(0.2); commit;`
+  const activityCall=(query=activitySQL)=>new Promise((resolve,reject)=>{
+    const child=spawn('docker',['--host=unix:///var/run/docker.sock','exec','-i',pg,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],{env:environment})
+    let output='',errors='';child.stdout.on('data',c=>output+=c);child.stderr.on('data',c=>errors+=c);child.on('error',reject);child.on('close',code=>code===0?resolve(output):reject(Error(errors)));child.stdin.end(query)
+  })
+  const activityResults=await Promise.all([activityCall(),activityCall()]);assert.equal(activityResults.filter(s=>s.includes('"recorded": true')).length,1)
+  assert.equal(request('/rpc/admin_user_activity',jwt(admin)).body.dau,1)
+  assert.equal(request('/rpc/admin_user_activity',jwt(admin)).body.actions.forecast_view,1)
+  // Withdrawal and recording contend for the same account lock, using separate connections.
+  const withdrawalCall=()=>new Promise((resolve,reject)=>{
+    const child=spawn('docker',['--host=unix:///var/run/docker.sock','exec','-i',pg,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],{env:environment})
+    let errors='';child.stdout.resume();child.stderr.on('data',c=>errors+=c);child.on('error',reject);child.on('close',code=>code===0?resolve():reject(Error(errors)))
+    child.stdin.end(`begin; set local role authenticated; set local request.jwt.claim.sub='${ordinary}'; select public.set_activity_consent(false); commit;`)
+  })
+  await Promise.all([activityCall(activitySQL.replace("'forecast_view'", "'chat_use'").replace("60000000-0000-0000-0000-000000000002", "60000000-0000-0000-0000-000000000003")),withdrawalCall()])
+  assert.match(sql("select count(*) from public.activity_daily;"), /\n\s+0\s*\n/)
+  console.log('PASS: activity opt-in, deletion, forged subject rejection, JWT validation, table isolation and concurrent duplicate writes')
   console.log('PASS: real PostgREST direct RPC returns 403 for ordinary users; 401 for missing, malformed, expired and forged JWTs')
   const favoritesBody=JSON.stringify({selected_id:ordinary})
   for (const token of [jwt(ordinary),jwt(undefined)]) assert.equal(request('/rpc/admin_user_favorites',token,favoritesBody).status,403)

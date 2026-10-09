@@ -38,6 +38,11 @@ export async function handleAdmin(req, res, env = process.env, fetcher = fetch) 
       return res.status(200).json(await rpc(action === 'analytics' ? 'admin_advanced_statistics' : 'admin_audit_entries',
         action === 'analytics' ? { period } : { period, selected_action: selectedAction, page_number: page }))
     }
+    if (action === 'activity') {
+      const period = req.query?.period || '30'
+      if (typeof period !== 'string' || !['7','30','90'].includes(period)) return res.status(400).json({ error: 'INVALID_QUERY' })
+      return res.status(200).json(await rpc('admin_user_activity', { period: Number(period) }))
+    }
     if (action === 'management-summary') return res.status(200).json(await rpc('admin_management_summary'))
     if (action === 'management-account') {
       const id = req.query?.id

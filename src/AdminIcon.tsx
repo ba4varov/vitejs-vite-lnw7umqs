@@ -7,6 +7,7 @@ const paths: Record<string, string[]> = {
   pro: ['m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z'],
   dashboard: ['M3 3h7v7H3ZM14 3h7v7h-7ZM3 14h7v7H3ZM14 14h7v7h-7Z'],
   analytics: ['M4 3v18h17M8 16v-5M13 16V7M18 16v-8'],
+  activity: ['M2 12h4l3-8 6 16 3-8h4'],
   audit: ['M8 3h12v18H4V7', 'M8 3v4H4l4-4M8 11h8M8 15h8'],
   system: ['M2 12h4l3-8 6 16 3-8h4'],
   profile: ['M5 21a7 7 0 0 1 14 0'],
