@@ -38,6 +38,9 @@ try {
   for(const file of ['20260930000000_auth_profiles.sql','20260930010000_favorite_places.sql','20260930020000_place_geoname_identity.sql','20261008000000_admin_readonly.sql','20261008010000_admin_user_favorites.sql','20261008020000_admin_statistics_audit.sql','20261008030000_admin_management.sql','20261008040000_user_activity.sql','20261009000000_planner_entitlement.sql','20261009010000_weather_alerts.sql','20261009020000_alert_location_scope.sql']) {
     sql(readFileSync(new URL(`supabase/migrations/${file}`,root),'utf8')); console.log(`Applied actual migration: ${file}`)
   }
+  sql(readFileSync(new URL('tests/sql/daily-pro-migration-before.sql',root),'utf8'))
+  sql(readFileSync(new URL('supabase/migrations/20261009030000_daily_pro_recommendations.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/daily-pro-migration-after.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
@@ -47,6 +50,7 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/planner-entitlement.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/weather-alerts.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/alert-location-scope.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('tests/sql/daily-pro-recommendations.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
@@ -171,6 +175,35 @@ try {
   assert.equal(request('/rpc/my_alerts',jwt(admin),JSON.stringify({payload:{operation:'load',locationKey:'427:233',zone:'UTC'}})).body.alerts.length,0)
   console.log('PASS: real JWT HTTP immediate A/B generation, scoped read/clear/history, tombstone replay and account isolation')
   console.log('PASS: alerts RPC rejects missing/invalid/expired/forged JWT; Free cannot enable Pro activity')
+  // Independent PostgreSQL connections contend for the same account lock.
+  // All subjects below are synthetic rows inside this script's disposable DB.
+  sql(`update public.subscriptions set plan='pro',status='active' where user_id='${ordinary}';`)
+  assert.equal(alertRpc({operation:'settings',enabled:['garden']}).status,200)
+  const tomorrow=Date.parse(new Date(Date.now()+86400000).toISOString().slice(0,10)+'T00:00Z')
+  const dailyWindow=hour=>({kind:'garden',start:tomorrow+hour*3600000,end:tomorrow+(hour+2)*3600000,feelsLikeMin:18,feelsLikeMax:20,rainProbability:10,rain:0,wind:5})
+  const dailyScope={locationKey:'700:300',zone:'UTC'}
+  const dailyPayload={operation:'generate',...dailyScope,city:'Concurrent synthetic day',events:[dailyWindow(7),dailyWindow(11)]}
+  const firstDaily=alertRpc(dailyPayload);assert.equal(firstDaily.status,200);assert.equal(firstDaily.body.alerts.length,1)
+  const dailyKey=firstDaily.body.alerts[0].key
+  assert.equal(firstDaily.body.alerts[0].event.windows.length,2)
+  sql(`update public.alert_generation_state set last_generated=now()-interval '31 seconds' where user_id='${ordinary}' and location_key='700:300';`)
+  const parallelDaily={...dailyPayload,events:[dailyWindow(17)]}
+  const concurrentGeneration=`begin;set local role authenticated;set local request.jwt.claim.sub='${ordinary}';select public.my_alerts('${JSON.stringify(parallelDaily)}');select pg_sleep(0.2);commit;`
+  const concurrentHide=`begin;set local role authenticated;set local request.jwt.claim.sub='${ordinary}';select public.my_alerts('${JSON.stringify({operation:'hide',...dailyScope,key:dailyKey})}');commit;`
+  await Promise.all([activityCall(concurrentGeneration),activityCall(concurrentGeneration),activityCall(concurrentHide)])
+  assert.equal(alertRpc({operation:'load',...dailyScope}).body.alerts.length,0)
+  assert.match(sql(`select count(*) from public.weather_alerts where user_id='${ordinary}' and location_key='700:300' and not superseded;`), /\n\s+1\s*\n/)
+  assert.match(sql(`select count(*) from public.weather_alerts where user_id='${ordinary}' and event_key='${dailyKey}' and hidden;`), /\n\s+1\s*\n/)
+  sql(`update public.alert_generation_state set last_generated=now()-interval '31 seconds' where user_id='${ordinary}' and location_key='700:300';`)
+  assert.equal(alertRpc({...dailyPayload,events:[dailyWindow(9)]}).body.alerts.length,0)
+  assert.equal(request('/rpc/my_alerts',jwt(admin),JSON.stringify({payload:{operation:'load',...dailyScope}})).body.alerts.length,0)
+  sql(`update public.subscriptions set plan='free' where user_id='${ordinary}';`)
+  assert.equal(alertRpc(parallelDaily).status,403)
+  sql(`update public.subscriptions set plan='pro' where user_id='${ordinary}';`)
+  assert.equal(alertRpc({operation:'load',...dailyScope}).body.alerts.length,0)
+  sql(`update public.subscriptions set plan='free' where user_id='${ordinary}';`)
+  console.log('PASS: real JWT daily identity and disjoint updates, concurrent generation/hide, retained tombstones, account isolation and Free/Pro restoration')
+
   console.log('PASS: real JWT HTTP Free → Pro → Free, entitlement refresh, replay and account isolation')
   sql(`delete from public.admin_memberships where user_id='${admin}';`)
   assert.equal(request('/rpc/admin_statistics',jwt(admin)).status,403)

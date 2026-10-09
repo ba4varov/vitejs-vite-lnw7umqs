@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test'
 import {calculatePlanner} from '../server/planner-logic.js'
-import {forecastRisks} from '../server/alerts-logic.js'
+import {forecastRisks,activityAlerts,alertKey} from '../server/alerts-logic.js'
 async function fixture(page:any, plan='pro') {
   await page.clock.install({time:new Date('2026-10-09T00:00:00Z')})
   if(plan!=='guest') await page.addInitScript(()=>localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:1791543600,user:{id:'00000000-0000-0000-0000-000000000002',email:'planner@example.invalid'}})))
@@ -20,11 +20,11 @@ async function fixture(page:any, plan='pro') {
     const input=r.request().postDataJSON();calls.push(input)
     return r.fulfill({status,json:status===200?calculatePlanner(input,Date.parse('2026-10-09T00:00:00Z')):{error:'TEST_FAILURE'}})
   })
-  return {calls,setStatus:(value:number)=>{status=value}}
+  return {calls,setStatus:(value:number)=>{status=value},setWindow:(hour:number)=>{hourly.wind_speed_10m=time.map((_:any,i:number)=>i===hour-3||i===hour-2?5:50)}}
 }
 
 async function alertFixture(page:any,plan:string){
- await fixture(page,plan)
+ const weather=await fixture(page,plan)
  let enabled=plan==='pro'?['wind','walk']:['wind'], rows:any[]=[],pro=plan==='pro', unavailable=false
  const requests:any[]=[]
  await page.route('**/api/alerts**',r=>{
@@ -33,8 +33,19 @@ async function alertFixture(page:any,plan:string){
   const scope=method==='POST'?{locationKey:b.locationKey,zone:b.forecast.timeZone}:{locationKey:url.searchParams.get('locationKey'),zone:url.searchParams.get('zone')}
   const inScope=(row:any)=>row.locationKey===scope.locationKey&&row.zone===scope.zone
   requests.push({method,scope,b})
-  if(method==='POST')for(const event of [...forecastRisks(b.forecast,Date.parse('2026-10-09T00:00Z')),...(pro&&enabled.includes('walk')?calculatePlanner({...b.forecast,activity:'walk'},Date.parse('2026-10-09T00:00Z')).windows.map((w:any)=>({kind:'walk',...w})):[])]){
-   const key=JSON.stringify([b.locationKey,scope.zone,event.kind,event.start]);if(!rows.some(row=>row.key===key))rows.push({key,locationKey:b.locationKey,city:b.city,zone:scope.zone,event,updated:Date.parse('2026-10-09T00:00Z'),read:false,hidden:false})
+  if(method==='POST') {
+   const daily=new Map<string,any>()
+   for(const event of [...forecastRisks(b.forecast,Date.parse('2026-10-09T00:00Z')),...(pro?activityAlerts(b.forecast,enabled,Date.parse('2026-10-09T00:00Z')):[])]) {
+    const key=alertKey(b.locationKey,scope.zone,event)
+    const activity=['walk','garden','sport'].includes(event.kind)
+    const prior=daily.get(key)
+    daily.set(key,activity?{...event,start:prior?.start??event.start,windows:[...(prior?.windows||[]),event]}:event)
+   }
+   for(const [key,event] of daily) {
+    const existing=rows.find(row=>row.key===key)
+    if(existing){existing.event=event;existing.city=b.city}
+    else rows.push({key,locationKey:b.locationKey,city:b.city,zone:scope.zone,event,updated:Date.parse('2026-10-09T00:00Z'),read:false,hidden:false})
+   }
   }
   if(method==='DELETE')rows=rows.map(row=>inScope(row)?{...row,hidden:true}:row)
   if(b.readKey)rows=rows.map(row=>inScope(row)&&row.key===b.readKey?{...row,read:true}:row)
@@ -42,7 +53,7 @@ async function alertFixture(page:any,plan:string){
   if(b.enabled)enabled=b.enabled
   return r.fulfill({json:{contractVersion:2,scope,pro,enabled,alerts:rows.filter(row=>inScope(row)&&!row.hidden&&enabled.includes(row.event.kind)&&(pro||!['walk','garden','sport'].includes(row.event.kind)))}})
  })
- return {requests,history:()=>rows,offline:()=>{unavailable=true},revoke:()=>{pro=false},restore:()=>{pro=true}}
+ return {requests,setWindow:weather.setWindow,history:()=>rows,offline:()=>{unavailable=true},revoke:()=>{pro=false},restore:()=>{pro=true}}
 }
 for(const plan of ['guest','free','pro'])for(const width of [390,768,1440])for(const lang of ['bg','en'])for(const dark of [false,true])test(`alerts ${plan} ${width} ${lang} ${dark?'dark':'light'}`,async({page})=>{
  await page.setViewportSize({width,height:1000});await alertFixture(page,plan);await page.goto('/')
@@ -50,12 +61,12 @@ for(const plan of ['guest','free','pro'])for(const width of [390,768,1440])for(c
  if(lang==='en')await page.locator('button.lang-btn').click()
  if(dark)await page.getByRole('button',{name:'🌙',exact:true}).click()
  await page.getByRole('button',{name:lang==='bg'?'Известия':'Notifications',exact:true}).click()
- const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(plan==='pro'?4:1)
+ const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(plan==='pro'?2:1)
  await expect(panel).toContainText(lang==='bg'?'Ориентировъчно предупреждение по прогноза':'Indicative forecast warning')
  await expect(panel).toContainText('65');await expect(panel).toContainText('Europe/Sofia')
  expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true)
  await panel.screenshot({path:`docs/alerts-screenshots/${plan}-${width}-${lang}-${dark?'dark':'light'}.png`})
- await panel.getByRole('button',{name:lang==='bg'?'Прочетено':'Mark read',exact:true}).first().click();if(plan==='pro')await expect(page.locator('.notification-count')).toContainText('3');else await expect(page.locator('.notification-count')).toHaveCount(0)
+ await panel.getByRole('button',{name:lang==='bg'?'Прочетено':'Mark read',exact:true}).first().click();if(plan==='pro')await expect(page.locator('.notification-count')).toContainText('1');else await expect(page.locator('.notification-count')).toHaveCount(0)
  await panel.getByRole('button',{name:lang==='bg'?'Изчисти известията':'Clear notifications',exact:true}).click();await expect(panel.locator('li')).toHaveCount(0)
 })
 test('notification outage keeps weather and Bobby available; profile settings remain separate from analytics',async({page})=>{
@@ -70,14 +81,14 @@ test('settings saved, activities only Pro, forecast refresh does not repeat read
  await settings.getByText('Време за градинарство',{exact:false}).click();await expect(settings.locator('input').nth(6)).toBeChecked()
  await page.getByRole('button',{name:'Затвори',exact:true}).click()
  await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');for(const button of await panel.getByRole('button',{name:'Прочетено',exact:true}).all())await button.click()
- await page.clock.fastForward(15*60000);await expect(panel.locator('li')).toHaveCount(4);await expect(page.locator('.notification-count')).toHaveCount(0)
+ await page.clock.fastForward(15*60000);await expect(panel.locator('li')).toHaveCount(3);await expect(page.locator('.notification-count')).toHaveCount(0)
 })
 
 test('same active session loses Pro notifications on rights refresh and regains them',async({page})=>{
  const state=await alertFixture(page,'pro');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
- await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(4)
+ await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(2)
  state.revoke();await page.clock.fastForward(60000);await expect(panel.locator('li')).toHaveCount(1)
- state.restore();await page.clock.fastForward(60000);await expect(panel.locator('li')).toHaveCount(4)
+ state.restore();await page.clock.fastForward(60000);await expect(panel.locator('li')).toHaveCount(2)
 })
 
 test('late notification request after city change is discarded; guest hides survive refresh',async({page})=>{
@@ -134,4 +145,39 @@ test('client rejects mixed location or time-zone rows even in a malformed scoped
  await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible();await page.getByRole('button',{name:'Известия',exact:true}).click()
  await expect(page.locator('.notification-panel')).toContainText('CURRENT CITY');await expect(page.locator('.notification-panel li')).toHaveCount(1);await expect(page.locator('.notification-count')).toContainText('1')
  await expect(page.locator('.notification-panel')).not.toContainText('FOREIGN')
+})
+
+for(const lang of ['bg','en'])test(`daily garden hide survives disjoint new forecast, reload, 15-minute update and city switches ${lang}`,async({page})=>{
+ const state=await alertFixture(page,'pro')
+ await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
+ if(lang==='en')await page.locator('button.lang-btn').click()
+ const button=(bg:string,en:string)=>lang==='bg'?bg:en
+ await page.locator('.auth-nav').getByRole('button',{name:button('Моят профил','My profile'),exact:true}).click()
+ const settings=page.locator('.notification-settings')
+ await settings.getByRole('button',{name:button('Изключи всички','Disable all'),exact:true}).click()
+ await settings.getByText(button('Време за градинарство','Time for gardening'),{exact:false}).click()
+ await page.getByRole('button',{name:button('Затвори','Close'),exact:true}).click()
+ await page.getByRole('button',{name:button('Известия','Notifications'),exact:true}).click()
+ const panel=page.locator('.notification-panel')
+ await expect(panel.locator('li')).toHaveCount(1);await expect(panel.locator('.notification-window')).toHaveCount(3)
+ const original=state.history().find(row=>row.event.kind==='garden')
+ const key=original.key,start=original.event.start
+ await panel.getByRole('button',{name:button('Скрий','Hide'),exact:true}).click()
+ await expect(panel.locator('li')).toHaveCount(0);await expect(page.locator('.notification-count')).toHaveCount(0)
+ state.setWindow(15);await page.reload()
+ await expect(page.locator('.weather-forecast-view')).toBeVisible()
+ await page.getByRole('button',{name:button('Известия','Notifications'),exact:true}).click()
+ await expect.poll(()=>state.history().find(row=>row.key===key).event.start).toBeGreaterThan(start+6*3600000)
+ await expect(panel.locator('li')).toHaveCount(0);await expect(page.locator('.notification-count')).toHaveCount(0)
+ expect(state.history().filter(row=>row.event.kind==='garden'&&row.locationKey==='432:279')).toHaveLength(1)
+ expect(state.history().find(row=>row.key===key)).toMatchObject({hidden:true,read:false})
+ await page.locator('.city-row').getByRole('button',{name:button('София','Sofia'),exact:true}).click()
+ await expect(panel.locator('li')).toHaveCount(1)
+ await page.locator('.city-row').getByRole('button',{name:button('Варна','Varna'),exact:true}).click()
+ await page.locator('.city-row').getByRole('button',{name:button('София','Sofia'),exact:true}).click()
+ await page.locator('.city-row').getByRole('button',{name:button('Варна','Varna'),exact:true}).click()
+ await expect(panel.locator('li')).toHaveCount(0)
+ state.setWindow(9);await page.clock.fastForward(15*60000+1000)
+ await expect.poll(()=>state.history().find(row=>row.key===key).event.start).toBe(start+2*3600000)
+ await expect(panel.locator('li')).toHaveCount(0);await expect(page.locator('.notification-count')).toHaveCount(0)
 })
