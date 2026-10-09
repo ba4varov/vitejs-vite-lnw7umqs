@@ -29,9 +29,11 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
  useEffect(()=>{onBusyChange?.(busy)},[busy,onBusyChange])
  const add=(c:PushCity)=>{
-  if(!c.name.trim()||!Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||!Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||draft.cities.length>=5)return
-  try{new Intl.DateTimeFormat('en',{timeZone:c.zone}).format(0)}catch{return}
-  if(!draft.cities.some(x=>x.latitude===c.latitude&&x.longitude===c.longitude))setDraft({...draft,cities:[...draft.cities,{...c,name:c.name.trim()}]})
+  if(!c.name.trim()||!Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||!Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||draft.cities.length>=5)return false
+  try{new Intl.DateTimeFormat('en',{timeZone:c.zone}).format(0)}catch{return false}
+  if(draft.cities.some(x=>x.latitude===c.latitude&&x.longitude===c.longitude))return false
+  setDraft({...draft,cities:[...draft.cities,{...c,name:c.name.trim()}]})
+  return true
  }
  return <section className="push-settings" aria-label={bg?'Push известия':'Push notifications'}>
   <h3>{bg?'Push известия при затворен сайт':'Push notifications when the site is closed'}</h3>
@@ -51,7 +53,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
      <label>{bg?'Географска ширина':'Latitude'}<input type="number" min={-90} max={90} step="any" value={city.latitude} onChange={e=>setCity({...city,latitude:e.target.value===''?NaN:Number(e.target.value)})}/></label>
      <label>{bg?'Географска дължина':'Longitude'}<input type="number" min={-180} max={180} step="any" value={city.longitude} onChange={e=>setCity({...city,longitude:e.target.value===''?NaN:Number(e.target.value)})}/></label>
      <label>{bg?'Часова зона (IANA)':'Time zone (IANA)'}<input value={city.zone} maxLength={64} onChange={e=>setCity({...city,zone:e.target.value})}/></label>
-     <button type="button" onClick={()=>add(city)}>{bg?'Добави град':'Add city'}</button>
+     <button type="button" onClick={()=>{if(add(city))setCity({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})}}>{bg?'Добави град':'Add city'}</button>
     </details>
     <button type="button" disabled={draft.enabled&&(!draft.cities.length||!draft.categories.length)} onClick={()=>void save({...draft,categories:data.pro?draft.categories:draft.categories.filter(k=>!personal.includes(k))})}>{bg?'Запази push настройките':'Save push preferences'}</button>
    </fieldset>

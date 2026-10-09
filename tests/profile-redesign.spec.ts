@@ -74,3 +74,45 @@ test('focus trap, backdrop cancellation, failed weather save retains draft, comp
  expect((await page.getByRole('dialog').boundingBox())!.width).toBeLessThanOrEqual(440)
  await page.keyboard.press('Escape')
 })
+
+for(const lang of ['bg','en'] as const)test(`coordinate city draft lifecycle ${lang}`,async({page})=>{
+ await fixture(page,lang)
+ let preferences:any={enabled:false,cities:[],categories:[]},fail=false
+ await page.route('**/api/push',r=>{
+  if(r.request().method()==='PATCH'){
+   if(fail)return r.fulfill({status:503,json:{error:'ISOLATED_FAILURE'}})
+   preferences=r.request().postDataJSON()
+  }
+  return r.fulfill({json:{contractVersion:1,pro:false,preferences,devices:[],registrationEnabled:false,publicKey:null,deliveryEnabled:false}})
+ })
+ await page.locator('.auth-nav').getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true}).click()
+ await page.getByRole('tab',{name:lang==='bg'?'Push известия':'Push notifications',exact:true}).click()
+ const panel=page.locator('.push-settings'),details=panel.locator('details')
+ await details.locator('summary').click()
+ const city=details.getByLabel(lang==='bg'?'Име на град':'City name')
+ await city.fill('Test town')
+ await details.getByLabel(lang==='bg'?'Географска ширина':'Latitude').fill('42.5')
+ await details.getByLabel(lang==='bg'?'Географска дължина':'Longitude').fill('24.5')
+ await details.getByRole('button',{name:lang==='bg'?'Добави град':'Add city',exact:true}).click()
+ await expect(city).toHaveValue('')
+ await expect(panel.locator('li')).toContainText('Test town')
+ await expect(page.locator('.profile-draft-note')).toBeVisible()
+ fail=true
+ const save=panel.getByRole('button',{name:lang==='bg'?'Запази push настройките':'Save push preferences'})
+ await save.click();await expect(panel.getByRole('status')).toContainText(lang==='bg'?'не е потвърдена':'not confirmed')
+ await expect(page.locator('.profile-draft-note')).toBeVisible()
+ fail=false;await save.click();await expect(panel.getByRole('status')).toContainText(lang==='bg'?'запазени':'saved')
+ await expect(page.locator('.profile-draft-note')).toHaveCount(0)
+ // An unsuccessful duplicate add must keep the user's unfinished input.
+ await city.fill('Duplicate')
+ await details.getByLabel(lang==='bg'?'Географска ширина':'Latitude').fill('42.5')
+ await details.getByLabel(lang==='bg'?'Географска дължина':'Longitude').fill('24.5')
+ await details.getByRole('button',{name:lang==='bg'?'Добави град':'Add city',exact:true}).click()
+ await expect(city).toHaveValue('Duplicate');await expect(panel.locator('li')).toHaveCount(1)
+ page.once('dialog',d=>d.dismiss());await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toBeVisible()
+ await city.fill('');await expect(page.locator('.profile-draft-note')).toHaveCount(0)
+ await expect(page.getByRole('button',{name:lang==='bg'?'Затвори':'Close',exact:true})).toBeEnabled()
+ let prompted=false;page.once('dialog',async d=>{prompted=true;await d.dismiss()})
+ await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);expect(prompted).toBe(false)
+ expect(preferences.cities).toEqual([{name:'Test town',latitude:42.5,longitude:24.5,zone:'Europe/Sofia'}])
+})
