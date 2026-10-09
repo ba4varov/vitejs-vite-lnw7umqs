@@ -88,7 +88,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     finally { setCaptchaToken(null); setCaptchaReset(value => value + 1); setBusy(false) }
   }
 
-  return <div className="auth-nav" aria-live="polite">
+  return <div id="planner-auth" className="auth-nav" aria-live="polite">
     {busy && view === 'closed' ? <span>{t.loading}</span> : session ? <><button onClick={openProfile}>{t.profile}</button><button onClick={logout} disabled={busy}>{t.logout}</button></> : <><button onClick={() => changeView('login')}>{t.login}</button><button className="primary" onClick={() => changeView('register')}>{t.register}</button></>}
     {view !== 'closed' && <div className="auth-backdrop" onMouseDown={e => e.target === e.currentTarget && changeView('closed')}><section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <button className="auth-close" aria-label={t.close} onClick={() => changeView('closed')}>×</button>

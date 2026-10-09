@@ -1,0 +1,90 @@
+{
+  "builder": "@vercel/node 23.0.0",
+  "verification": "Local official builder using installed dependencies; no deployment performed",
+  "count": 7,
+  "hobbyLimit": 12,
+  "functions": [
+    {
+      "entrypoint": "api/activity.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/activity.js.map",
+        "api/activity.js",
+        "package.json",
+        "server/activity-core.js",
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "entrypoint": "api/admin-management.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/admin-management.js.map",
+        "api/admin-management.js",
+        "package.json",
+        "server/admin-management-core.js",
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "entrypoint": "api/admin.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/admin.js.map",
+        "api/admin.js",
+        "package.json",
+        "server/admin-core.js",
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "entrypoint": "api/planner.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/planner.js.map",
+        "api/planner.js",
+        "package.json",
+        "server/planner-core.js",
+        "server/profile-core.js",
+        "server/planner-logic.js"
+      ]
+    },
+    {
+      "entrypoint": "api/profile.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/profile.js.map",
+        "api/profile.js",
+        "package.json",
+        "server/profile-core.js"
+      ]
+    },
+    {
+      "entrypoint": "api/weather-advice.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/weather-advice.js.map",
+        "api/weather-advice.js",
+        "package.json"
+      ]
+    },
+    {
+      "entrypoint": "api/weather-chat.ts",
+      "type": "Lambda",
+      "runtime": "nodejs24.x",
+      "files": [
+        "api/weather-chat.js.map",
+        "api/weather-chat.js",
+        "package.json",
+        "server/weather-chat-core.js",
+        "server/gemini-client.js"
+      ]
+    }
+  ]
+}
