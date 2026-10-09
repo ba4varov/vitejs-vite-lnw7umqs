@@ -749,6 +749,12 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .notification-panel ul {padding:0;list-style:none}.notification-panel li {padding:1rem 0;border-bottom:1px solid #64748b55;overflow-wrap:anywhere}.notification-panel p {font-size:.85rem}.notification-panel small {display:block;font-size:.75rem}.notification-panel button {margin:.3rem .3rem 0 0}.notification-read {opacity:.65}.notification-settings label {display:flex;align-items:center;gap:.5rem;margin:.5rem 0}.notification-settings input[type=checkbox]{width:auto}
 @media(max-width:600px){.notification-panel{position:fixed;top:90px;right:16px;left:16px;width:auto}}
 .notification-panel {position:fixed;top:90px;right:24px}.weather-app.dark .notification-panel {background:#1e293b;color:#f8fafc}.weather-notifications>button {display:flex;align-items:center;gap:.4rem}
+.notification-panel-header {display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.notification-panel-header h3 {margin:0;min-width:0}
+.notification-panel .notification-close {display:inline-flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;margin:0;padding:0;border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit;font-size:28px;line-height:1;cursor:pointer}
+.notification-panel .notification-close:hover {background:#64748b22;transform:none}
+.notification-panel .notification-close:focus-visible {outline:3px solid #2563eb;outline-offset:3px}
+@media(max-width:600px){.notification-panel{right:16px}}
 .push-settings {margin-top:1.5rem;padding-top:1rem;border-top:1px solid #64748b55;overflow-wrap:anywhere}
 .push-settings fieldset {border:1px solid #64748b55;border-radius:8px;padding:.75rem;min-width:0}
 .push-settings label {display:flex;align-items:center;gap:.5rem;margin:.6rem 0;flex-wrap:wrap}

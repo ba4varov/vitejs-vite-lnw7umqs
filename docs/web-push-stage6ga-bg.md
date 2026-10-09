@@ -144,6 +144,29 @@ Invocation модел: coordinator 1/cycle; forecast jobs по 50 града; fa
 
 ## Следващи ръчни стъпки след одобрение
 
+### Актуализация на същия PR №61: затваряне на панела и видимост без миграция
+
+Панелът от камбанката вече има видим X в горния десен ъгъл, BG `aria-label`/`title` **„Затвори известията“** и EN **„Close notifications“**, 44×44 CSS px зона за натискане и видим keyboard focus. Flex заглавният ред пази бутона вдясно без застъпване на заглавието. При mobile са запазени 16 px отстояния от двата края. X и Escape променят само локалното `open` състояние и връщат фокуса към камбанката. Escape listener съществува само докато панелът е отворен. Старият toggle чрез камбанката остава. Няма промяна в read/hide/generate/API/storage логиката.
+
+Добавени са **24 Chromium проверки** за guest/Free/Pro × mobile/desktop × BG/EN × light/dark. След предварително прочитане и (за Pro) скриване, тестовете затварят/отварят последователно чрез X, Escape и камбанката и сравняват състоянието, броя непрочетени, текста, request history и server fixture history. Проверяват също focus restoration, достъпното име и позицията/размера на X. Общата повторна Chromium regression команда вече минава **145 теста**; build, lint и **256 unit теста** също са PASS.
+
+Push секцията се рендерира в удостоверения профил независимо от успеха на `/api/push`. При неприложена миграция RPC/API е недостъпен и секцията остава видима със заглавие, обяснение за изключена доставка и BG/EN status **„Push подготовката още не е конфигурирана.“ / „Push preparation is not configured yet.“**; не предлага регистрация или permission prompt. Това е проверено с **4 нови Chromium теста**, връщащи API 503 `PUSH_UNAVAILABLE`, при 390/1440 px и BG/EN. Отделно същите **4 теста минаха върху компилирания production bundle чрез локален `vite preview`**, а не само Vite dev server. Използвани са синтетична browser сесия и изолирани account API fixtures; няма реално влизане или промяна на Production акаунт.
+
+Контролни screenshots от тези локални проверки: [X mobile BG](web-push-screenshots/notifications-close-mobile-bg.png), [X desktop EN dark](web-push-screenshots/notifications-close-desktop-en-dark.png), [Push без миграция mobile BG](web-push-screenshots/push-no-migration-mobile-bg.png), [Push без миграция desktop EN](web-push-screenshots/push-no-migration-desktop-en.png). Те не са представени като screenshots от hosted Vercel.
+
+Директният достъп до Vercel Preview е повторен и остава блокиран от средата — CONNECT proxy/Envoy **403**, преди заявката да достигне приложението. Локалният production Preview PASS не доказва hosted UI или действителните Preview environment variables/SQL state. За безопасно завършване след разрешаване на точния Preview host е добавен `playwright.push-preview.config.ts`: той зарежда реалните статични assets от PR №61, но използва синтетична сесия и fixtures за всички account API заявки, включително 503 за липсваща миграция. Няма изпращане на истински JWT към hosted API, Production mutations или subscriptions. Proxy настройката се запазва; няма bypass/изключване на TLS verification.
+
+```sh
+# Само локалният компилиран bundle — изпълнено успешно (4/4):
+npm run build
+PUSH_PREVIEW_URL=http://127.0.0.1:4174 CHROMIUM_PATH=/usr/bin/chromium npx playwright test --config playwright.push-preview.config.ts
+
+# Hosted assets + изолирани API fixtures — изисква разрешен Preview host:
+PUSH_PREVIEW_URL=https://weather-git-feat-web-push-stage6ga-ba4varov-projects.vercel.app CHROMIUM_PATH=/usr/bin/chromium npx playwright test --config playwright.push-preview.config.ts
+```
+
+SQL/API/push sender кодът не е променян в тази UI актуализация; предходната disposable SQL проверка остава валидна и не е повторена за козметичната промяна. Няма Production SQL, delivery activation, real Cron, нов PR или merge. PR №61 остава за одобрение.
+
 1. Прегледайте PR и този отчет; не сливайте автоматично. Production остава без миграция и без флагове.
 2. В отделен disposable/staging Supabase проект приложете миграциите; оставете регистрационните gates false. Тествайте с отделни синтетични акаунти, изолирани VAPID ключове и отделен origin. Не копирайте Production private keys в Preview.
 3. Прегледайте реалните Open-Meteo/hosting лицензи, реклами/платени Pro subscriptions, privacy/notification текст и бюджет. Няма автоматично поръчване на платени планове.

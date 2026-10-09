@@ -9,8 +9,9 @@
   "checks": {
     "build": "PASS: TypeScript project references and Vite production bundle",
     "lint": "PASS: oxlint",
-    "unit": "PASS: 29 test modules including OAuth, Free/Pro, planner, alerts and push",
-    "chromium": "PASS: 117 tests (19 new push checks + existing alerts/planner/profile-plan regressions)",
+    "unit": "PASS: 256 unit tests including OAuth, Free/Pro, planner, alerts and push (follow-up verification)",
+    "chromium": "PASS: 145 tests; includes 24 X/Escape/bell close-reopen checks with unchanged read/hidden/unread state and API request history, plus 4 missing-migration Push visibility checks",
+    "localProductionPreview": "PASS: 4 Chromium tests against compiled Vite bundle served by vite preview; Push section visible with API 503 fixture at 390/1440 px in BG/EN; no real account APIs",
     "sql": "PASS: disposable PostgreSQL 17 + PostgREST; current migrations and push SQL ownership/default gate/dedup/delete/cascade/rate limit; existing SQL/HTTP regressions",
     "vercelBuilder": "PASS: @vercel/node 23.0.0, 9 official Lambda bundles; see vercel-functions-stage6ga.json",
     "preview": "PASS: Vercel GitHub status success and bot reports Ready for commit 2ac38e5b1300f38e7d3450f2681f292686ab2ebd; hosted HTTP/UI smoke check BLOCKED by environment outbound proxy 403"
@@ -21,6 +22,17 @@
     "pullRequest": "https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/61",
     "remoteHttpCheck": "BLOCKED: environment proxy denies CONNECT/GET with 403 (server: envoy); no bypass or Vercel protection changes attempted",
     "manualNextStep": "Allow this Preview host in the cloud environment network configuration, or open Preview manually to complete hosted UI/SW/header checks"
+  },
+  "notificationCloseFollowUp": {
+    "scope": "X close button, Escape, bell focus restoration and mobile position; alert read/hide/generate/persistence logic unchanged",
+    "labels": ["Затвори известията", "Close notifications"],
+    "touchTarget": "44x44 CSS px",
+    "hostedPreviewRetried": "2026-10-09: proxy still rejects CONNECT with 403 before the app is reached",
+    "missingMigrationFixture": "GET /api/push -> HTTP 503 PUSH_UNAVAILABLE; section heading/status remain visible, no subscribe action or automatic permission prompt",
+    "productionSqlRerun": false,
+    "localSqlRerun": false,
+    "localSqlReason": "UI-only follow-up; API, SQL migration and delivery code unchanged from prior successful disposable SQL suite",
+    "safePreviewConfig": "playwright.push-preview.config.ts; only PR #61 origin or local bundle; synthetic browser session and isolated API fixtures"
   },
   "limits": [
     "Chromium permission/PushManager lifecycle uses isolated fixtures; no real provider delivery",
