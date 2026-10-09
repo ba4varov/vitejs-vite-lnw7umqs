@@ -36,4 +36,3 @@ export async function fixture(page: Page, lang: 'bg' | 'en', initialPlan = 'free
   return { requests, setPlan: (value: string) => { plan = value }, fail: () => { failed = true },
     hold: () => { hold = true }, release: () => { hold = false; release() } }
 }
-

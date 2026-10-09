@@ -322,7 +322,7 @@ Running 277 tests using 4 workers
   ✓  165 tests/admin-stage5.spec.ts:4:108 › stage5 1440 bg dark (17.0s)
   ✓  168 tests/planner.spec.ts:26:3 › planner free 390 bg dark (9.1s)
 [WebServer] 9:28:51 AM [vite] (client) [console.error] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
-[WebServer] 
+[WebServer]
 [WebServer] Previous: [true, function () { [native code] }]
 [WebServer] Incoming: [true, false, function () { [native code] }]
 [WebServer] 9:28:51 AM [vite] (client) [console.error] TypeError: Cannot read properties of undefined (reading 'weather_code')
