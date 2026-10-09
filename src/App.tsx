@@ -7,6 +7,7 @@ import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel } from './AuthPanel'
+import { WeatherNotifications } from './WeatherNotifications'
 import { WeatherPlanner } from './WeatherPlanner'
 import { AdminLink } from './AdminLink'
 import { loadLanguage, saveLanguage } from './language-storage.js'
@@ -395,6 +396,8 @@ const WeatherApp = () => {
   const [error, setError] = useState<string | null>(null)
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
+  const [notificationForecast,setNotificationForecast]=useState<any>(null)
+  const [plannerLocation,setPlannerLocation]=useState<any>(null)
   const [plannerForecast, setPlannerForecast] = useState<any>(null)
   const [forecast, setForecast] = useState<any[]>([])
   const [places, setPlaces] = useState<Place[]>([])
@@ -759,6 +762,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   }
   const fetchWeather = async (lat: number, lon: number) => {
     setPlannerForecast(null)
+    setNotificationForecast(null)
     const viewIntent = forecastIntent.current
     const requestId = ++weatherRequestIdRef.current
     setLoading(true)
@@ -860,16 +864,19 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       }, requestId);
 
       const startIdx = findHourlyStartIndex(data.hourly.time, data.current.time)
-      setPlannerForecast(typeof data.timezone === 'string' ? {
+      setPlannerLocation({lat,lon})
+      const notificationData = typeof data.timezone === 'string' ? {
         timeZone: data.timezone,
         hours: data.hourly.time.slice(startIdx, startIdx + 72).map((time: string, i: number) => ({
-          time, feelsLike: hourlyNumber(data.hourly.apparent_temperature?.[startIdx + i]),
-          rainProbability: hourlyNumber(data.hourly.precipitation_probability?.[startIdx + i]),
+          time, feelsLike: hourlyNumber(data.hourly.apparent_temperature?.[startIdx + i], false),
+          rainProbability: hourlyNumber(data.hourly.precipitation_probability?.[startIdx + i], false),
           rain: hourlyNumber(data.hourly.precipitation?.[startIdx + i], false),
-          wind: hourlyNumber(data.hourly.wind_speed_10m?.[startIdx + i]),
+          wind: hourlyNumber(data.hourly.wind_speed_10m?.[startIdx + i], false),
           code: data.hourly.weather_code?.[startIdx + i] ?? null,
         })),
-      } : null)
+      } : null
+      setNotificationForecast(notificationData)
+      setPlannerForecast(notificationData ? {...notificationData,hours:notificationData.hours.map(h=>({...h,feelsLike:hourlyNumber(h.feelsLike),rainProbability:hourlyNumber(h.rainProbability),wind:hourlyNumber(h.wind)}))}:null)
 
       const hr: any[] = []
       for (let i = 0; i < 24; i++) {
@@ -1040,6 +1047,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         </div>
         <div className="header-btns">
           <AuthPanel lang={lang} />
+          <WeatherNotifications locationKey={`${Math.round(coords.lat*10)}:${Math.round(coords.lon*10)}`} key={session?.user.id||'guest'} lang={lang} session={session} forecast={plannerLocation?.lat===coords.lat && plannerLocation?.lon===coords.lon ? notificationForecast : null} city={city} />
           <AdminLink lang={lang} />
           <button className="lang-btn" onClick={toggleLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCallback, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
+import { NotificationSettings } from './NotificationSettings'
 import { ActivityConsent } from './ActivityConsent'
 import { Turnstile } from './Turnstile'
 
@@ -96,6 +97,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       {!authConfigured && <p className="auth-error">{t.unavailable}</p>}
       {view === 'profile' && profile && <><p className="profile-email">{profile.email}</p><p><strong>{t.plan}:</strong> {t.free}</p></>}
       {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
+      {view === 'profile' && session && <NotificationSettings key={'notifications-'+session.user.id} session={session} lang={lang} />}
       {view === 'profile' && session && <ActivityConsent key={session.user.id} session={session} lang={lang} />}
       <form onSubmit={submit}>
         {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>}

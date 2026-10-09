@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-10-09T05:10:47.983Z",
+  "status": "PASS",
+  "images": {
+    "postgres": "postgres@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826",
+    "auth": "supabase/gotrue@sha256:6a916b47af0386b7e0152ca84f3d45d050bf056e449a75a5460b48742fd67822",
+    "rest": "postgrest/postgrest@sha256:0a46780309a604cdc8b56c776c6e5e15788ce58174d709e40459ab5a2d44d228"
+  },
+  "isolation": "Disposable dedicated Docker bridge network; ephemeral database; loopback-only HTTP; synthetic .invalid accounts; no production credentials",
+  "mocks": false,
+  "results": [
+    {
+      "name": "Real GoTrue health and actual Auth schema migrations",
+      "status": "PASS"
+    },
+    {
+      "name": "Actual signup/password login and GoTrue-issued JWT; invalid, tampered and missing JWT rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Actual GoTrue refresh-token rotation",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C review: immediate A/B switch, concurrent generations, separate location+zone histories, read/hide/clear, replay tombstones, relogin settings and account isolation",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C: real JWT denial, Free settings, concurrent deduplication, read/clear tombstones, durable settings and account isolation",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C review: actual GoTrue/API HTTP 429 budget denial, no rejected scope persistence, cached scope and refill",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C: same active GoTrue JWT Pro generation, revocation and restoration without relogin",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6B: real Free/Pro/guest authorization, missing migration, invalid/expired/tampered JWT, manual grant/revoke with same JWT and two audit entries; no analytics",
+      "status": "PASS"
+    },
+    {
+      "name": "Default consent off; no recording before explicit consent; consent enabled via real app API",
+      "status": "PASS"
+    },
+    {
+      "name": "Actual authenticated favorite insertion followed by real activity recording and duplicate rejection",
+      "status": "PASS"
+    },
+    {
+      "name": "Actual administrative aggregates; ordinary user denied; table/RPC and favorite RLS account isolation",
+      "status": "PASS"
+    },
+    {
+      "name": "Chromium: real email/password GoTrue login and actual aggregate values rendered in admin UI (no mocks)",
+      "status": "PASS"
+    },
+    {
+      "name": "Withdrawal deletes stored analytics; stale consent rejected; actual admin UI shows no data; favorite preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C Chromium: real password login, persisted Pro settings without analytics consent, real history screenshots and live-session revoke/restore; weather fixture, real Auth/API and current Varna/UTC scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Stage 6C: absent migration/RPC safely fails without altering core forecast or profile APIs",
+      "status": "PASS"
+    }
+  ],
+  "limits": [
+    "Local GoTrue password authentication/refresh only; Google provider, SMTP confirmation/recovery and Vercel-hosted API runtime are not exercised",
+    "Favorite action is a real database mutation followed by application activity API; public weather providers are not used",
+    "Chromium uses real local Auth/API for admin and notifications; notification weather is an isolated Open-Meteo fixture; other external requests are aborted"
+  ]
+}
