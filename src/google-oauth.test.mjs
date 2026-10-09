@@ -13,7 +13,7 @@ function fixture(href = 'https://meteo.example/', enabled = true) {
     signInWithOAuth: async options => { calls.push(options); storage.setItem('meteo-pulse-google-code-verifier', 'verifier'); return { data: { url: 'https://auth.example/authorize' } } },
     exchangeCodeForSession: async code => { calls.push(code); return { data: { session } } },
   }
-  const flow = createGoogleOAuth({ createClient: () => client, storage, location, history: { replaceState: (_a, _b, url) => { replacements.push(url); location.href = `https://meteo.example${url}` } }, publish: s => published.push(s), enabled })
+  const flow = createGoogleOAuth({ createClient: () => client, storage, location, history: { replaceState: (_a, _b, url) => { replacements.push(url); location.href = `${location.origin}${url}` } }, publish: s => published.push(s), enabled })
   return { flow, values, published, calls, replacements, redirects, session, client, location, pending: () => { storage.setItem('meteo-pulse-google-pending', String(Date.now())); storage.setItem('meteo-pulse-google-code-verifier', 'verifier') } }
 }
 
@@ -122,4 +122,17 @@ test('real Supabase SDK persists PKCE across clients but never persists its sess
     assert.equal(values.size, 0)
     assert.equal((await second.getSession()).data.session, null)
   } finally { await second.dispose() }
+})
+
+test('Preview Google callback remains on the initiating Preview origin', async () => {
+  const origin = 'https://weather-git-redesign-profile-sections-ba4varov-projects.vercel.app'
+  const f = fixture(origin + '/')
+  f.location.origin = origin
+  await f.flow.start()
+  assert.equal(f.calls[0].options.redirectTo, origin + '/?oauth=google')
+  f.location.href = origin + '/?oauth=google&code=preview-code'
+  await f.flow.consume()
+  assert.equal(f.replacements.at(-1), '/')
+  assert.equal(new URL(f.location.href).origin, origin)
+  assert.equal(f.published.length, 1)
 })

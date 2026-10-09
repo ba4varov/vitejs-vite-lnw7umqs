@@ -12,7 +12,8 @@
     "test:admin:browser": "playwright test",
     "test:admin:sql": "node scripts/test-admin-sql.mjs",
     "typecheck": "tsc -b",
-    "test:activity:integration": "node scripts/test-activity-integration.mjs"
+    "test:activity:integration": "node scripts/test-activity-integration.mjs",
+    "test:profile:build": "playwright test --config=playwright.profile-build.config.ts"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.117.3",

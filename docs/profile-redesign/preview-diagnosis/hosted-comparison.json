@@ -1,0 +1,8 @@
+{
+  "target": "https://weather-git-redesign-profile-sections-ba4varov-projects.vercel.app/",
+  "hostedVerified": false,
+  "assets": [],
+  "errors": [
+    "Download failed: https://weather-git-redesign-profile-sections-ba4varov-projects.vercel.app/: curl: (56) CONNECT tunnel failed, response 403"
+  ]
+}

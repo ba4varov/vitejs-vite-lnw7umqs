@@ -1,0 +1,41 @@
+
+> vite-react-typescript-starter@0.0.0 test
+> node --test tests/unit/*.test.mjs src/*.test.mjs
+
+✔ src/account-place-localization.test.mjs (41.480816ms)
+✔ src/admin-stage2.test.mjs (37.896119ms)
+✔ src/auth-contract.test.mjs (43.261257ms)
+✔ src/auth-session.test.mjs (181.169756ms)
+✔ src/captcha-payload.test.mjs (38.504979ms)
+✔ src/chart-utils.test.mjs (65.773858ms)
+✔ src/current-location-localization.test.mjs (39.831344ms)
+✔ src/forecast-layout.test.mjs (44.780523ms)
+✔ src/google-oauth.test.mjs (86.154428ms)
+✔ src/language-storage.test.mjs (38.924153ms)
+✔ src/place-localization.test.mjs (46.877812ms)
+✔ src/places-core.test.mjs (45.145685ms)
+✔ src/profile-plan.test.mjs (41.757775ms)
+✔ src/promotional-components.test.mjs (49.362913ms)
+✔ src/reverse-geocoding.test.mjs (40.178789ms)
+✔ src/turnstile-loader.test.mjs (39.771934ms)
+✔ src/weather-chat-handler.test.mjs (393.897048ms)
+✔ src/weather-chat-types.test.mjs (3346.644991ms)
+✔ src/weather-utils.test.mjs (47.728868ms)
+✔ tests/unit/activity.test.mjs (51.332985ms)
+✔ tests/unit/admin-management.test.mjs (50.171189ms)
+✔ tests/unit/admin.test.mjs (54.874387ms)
+✔ tests/unit/alerts.test.mjs (460.970731ms)
+✔ tests/unit/gemini-client.test.mjs (50.824126ms)
+✔ tests/unit/planner.test.mjs (147.862132ms)
+✔ tests/unit/profile.test.mjs (47.391829ms)
+✔ tests/unit/push.test.mjs (182.437543ms)
+✔ tests/unit/vercel-endpoints.test.mjs (43.766525ms)
+✔ tests/unit/weather-chat.test.mjs (113.847694ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5890.508941

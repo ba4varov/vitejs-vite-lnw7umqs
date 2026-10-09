@@ -764,3 +764,65 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .push-settings p {line-height:1.5}
 .push-settings ul {padding-left:1.2rem}
 .push-settings li {margin:.6rem 0}
+
+.auth-backdrop:has(.profile-dialog) { align-items: start; padding-top: 48px; padding-bottom: 48px; }
+/* Profile workspace: the header and navigation stay outside the single scroll area. */
+.auth-dialog-header h2 { padding-right: 42px; }
+.profile-dialog.auth-dialog { width: min(960px, 100%); height: auto; min-height: min(440px, calc(100dvh - 96px)); max-height: min(760px, calc(100dvh - 96px)); padding: 0; overflow: hidden; display: grid; grid-template-columns: 224px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.profile-dialog .auth-dialog-header { grid-column: 1 / -1; padding: 24px 28px; border-bottom: 1px solid #cbd5e1; }
+.profile-dialog .auth-dialog-header h2 { margin: 0; font-size: 1.5rem; }
+.profile-dialog .auth-close { top: 18px; right: 20px; min-width: 44px; min-height: 44px; }
+.profile-tabs { display: flex; flex-direction: column; gap: 8px; padding: 24px 16px; background: #f1f5f9; border-right: 1px solid #cbd5e1; }
+.profile-tabs button { text-align: left; min-height: 48px; border-radius: 12px; box-shadow: none; background: transparent; color: #475569; padding: 12px 14px; }
+.profile-tabs button[aria-selected=true] { background: #dbeafe; color: #1d4ed8; }
+.profile-dialog .auth-dialog-content { overflow-y: auto; min-width: 0; padding: 28px; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.profile-dialog [hidden] { display: none !important; }
+.profile-dialog h3 { margin: 0 0 16px; font-size: 1.2rem; }
+.profile-dialog p { line-height: 1.6; }
+.profile-dialog button { min-height: 44px; }
+.profile-dialog button:focus-visible, .profile-dialog summary:focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+.profile-dialog .profile-email { display: grid; gap: 6px; padding: 18px; border: 1px solid #cbd5e1; border-radius: 14px; overflow-wrap: anywhere; }
+.profile-email span { font-size: .85rem; }
+.profile-dialog .profile-plan { padding: 14px 18px; background: #eff6ff; border-radius: 12px; }
+.profile-dialog .notification-settings label, .profile-dialog .push-settings label:has(input[type=checkbox]) { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; margin: 6px 0; border: 1px solid #cbd5e1; border-radius: 10px; }
+.profile-dialog input[type=checkbox] { width: 20px; height: 20px; flex: 0 0 20px; accent-color: #2563eb; }
+.profile-dialog label:has(input:disabled) { opacity: .65; }
+.profile-dialog .notification-settings > button { margin: 12px 8px 0 0; }
+.profile-dialog .activity-consent { margin: 0; border-color: #cbd5e1; }
+.profile-dialog fieldset { min-width: 0; padding: 16px; border: 1px solid #cbd5e1; border-radius: 14px; }
+.profile-dialog .push-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-dialog .push-presets button { margin: 0; }
+.profile-dialog .push-settings ul { padding-left: 20px; overflow-wrap: anywhere; }
+.profile-dialog .push-settings li { margin: 12px 0; }
+.profile-dialog .push-settings details { margin: 16px 0; }
+.profile-dialog summary { cursor: pointer; min-height: 44px; }
+.profile-dialog .push-settings details label { margin: 12px 0; }
+.dark .profile-dialog .profile-tabs { background: #172238; border-color: #334155; }
+.dark .profile-dialog .profile-tabs button { color: #cbd5e1; background: transparent; }
+.dark .profile-dialog .profile-tabs button[aria-selected=true] { color: #bfdbfe; background: #1e3a5f; }
+.dark .profile-dialog .auth-dialog-header, .dark .profile-dialog fieldset, .dark .profile-dialog .activity-consent, .dark .profile-dialog .profile-email, .dark .profile-dialog .notification-settings label, .dark .profile-dialog .push-settings label { border-color: #475569; }
+.dark .profile-dialog .profile-email { color: #cbd5e1; }
+.dark .profile-dialog .profile-plan { background: #1e3a5f; }
+.dark .auth-dialog .auth-success { color: #6ee7b7; }
+.dark .auth-dialog .auth-error { color: #fca5a5; }
+@media (max-width: 640px) {
+  .auth-backdrop:has(.profile-dialog) { padding: 8px; align-items: center; }
+  .profile-dialog.auth-dialog { height: calc(100dvh - 16px); min-height: 0; max-height: calc(100dvh - 16px); grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); border-radius: 18px; }
+  .profile-dialog .auth-dialog-header { padding: 18px; }
+  .profile-dialog .auth-dialog-header h2 { font-size: 1.25rem; }
+  .profile-dialog .auth-close { top: 10px; right: 12px; }
+  .profile-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 6px; border-right: 0; border-bottom: 1px solid #cbd5e1; }
+  .profile-tabs button { text-align: center; padding: 8px; font-size: .85rem; }
+  .profile-dialog .auth-dialog-content { padding: 18px; }
+  .profile-dialog fieldset { padding: 12px; }
+}
+.profile-draft-note { margin: 0 0 20px; padding: 12px 16px; border-radius: 12px; background: #fef3c7; color: #78350f; font-size: .85rem; }
+.dark .profile-draft-note { background: #422f16; color: #fde68a; }
+.profile-dialog .push-settings { margin-top: 0; padding-top: 0; border-top: 0; }
+.profile-dialog .push-settings label:has(input[type=checkbox]) { flex-wrap: nowrap; }
+.profile-dialog .auth-submit { background: #2563eb !important; color: white !important; }
+
+@media (min-width: 641px) and (max-height: 540px) {
+  .auth-backdrop:has(.profile-dialog) { padding-top: 16px; padding-bottom: 16px; }
+  .profile-dialog.auth-dialog { min-height: min(440px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); }
+}

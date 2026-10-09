@@ -5,13 +5,13 @@ import {pushSupport,preparePushWorker,enrollPush,removePushDevice} from './push-
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
 const presets:PushCity[]=[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'},{name:'Пловдив',latitude:42.1354,longitude:24.7453,zone:'Europe/Sofia'},{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'},{name:'Бургас',latitude:42.5048,longitude:27.4626,zone:'Europe/Sofia'}]
-export function PushSettings({session,lang}:{session:AuthSession;lang:'bg'|'en'}) {
+export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:AuthSession;lang:'bg'|'en';onDirtyChange?:(dirty:boolean)=>void;onBusyChange?:(busy:boolean)=>void}) {
  const bg=lang==='bg',support=pushSupport()
  const [data,setData]=useState<PushSnapshot|null>(null),[draft,setDraft]=useState<PushPreferences>({enabled:false,cities:[],categories:[]}),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[worker,setWorker]=useState<ServiceWorkerRegistration|null>(null)
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
  const live=useRef(true)
  const apply=(d:PushSnapshot)=>{if(live.current){setData(d);setDraft(d.preferences)}}
- useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push подготовката още не е конфигурирана.':'Push preparation is not configured yet.')});return()=>{live.current=false}},[session.user.id,session.access_token])
+ useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{live.current=false}},[session.user.id,session.access_token])
  useEffect(()=>{let active=true;if(support==='supported')void preparePushWorker().then(r=>{if(active)setWorker(r)}).catch(()=>{if(active)setMessage(bg?'Service Worker е недостъпен.':'Service Worker is unavailable.')});return()=>{active=false}},[support])
  const fail=(error:any)=>setMessage(error.message==='DENIED'?(bg?'Разрешението е отказано. Можеш да го промениш от настройките на браузъра.':'Permission denied. Change it in browser settings.'):error.message==='DISMISSED'?(bg?'Разрешението не е дадено. Няма регистрирано устройство.':'Permission was not granted. No device registered.'):(bg?'Промяната не е потвърдена. Обнови и опитай отново.':'Change was not confirmed. Refresh and retry.'))
  const save=async(p:PushPreferences)=>{setBusy(true);setMessage('');try{apply(await pushRequest(session,'PATCH',p));setMessage(bg?'Push настройките са запазени. Доставката остава изключена.':'Push preferences saved. Delivery remains disabled.')}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
@@ -25,15 +25,21 @@ export function PushSettings({session,lang}:{session:AuthSession;lang:'bg'|'en'}
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
  const dirty=!!data&&JSON.stringify(draft)!==JSON.stringify(data.preferences)
+ const unsavedInputs=Boolean(city.name.trim() || (label.trim() && !data?.devices.some(device=>device.label===label.trim())))
+ useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
+ useEffect(()=>{onBusyChange?.(busy)},[busy,onBusyChange])
  const add=(c:PushCity)=>{
-  if(!c.name.trim()||!Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||!Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||draft.cities.length>=5)return
-  try{new Intl.DateTimeFormat('en',{timeZone:c.zone}).format(0)}catch{return}
-  if(!draft.cities.some(x=>x.latitude===c.latitude&&x.longitude===c.longitude))setDraft({...draft,cities:[...draft.cities,{...c,name:c.name.trim()}]})
+  if(!c.name.trim()||!Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||!Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||draft.cities.length>=5)return false
+  try{new Intl.DateTimeFormat('en',{timeZone:c.zone}).format(0)}catch{return false}
+  if(draft.cities.some(x=>x.latitude===c.latitude&&x.longitude===c.longitude))return false
+  setDraft({...draft,cities:[...draft.cities,{...c,name:c.name.trim()}]})
+  return true
  }
  return <section className="push-settings" aria-label={bg?'Push известия':'Push notifications'}>
   <h3>{bg?'Push известия при затворен сайт':'Push notifications when the site is closed'}</h3>
   <p>{bg?'Подготовка: автоматичната доставка е изключена. Тези настройки са независими от камбанката и съгласието за аналитика.':'Preparation: automatic delivery is disabled. These preferences are independent of the bell and analytics consent.'}</p>
   <p>{support==='ios-install'?(bg?'За iPhone/iPad: iOS 16.4 или по-нова версия → Добави към началния екран → отвори приложението от иконата.':'For iPhone/iPad: iOS 16.4 or later → Add to Home Screen → open from the icon.'):support==='unsupported'?(bg?'Този браузър не поддържа Web Push. Нужни са HTTPS и съвместим браузър.':'This browser does not support Web Push. HTTPS and a compatible browser are required.'):(bg?'Поддържан браузър. Разрешението се иска само с бутона за регистрация.':'Supported browser. Permission is requested only by the registration button.')}</p>
+  {!data&&!message&&<p role="status">{bg?'Зареждане на Push настройките…':'Loading Push preferences…'}</p>}
   {message&&<p role="status">{message}</p>}
   {support==='supported'&&Notification.permission==='denied'&&<p>{bg?'Разрешението е отказано. За ново включване промени настройките за известия на този сайт в браузъра.':'Permission is denied. To enable notifications again, change this site’s notification settings in your browser.'}</p>}
   {data&&<>
@@ -48,7 +54,7 @@ export function PushSettings({session,lang}:{session:AuthSession;lang:'bg'|'en'}
      <label>{bg?'Географска ширина':'Latitude'}<input type="number" min={-90} max={90} step="any" value={city.latitude} onChange={e=>setCity({...city,latitude:e.target.value===''?NaN:Number(e.target.value)})}/></label>
      <label>{bg?'Географска дължина':'Longitude'}<input type="number" min={-180} max={180} step="any" value={city.longitude} onChange={e=>setCity({...city,longitude:e.target.value===''?NaN:Number(e.target.value)})}/></label>
      <label>{bg?'Часова зона (IANA)':'Time zone (IANA)'}<input value={city.zone} maxLength={64} onChange={e=>setCity({...city,zone:e.target.value})}/></label>
-     <button type="button" onClick={()=>add(city)}>{bg?'Добави град':'Add city'}</button>
+     <button type="button" onClick={()=>{if(add(city))setCity({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})}}>{bg?'Добави град':'Add city'}</button>
     </details>
     <button type="button" disabled={draft.enabled&&(!draft.cities.length||!draft.categories.length)} onClick={()=>void save({...draft,categories:data.pro?draft.categories:draft.categories.filter(k=>!personal.includes(k))})}>{bg?'Запази push настройките':'Save push preferences'}</button>
    </fieldset>

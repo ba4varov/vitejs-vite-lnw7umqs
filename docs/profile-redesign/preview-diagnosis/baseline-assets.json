@@ -1,0 +1,30 @@
+{
+  "commit": "e12e20d16a89d66ade6dba61e11213f673ff7bb2",
+  "assets": [
+    {
+      "path": "index.html",
+      "bytes": 2789,
+      "sha256": "21dd2ae4519fe1b2ca29c1525364c3c0680237f65265f6b43d476586d70fc206"
+    },
+    {
+      "path": "assets/google-oauth-B6EOnn-a.js",
+      "bytes": 1608,
+      "sha256": "9be3ae55d6412513c7a48104601933fd9d12ac686f9d0b1025a5c952fc6e03af"
+    },
+    {
+      "path": "assets/index-CzWllIKy.js",
+      "bytes": 369611,
+      "sha256": "68a0a96b5be47fcccafbdedddb15c8c7cc94e2cb30f7cd887bd9ddc752d661cb"
+    },
+    {
+      "path": "assets/index-d7g8Hij3.css",
+      "bytes": 61079,
+      "sha256": "d750ec1c25370064e007c4ca6f0e51e4c589e1db031bbe078fe727144547909b"
+    },
+    {
+      "path": "assets/module-BhKvEe30.js",
+      "bytes": 103770,
+      "sha256": "4fedd466a8f02f946e38deeca17a58e51eb660e552b04a14b8045dc4c487d207"
+    }
+  ]
+}

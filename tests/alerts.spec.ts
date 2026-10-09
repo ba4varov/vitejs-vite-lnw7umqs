@@ -105,8 +105,9 @@ test('notification outage keeps weather and Bobby available; profile settings re
 test('settings saved, activities only Pro, forecast refresh does not repeat read notifications',async({page})=>{
  await alertFixture(page,'pro');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
  await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+ await page.getByRole('tab',{name:/Метео известия|Weather notifications/}).click()
  const settings=page.locator('.notification-settings');await expect(settings).toBeVisible();await expect(settings.locator('input')).toHaveCount(8)
- await settings.getByText('Време за градинарство',{exact:false}).click();await expect(settings.locator('input').nth(6)).toBeChecked()
+ await settings.getByText('Време за градинарство',{exact:false}).click();await expect(settings.locator('input').nth(6)).toBeChecked();await settings.getByRole('button',{name:'Запази метео настройките'}).click()
  await page.getByRole('button',{name:'Затвори',exact:true}).click()
  await page.getByRole('button',{name:'Известия',exact:true}).click();const panel=page.locator('.notification-panel');for(const button of await panel.getByRole('button',{name:'Прочетено',exact:true}).all())await button.click()
  await page.clock.fastForward(15*60000);await expect(panel.locator('li')).toHaveCount(3);await expect(page.locator('.notification-count')).toHaveCount(0)
@@ -181,9 +182,11 @@ for(const lang of ['bg','en'])test(`daily garden hide survives disjoint new fore
  if(lang==='en')await page.locator('button.lang-btn').click()
  const button=(bg:string,en:string)=>lang==='bg'?bg:en
  await page.locator('.auth-nav').getByRole('button',{name:button('Моят профил','My profile'),exact:true}).click()
+ await page.getByRole('tab',{name:/Метео известия|Weather notifications/}).click()
  const settings=page.locator('.notification-settings')
  await settings.getByRole('button',{name:button('Изключи всички','Disable all'),exact:true}).click()
  await settings.getByText(button('Време за градинарство','Time for gardening'),{exact:false}).click()
+ await settings.getByRole('button',{name:button('Запази метео настройките','Save weather preferences')}).click()
  await page.getByRole('button',{name:button('Затвори','Close'),exact:true}).click()
  await page.getByRole('button',{name:button('Известия','Notifications'),exact:true}).click()
  const panel=page.locator('.notification-panel')
