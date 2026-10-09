@@ -1,0 +1,31 @@
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000002';
+do $$ declare d jsonb; begin
+ d:=public.my_alerts();if d->'enabled'<>'[]'::jsonb then raise exception 'default enabled';end if;
+ perform public.my_alerts('{"operation":"settings","enabled":["rain"]}');
+ begin perform public.my_alerts('{"operation":"settings","enabled":["walk"]}');raise exception 'Free activity accepted';exception when insufficient_privilege then null;end;
+ begin perform 1 from public.weather_alerts;raise exception 'direct history grant';exception when insufficient_privilege then null;end;
+ begin perform public.my_alerts('{"operation":"settings","enabled":["unknown"]}');raise exception 'invalid accepted';exception when raise_exception then if sqlerrm='invalid accepted' then raise;end if;end;
+ perform public.my_alerts(jsonb_build_object('operation','generate','city','SQL isolated','locationKey','432:279','zone','UTC','events',jsonb_build_array(jsonb_build_object('kind','rain','start',extract(epoch from now()+interval '1 hour')*1000,'end',extract(epoch from now()+interval '2 hours')*1000,'min',10,'max',12))));
+ d:=public.my_alerts();if jsonb_array_length(d->'alerts')<>1 then raise exception 'generation failed';end if;
+ perform public.my_alerts(jsonb_build_object('operation','read','key',d->'alerts'->0->>'key'));
+ d:=public.my_alerts();if not (d->'alerts'->0->>'read')::boolean then raise exception 'read failed';end if;
+ perform public.my_alerts('{"operation":"clear"}');
+ d:=public.my_alerts();if d->'alerts'<>'[]'::jsonb then raise exception 'clear failed';end if;
+end $$;
+reset role;
+set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000001';
+set local role authenticated;
+do $$ begin if public.my_alerts()->'alerts'<>'[]'::jsonb then raise exception 'account isolation';end if;end $$;
+reset role;
+insert into auth.users(id,email) values('90000000-0000-0000-0000-000000000001','cascade@example.invalid');
+insert into public.alert_settings(user_id) values('90000000-0000-0000-0000-000000000001');
+insert into public.weather_alerts(user_id,event_key,kind,location_key,city,zone,event) values('90000000-0000-0000-0000-000000000001','cascade','rain','432:279','Synthetic city','UTC','{"kind":"rain","start":0,"end":1}');
+delete from auth.users where id='90000000-0000-0000-0000-000000000001';
+do $$ begin
+ if exists(select 1 from public.alert_settings where user_id='90000000-0000-0000-0000-000000000001') or exists(select 1 from public.weather_alerts where event_key='cascade') then raise exception 'account deletion did not cascade';end if;
+ if has_function_privilege('anon','public.my_alerts(jsonb)','execute') then raise exception 'anonymous RPC allowed';end if;
+ if exists(select 1 from pg_class where relname in ('weather_alerts','alert_settings') and (not relrowsecurity or not relforcerowsecurity)) then raise exception 'RLS absent';end if;
+end $$;
+rollback;
