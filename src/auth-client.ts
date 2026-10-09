@@ -151,7 +151,7 @@ export async function profileRequest(session: AuthSession, method = 'GET', name?
   const headers = { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }
   const response = method === 'PATCH'
     ? await fetch('/api/profile', { method: 'PATCH', headers, body: JSON.stringify({ name }) })
-    : await fetch('/api/profile', { method: 'GET', headers })
+    : await fetch('/api/profile', { method: 'GET', headers, cache: 'no-store' })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || 'PROFILE_FAILED')
   return data

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCallback, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
+import { profilePlanLabel } from './profile-plan.js'
 import { NotificationSettings } from './NotificationSettings'
 import { ActivityConsent } from './ActivityConsent'
 import { Turnstile } from './Turnstile'
@@ -78,7 +79,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       if (view === 'profile' && session) { const data = await profileRequest(session, 'PATCH', name); setProfile(data); setMessage(t.success) }
     } catch (reason: any) { if (reason.message === 'mismatch') setError(t.mismatch); else fail(reason) } finally { if (captchaSent) { setCaptchaToken(null); setCaptchaReset(value => value + 1) }; setBusy(false) }
   }
-  const openProfile = async () => { setView('profile'); setError(''); setMessage(''); if (!session) return; setBusy(true); try { const data = await profileRequest(session); setProfile(data); setName(data.name) } catch (reason) { fail(reason) } finally { setBusy(false) } }
+  const openProfile = async () => { if (busy) return; setProfile(null); setView('profile'); setError(''); setMessage(''); if (!session) return; setBusy(true); try { const data = await profileRequest(session); setProfile(data); setName(data.name) } catch (reason) { fail(reason) } finally { setBusy(false) } }
   const logout = async () => { if (!session) return; const active = session; setSession(null); setProfile(null); setView('closed'); setMessage(t.signedOut); setBusy(false); await signOut(active) }
   const resend = async () => {
     if (busy) return
@@ -95,7 +96,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       <button className="auth-close" aria-label={t.close} onClick={() => changeView('closed')}>×</button>
       <h2 id="auth-title">{view === 'profile' ? t.profile : view === 'register' ? t.register : view === 'forgot' ? t.forgot : view === 'password' ? t.newPassword : t.login}</h2>
       {!authConfigured && <p className="auth-error">{t.unavailable}</p>}
-      {view === 'profile' && profile && <><p className="profile-email">{profile.email}</p><p><strong>{t.plan}:</strong> {t.free}</p></>}
+      {view === 'profile' && <>{profile && <p className="profile-email">{profile.email}</p>}<p className="profile-plan"><strong>{t.plan}:</strong> {profilePlanLabel(profile?.plan, lang, busy, Boolean(error))}</p></>}
       {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
       {view === 'profile' && session && <NotificationSettings key={'notifications-'+session.user.id} session={session} lang={lang} />}
       {view === 'profile' && session && <ActivityConsent key={session.user.id} session={session} lang={lang} />}
