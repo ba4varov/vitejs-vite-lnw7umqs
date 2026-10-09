@@ -826,3 +826,6 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .auth-backdrop:has(.profile-dialog) { padding-top: 16px; padding-bottom: 16px; }
   .profile-dialog.auth-dialog { min-height: min(440px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); }
 }
+.statistics-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+.statistics-actions button { flex: 1 1 180px; min-height: 48px; padding: .75rem; border: 1px solid #64748b; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-weight: 600; }
+.signup-activity-choice summary { cursor: pointer; text-decoration: underline; line-height: 1.5; }

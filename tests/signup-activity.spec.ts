@@ -1,0 +1,118 @@
+import {test,expect} from '@playwright/test'
+const user={id:'00000000-0000-0000-0000-000000000099',email:'new@example.invalid',email_confirmed_at:'2026-10-09T10:00:00Z'}
+const session={expires_in:3600,token_type:'bearer',access_token:'new-token',refresh_token:'new-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user}
+async function fixture(page:any,lang='bg',pending=true) {
+ await page.route('**/*', (r:any) => { const url = new URL(r.request().url()); return ['127.0.0.1','auth.example.invalid'].includes(url.hostname) ? r.fallback() : r.fulfill({json:{}}) })
+ let shown=false,enabled=false,fail=false
+ const decisions:any[]=[]
+ await page.addInitScript((lang:string)=>localStorage.setItem('meteoPulseLanguage',lang),lang)
+ await page.route('**/api/activity?onboarding=1',async(r:any)=>{
+  if(r.request().method()==='POST') {const offer=pending&&!shown;shown=true;return r.fulfill({json:{offer}})}
+  decisions.push(r.request().postDataJSON())
+  if(fail)return r.fulfill({status:503,json:{error:'ACTIVITY_UNAVAILABLE'}})
+  enabled=r.request().postDataJSON().enabled;pending=false
+  return r.fulfill({json:{enabled,revision:'60000000-0000-0000-0000-000000000099'}})
+ })
+ await page.route('**/api/activity',async(r:any)=>{
+  if(r.request().method()==='PATCH'){enabled=r.request().postDataJSON().enabled;decisions.push(r.request().postDataJSON())}
+  return r.fulfill({json:{enabled,revision:'60000000-0000-0000-0000-000000000099'}})
+ })
+ await page.route('**/auth/v1/user',r=>r.fulfill({json:user}))
+ await page.route('**/auth/v1/token?**',r=>r.fulfill({json:session}))
+ await page.route('**/api/profile',r=>r.fulfill({json:{name:'Existing name',email:user.email,plan:'free'}}))
+ return {decisions,fail:(value:boolean)=>{fail=value}}
+}
+for(const lang of ['bg','en']) for(const allowed of [false,true]) test(`email live consent ${lang} ${allowed}`,async({page})=>{
+ await page.setViewportSize({width:390,height:844});const f=await fixture(page,lang)
+ await page.route('**/auth/v1/signup?**',r=>r.fulfill({json:session}))
+ await page.goto('/');await page.locator('#planner-auth > button.primary').click()
+ const check=page.locator('.signup-activity-choice input');await expect(check).not.toBeChecked()
+ await page.locator('input[type=email]').fill(user.email)
+ await page.locator('input[type=password]').nth(0).fill('safe-test-password');await page.locator('input[type=password]').nth(1).fill('safe-test-password')
+ if(allowed)await check.check()
+ await page.locator('.signup-activity-choice a').click();await expect(page.locator('.signup-activity-choice details')).toHaveAttribute('open','')
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ await page.locator('.auth-submit').click()
+ await expect(page.getByRole('dialog')).toHaveCount(0)
+ await expect.poll(()=>f.decisions).toEqual([{enabled:allowed,onboarding:true}])
+ await page.reload();await expect(page.locator('#planner-auth')).toContainText(lang==='bg'?'Моят профил':'My profile')
+ await expect(page.locator('.statistics-actions')).toHaveCount(0)
+})
+test('email confirmation never trusts checked signup metadata or storage; fresh refusal and no repeats',async({page})=>{
+ const f=await fixture(page)
+ await page.route('**/auth/v1/signup?**',r=>r.fulfill({json:{user}}))
+ await page.goto('/');await page.locator('#planner-auth > button.primary').click()
+ await page.locator('input[type=email]').fill(user.email)
+ await page.locator('input[type=password]').nth(0).fill('safe-test-password');await page.locator('input[type=password]').nth(1).fill('safe-test-password')
+ await page.locator('.signup-activity-choice input').check();await page.locator('.auth-submit').click()
+ await expect(page.locator('.auth-success')).toContainText('Провери имейла');await expect.poll(()=>f.decisions).toEqual([])
+ await page.goto('/?confirmed=1#access_token=new-token&refresh_token=new-refresh&type=signup')
+ await expect(page.locator('.statistics-actions')).toBeVisible()
+ await page.getByRole('button',{name:'Продължи без статистика'}).click()
+ await expect.poll(()=>f.decisions).toEqual([{enabled:false,onboarding:true}])
+ await page.reload();await expect(page.locator('.statistics-actions')).toHaveCount(0)
+})
+test('authenticated offer API failure, retry, withdrawal and existing profile name',async({page})=>{
+ const f=await fixture(page,'en');await page.addInitScript(s=>localStorage.setItem('meteo-pulse-auth',JSON.stringify(s)),session)
+ await page.goto('/');await expect(page.locator('.statistics-actions')).toBeVisible()
+ f.fail(true);await page.getByRole('button',{name:'Allow statistics',exact:true}).click()
+ await expect(page.locator('.auth-error[role=alert]')).toContainText('could not be saved')
+ f.fail(false);await page.getByRole('button',{name:'Allow statistics',exact:true}).click()
+ await expect(page.getByRole('dialog')).toHaveCount(0)
+ await page.getByRole('button',{name:'My profile',exact:true}).click()
+ await expect(page.locator('input[autocomplete=name]')).toHaveValue('Existing name')
+ await page.getByRole('tab',{name:'Privacy',exact:true}).click()
+ await expect(page.locator('.activity-consent input')).toBeChecked()
+ await page.locator('.activity-consent input').uncheck();await expect(page.locator('.activity-consent input')).not.toBeChecked()
+ await page.reload();await expect(page.locator('.statistics-actions')).toHaveCount(0)
+})
+test('existing account has no offer; closing offered dialog does not cause repeats',async({page})=>{
+ await fixture(page,'bg',false);await page.addInitScript(s=>localStorage.setItem('meteo-pulse-auth',JSON.stringify(s)),session)
+ await page.goto('/');await expect(page.locator('#planner-auth')).toContainText('Моят профил');await expect(page.locator('.statistics-actions')).toHaveCount(0)
+})
+test('dismissed offer remains off and does not reappear after reload',async({page})=>{
+ const f=await fixture(page);await page.addInitScript(s=>localStorage.setItem('meteo-pulse-auth',JSON.stringify(s)),session)
+ await page.goto('/');await expect(page.locator('.statistics-actions')).toBeVisible();await page.getByRole('button',{name:'Затвори',exact:true}).click()
+ await page.reload();await expect(page.locator('#planner-auth')).toContainText('Моят профил');await expect(page.locator('.statistics-actions')).toHaveCount(0);await expect.poll(()=>f.decisions).toEqual([])
+})
+for(const lang of ['bg','en']) for(const allow of [false,true]) test(`Google first creation and subsequent login ${lang} ${allow}`,async({page})=>{
+ await page.setViewportSize({width:390,height:844})
+ const f=await fixture(page,lang)
+ await page.route('**/auth/v1/authorize?**',r=>{const target=new URL(new URL(r.request().url()).searchParams.get('redirect_to')!);target.searchParams.set('code','isolated-code');return r.fulfill({status:302,headers:{location:target.href}})})
+ await page.goto('/');await page.locator('#planner-auth > button').first().click()
+ await page.getByRole('button',{name:lang==='bg'?'Продължи с Google':'Continue with Google',exact:true}).click()
+ await expect(page.locator('.statistics-actions')).toBeVisible()
+ await page.getByRole('button',{name:lang==='bg'?(allow?'Разрешавам статистиката':'Продължи без статистика'):(allow?'Allow statistics':'Continue without statistics'),exact:true}).click()
+ await expect(page.getByRole('dialog')).toHaveCount(0)
+ await expect.poll(()=>f.decisions).toEqual([{enabled:allow,onboarding:true}])
+ await page.reload();await expect(page.locator('#planner-auth')).toContainText(lang==='bg'?'Моят профил':'My profile');await expect(page.locator('.statistics-actions')).toHaveCount(0)
+})
+test('cancelled Google creation never records consent',async({page})=>{
+ const f=await fixture(page)
+ await page.route('**/auth/v1/authorize?**',r=>r.fulfill({status:302,headers:{location:'http://127.0.0.1:4173/?oauth=google&error=access_denied'}}))
+ await page.goto('/');await page.locator('#planner-auth > button').first().click();await page.getByRole('button',{name:'Продължи с Google',exact:true}).click()
+ await expect(page.locator('.auth-error[role=alert]')).toContainText('Google');await expect.poll(()=>f.decisions).toEqual([])
+})
+test('missing offer migration does not block login or enable statistics',async({page})=>{
+ const f=await fixture(page)
+ await page.route('**/api/activity?onboarding=1',r=>r.fulfill({status:503,json:{error:'ACTIVITY_UNAVAILABLE'}}))
+ await page.goto('/');await page.locator('#planner-auth > button').first().click()
+ await page.locator('input[type=email]').fill(user.email);await page.locator('input[type=password]').fill('safe-test-password');await page.locator('.auth-submit').click()
+ await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('#planner-auth')).toContainText('Моят профил');await expect.poll(()=>f.decisions).toEqual([])
+})
+test('failed email signup has no authenticated consent operation',async({page})=>{
+ const f=await fixture(page)
+ await page.route('**/auth/v1/signup?**',r=>r.fulfill({status:500,json:{message:'isolated failure'}}))
+ await page.goto('/');await page.locator('#planner-auth > button.primary').click()
+ await page.locator('input[type=email]').fill(user.email);await page.locator('input[type=password]').nth(0).fill('safe-test-password');await page.locator('input[type=password]').nth(1).fill('safe-test-password');await page.locator('.signup-activity-choice input').check();await page.locator('.auth-submit').click()
+ await expect(page.locator('.auth-error')).toBeVisible();await expect.poll(()=>f.decisions).toEqual([])
+ await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('#planner-auth > button.primary').click();await expect(page.locator('.signup-activity-choice input')).not.toBeChecked()
+})
+for(const width of [390,768,1440]) for(const lang of ['bg','en']) test(`offer layout ${width} ${lang}`,async({page})=>{
+ await page.setViewportSize({width,height:844});await fixture(page,lang);await page.addInitScript(s=>localStorage.setItem('meteo-pulse-auth',JSON.stringify(s)),session)
+ await page.goto('/');await expect(page.locator('.statistics-actions')).toBeVisible()
+ const buttons=page.locator('.statistics-actions button');await expect(buttons).toHaveCount(2)
+ const a=await buttons.nth(0).boundingBox(),b=await buttons.nth(1).boundingBox();expect(Math.abs(a!.width-b!.width)).toBeLessThan(1)
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ await page.screenshot({path:`work/signup-offer-${width}-${lang}.png`})
+})

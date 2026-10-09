@@ -113,7 +113,8 @@ test('real Supabase SDK persists PKCE across clients but never persists its sess
   await first.dispose()
   const second = new GoTrueClient(options)
   try {
-    const exchange = await second.exchangeCodeForSession('auth-code')
+    const flowId = new URL(authorize.searchParams.get('redirect_to')).searchParams.get('sb_flow_id') || JSON.parse(values.get('meteo-pulse-google-flows-code-verifier'))[0]
+    const exchange = await second.exchangeCodeForSession('auth-code', flowId ? {flowId} : undefined)
     assert.equal(exchange.error, null)
     assert.equal(exchange.data.session.user.id, 'existing-account')
     assert.ok(requests[0].url.includes('grant_type=pkce'))
@@ -135,4 +136,16 @@ test('Preview Google callback remains on the initiating Preview origin', async (
   assert.equal(f.replacements.at(-1), '/')
   assert.equal(new URL(f.location.href).origin, origin)
   assert.equal(f.published.length, 1)
+})
+
+test('scoped PKCE slots are allowed, session tokens excluded, and cancellation cleans all verifier state',async()=>{
+ const values=new Map()
+ const storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k),get length(){return values.size},key:i=>[...values.keys()][i]}
+ const adapter=createPKCEStorage(storage)
+ adapter.setItem('meteo-pulse-google-flow-isolated-code-verifier','ephemeral')
+ adapter.setItem('meteo-pulse-google-flows-code-verifier','["isolated"]')
+ adapter.setItem('meteo-pulse-google','must-not-persist')
+ assert.equal(values.has('meteo-pulse-google'),false)
+ const flow=createGoogleOAuth({storage,enabled:true,location:{href:'https://meteo.example/',origin:'https://meteo.example'},history:{},createClient:()=>({})})
+ flow.cancel();assert.equal(values.size,0)
 })

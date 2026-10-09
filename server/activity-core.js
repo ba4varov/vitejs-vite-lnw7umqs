@@ -14,10 +14,12 @@ export async function handleActivity(req, res, env = process.env, fetcher = fetc
     const body = req.body || {}
     let rpc = 'get_activity_consent', payload = {}
     if (req.method === 'PATCH') {
-      if (typeof body.enabled !== 'boolean' || Object.keys(body).some(k => k !== 'enabled')) return res.status(400).json({error:'INVALID_BODY'})
-      rpc = 'set_activity_consent'; payload = {desired:body.enabled}
+      if (typeof body.enabled !== 'boolean' || (body.onboarding !== undefined && body.onboarding !== true) || Object.keys(body).some(k => !['enabled','onboarding'].includes(k))) return res.status(400).json({error:'INVALID_BODY'})
+      rpc = body.onboarding ? 'answer_activity_offer' : 'set_activity_consent'; payload = {desired:body.enabled}
     }
-    if (req.method === 'POST') {
+    if (req.method === 'POST' && body.onboarding === 'offer' && Object.keys(body).length === 1) {
+      rpc = 'claim_activity_offer'
+    } else if (req.method === 'POST') {
       if (!activityActions.includes(body.action) || !uuid(body.operationId) || !uuid(body.revision) || Object.keys(body).some(k => !['action','operationId','revision'].includes(k))) return res.status(400).json({error:'INVALID_BODY'})
       rpc = 'record_activity'; payload = {selected_action:body.action,operation_id:body.operationId,consent_revision:body.revision}
     }
