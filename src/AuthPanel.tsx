@@ -28,6 +28,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const t = copy[lang]
   const stats = signupActivityCopy[lang]
   const [signupStatistics, setSignupStatistics] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null)
   const [offerFailed, setOfferFailed] = useState(false)
   const [session, setSession] = useState<AuthSession | null>(null), [view, setView] = useState<View>('closed')
   const [email, setEmail] = useState(''), [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('')
@@ -82,7 +83,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const captchaSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
   const protectedView = view === 'login' || view === 'register' || view === 'forgot'
   const onCaptchaTokenChange = useCallback((token: string | null) => setCaptchaToken(token), [])
-  const changeView = (next: View) => { setCaptchaToken(null); setError(''); setMessage(''); setView(next); if (next === 'register' || next === 'closed') setSignupStatistics(false) }
+  const changeView = (next: View) => { setCaptchaToken(null); setError(''); setMessage(''); setConfirmationEmail(null); setView(next); if (next === 'register' || next === 'closed') setSignupStatistics(false) }
 
   useEffect(() => subscribeSession(active => {
     setSession(active)
@@ -142,14 +143,14 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
     setBusy(true); setError(''); setMessage('')
     let captchaSent = false
     try {
-      if (view === 'register') { if (password !== confirmation) throw new Error('mismatch'); captchaSent = true; const result = await signUp(email, password, redirect, captchaToken || undefined)
+      if (view === 'register') { setConfirmationEmail(null); if (password !== confirmation) throw new Error('mismatch'); captchaSent = true; const result = await signUp(email, password, redirect, captchaToken || undefined)
         if (result.access_token && result.refresh_token) {
           const user = await getUser(result.access_token)
           const active = { ...result, user } as AuthSession
           // Live intent only, after verified authentication; never persist signup checkbox/metadata.
           try { await activityRequest(active, 'PATCH', {enabled: signupStatistics, onboarding: true}) } catch { /* A fresh server offer remains available. */ }
           saveSession(active); setSession(active); changeView('closed')
-        } else { setSignupStatistics(false); setMessage(t.verify) } }
+        } else { setConfirmationEmail(email); setSignupStatistics(false); setMessage(t.verify) } }
       if (view === 'login') { captchaSent = true; const active = await signIn(email, password, captchaToken || undefined); setSession(active); changeView('closed') }
       if (view === 'forgot') { captchaSent = true; await resetPassword(email, redirect, captchaToken || undefined); setMessage(t.reset) }
       if (view === 'password' && session) { await updatePassword(session.access_token, password); setPassword(''); setMessage(t.success) }
@@ -159,10 +160,10 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const openProfile = async () => { if (busy) return; setProfile(null); setTab('account'); setWeatherDirty(false); setPushDirty(false); setView('profile'); setError(''); setMessage(''); if (!session) return; setBusy(true); try { const data = await profileRequest(session); setProfile(data); setName(data.name) } catch (reason) { fail(reason) } finally { setBusy(false) } }
   const logout = async () => { if (!session) return; const active = session; setSession(null); setProfile(null); setView('closed'); setMessage(t.signedOut); setBusy(false); await signOut(active) }
   const resend = async () => {
-    if (busy) return
+    if (busy || !confirmationEmail) return
     if (captchaConfigured && !captchaToken) { setError(t.captchaRequired); return }
     setBusy(true); setError(''); setMessage('')
-    try { await resendConfirmation(email, redirect, captchaToken || undefined); setMessage(t.resent) }
+    try { await resendConfirmation(confirmationEmail, redirect, captchaToken || undefined); setMessage(t.resent) }
     catch (reason) { fail(reason) }
     finally { setCaptchaToken(null); setCaptchaReset(value => value + 1); setBusy(false) }
   }
@@ -191,7 +192,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
       <section id="profile-panel-account" role={view === 'profile' ? 'tabpanel' : undefined} aria-labelledby={view === 'profile' ? 'profile-tab-account' : undefined} hidden={view === 'statistics' || (view === 'profile' && tab !== 'account')}>
       {view === 'profile' && <><h3>{t.profile}</h3>{profile && <p className="profile-email"><span>{t.email}</span><strong>{profile.email}</strong></p>}<p className="profile-plan"><strong>{t.plan}:</strong> {profilePlanLabel(profile?.plan, lang, busy, Boolean(error))}</p></>}
       <form onSubmit={submit}>
-        {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>}
+        {view !== 'profile' && view !== 'password' && <label>{t.email}<input type="email" required autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); setConfirmationEmail(null) }} /></label>}
         {(view === 'login' || view === 'register' || view === 'password') && <PasswordField label={view === 'password' ? t.newPassword : t.password} value={password} onChange={e => setPassword(e.target.value)} autoComplete={view === 'login' ? 'current-password' : 'new-password'} showLabel={t.showPassword} hideLabel={t.hidePassword} />}
         {view === 'register' && <PasswordField label={t.confirm} value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="new-password" showLabel={t.showPassword} hideLabel={t.hidePassword} />}
         {view === 'register' && <SignupActivityChoice lang={lang} checked={signupStatistics} onChange={setSignupStatistics} />}
@@ -201,7 +202,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
         <button className="auth-submit" disabled={busy || !authConfigured || (view === 'profile' && !profile) || (protectedView && captchaConfigured && !captchaToken)}>{busy ? t.loading : view === 'profile' ? t.save : view === 'login' ? t.login : view === 'register' ? t.register : t.send}</button>
       </form>
       {view === 'login' && <button className="auth-link" onClick={() => changeView('forgot')}>{t.forgot}</button>}
-      {view === 'register' && <button className="auth-link" disabled={!email || busy || (captchaConfigured && !captchaToken)} onClick={resend}>{t.resend}</button>}
+      {view === 'register' && confirmationEmail && <button className="auth-link" disabled={!email || busy || (captchaConfigured && !captchaToken)} onClick={resend}>{t.resend}</button>}
       </section></div>
     </section></div>}
   </div>
