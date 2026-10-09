@@ -140,6 +140,8 @@ Invocation модел: coordinator 1/cycle; forecast jobs по 50 града; fa
 
 Окончателните резултати и Preview проверката се записват в `docs/web-push-verification.json`. Chromium UA simulation не замества физически Android/Windows/iOS устройства и реален encrypted push в отделен тестов проект. Непроменените browser forecast endpoints не се извикват от новия backend.
 
+**Резултат:** build/lint, 29 unit modules, 117 Chromium теста, disposable SQL/PostgREST suite и official Vercel builder (9 Lambda bundles) — PASS. [PR #61](https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/61) е отворен към `main`. Vercel GitHub status е success и bot отчита **Ready** за deployment `ApaoYrpRgjnn2DiiHKQ7d45XhiUY`. [Preview](https://weather-git-feat-web-push-stage6ga-ba4varov-projects.vercel.app) е създаден. Дистанционният HTTP/UI smoke check е **блокиран от outbound network policy на изпълнителната среда**: proxy/Envoy връща 403, включително отказ на CONNECT. Това не е установен дефект на Vercel приложението и не доказва неговото hosted HTTP поведение. Нужно е разрешаване на този конкретен host в конфигурацията на cloud средата или ръчно отваряне на Preview; не е правен обход на proxy/защитите. Проверете hosted manifest/icons, SW Content-Type/no-cache headers, root scope, guest forecast, OAuth callback, Free/Pro профил и unavailable push UI без Production mutations. Локалните Chromium проверки и official builder са завършени; не са представени като дистанционен Preview тест.
+
 ## Следващи ръчни стъпки след одобрение
 
 1. Прегледайте PR и този отчет; не сливайте автоматично. Production остава без миграция и без флагове.
