@@ -142,9 +142,7 @@ Invocation модел: coordinator 1/cycle; forecast jobs по 50 града; fa
 
 **Резултат:** build/lint, 29 unit modules, 117 Chromium теста, disposable SQL/PostgREST suite и official Vercel builder (9 Lambda bundles) — PASS. [PR #61](https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/61) е отворен към `main`. Vercel GitHub status е success и bot отчита **Ready** за deployment `ApaoYrpRgjnn2DiiHKQ7d45XhiUY`. [Preview](https://weather-git-feat-web-push-stage6ga-ba4varov-projects.vercel.app) е създаден. Дистанционният HTTP/UI smoke check е **блокиран от outbound network policy на изпълнителната среда**: proxy/Envoy връща 403, включително отказ на CONNECT. Това не е установен дефект на Vercel приложението и не доказва неговото hosted HTTP поведение. Нужно е разрешаване на този конкретен host в конфигурацията на cloud средата или ръчно отваряне на Preview; не е правен обход на proxy/защитите. Проверете hosted manifest/icons, SW Content-Type/no-cache headers, root scope, guest forecast, OAuth callback, Free/Pro профил и unavailable push UI без Production mutations. Локалните Chromium проверки и official builder са завършени; не са представени като дистанционен Preview тест.
 
-## Следващи ръчни стъпки след одобрение
-
-### Актуализация на същия PR №61: затваряне на панела и видимост без миграция
+## Актуализация на същия PR №61: затваряне на панела и видимост без миграция
 
 Панелът от камбанката вече има видим X в горния десен ъгъл, BG `aria-label`/`title` **„Затвори известията“** и EN **„Close notifications“**, 44×44 CSS px зона за натискане и видим keyboard focus. Flex заглавният ред пази бутона вдясно без застъпване на заглавието. При mobile са запазени 16 px отстояния от двата края. X и Escape променят само локалното `open` състояние и връщат фокуса към камбанката. Escape listener съществува само докато панелът е отворен. Старият toggle чрез камбанката остава. Няма промяна в read/hide/generate/API/storage логиката.
 
@@ -166,6 +164,10 @@ PUSH_PREVIEW_URL=https://weather-git-feat-web-push-stage6ga-ba4varov-projects.ve
 ```
 
 SQL/API/push sender кодът не е променян в тази UI актуализация; предходната disposable SQL проверка остава валидна и не е повторена за козметичната промяна. Няма Production SQL, delivery activation, real Cron, нов PR или merge. PR №61 остава за одобрение.
+
+Vercel отчита **success/Ready** и за UI commit `6566f48a8e4a60e326129e0133de0e8491cebec0`, [deployment HZ5JrFoFrc4ELj4dTJP7R4CJwFFv](https://vercel.com/ba4varov-projects/weather/HZ5JrFoFrc4ELj4dTJP7R4CJwFFv). Това потвърждава успешното внедряване на обновения PR Preview, а не дистанционната UI проверка, която остава блокирана от proxy.
+
+## Следващи ръчни стъпки след одобрение
 
 1. Прегледайте PR и този отчет; не сливайте автоматично. Production остава без миграция и без флагове.
 2. В отделен disposable/staging Supabase проект приложете миграциите; оставете регистрационните gates false. Тествайте с отделни синтетични акаунти, изолирани VAPID ключове и отделен origin. Не копирайте Production private keys в Preview.
