@@ -123,6 +123,15 @@ try {
   const refreshed=await json(base+'/auth/v1/token?grant_type=refresh_token','POST',undefined,{refresh_token:owner.refresh_token},{apikey:anon})
   assert.equal(refreshed.status,200);Object.assign(owner,refreshed.body)
   pass('Actual GoTrue refresh-token rotation')
+  assert.equal((await api('/api/activity',owner,'POST',{onboarding:'offer'})).body.offer,true)
+  assert.equal((await api('/api/activity',owner,'POST',{onboarding:'offer'})).body.offer,false)
+  assert.equal((await api('/api/activity',other,'PATCH',{enabled:false,onboarding:true})).body.enabled,false)
+  assert.equal((await api('/api/activity',other,'PATCH',{enabled:true,onboarding:true})).body.enabled,false)
+  assert.equal((await api('/api/activity',admin,'PATCH',{enabled:true,onboarding:true})).body.enabled,true)
+  assert.equal((await api('/api/activity',admin,'PATCH',{enabled:false})).body.enabled,false)
+  assert.equal((await api('/api/activity',admin,'PATCH',{enabled:true,onboarding:true})).body.enabled,false)
+  pass('Actual GoTrue JWT and onboarding RPC: single offer, refusal, opt-in and stale-answer protection after withdrawal')
+
   // Stage 6B: actual GoTrue JWT, actual entitlement RPC, actual manual grants and audit.
   const plannerBody={activity:'walk',timeZone:'UTC',hours:Array.from({length:72},(_,i)=>({time:new Date(Math.ceil(Date.now()/3600000)*3600000+i*3600000).toISOString().slice(0,16),feelsLike:20,rainProbability:10,rain:0,wind:5,code:1}))}
   assert.equal((await api('/api/planner',null,'POST',plannerBody)).status,401)
@@ -295,11 +304,16 @@ try {
   await ownerPage.locator('input[autocomplete="current-password"]').fill(password)
   await ownerPage.locator('form').getByRole('button',{name:'Вход',exact:true}).click()
   await ownerPage.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+  await ownerPage.getByRole('tab',{name:'Метео известия',exact:true}).click()
   const settings=ownerPage.locator('.notification-settings')
   await settings.getByRole('button',{name:'Изключи всички',exact:true}).click()
   await settings.getByRole('button',{name:'Изключи всички',exact:true}).waitFor({state:'visible'})
   await settings.getByText('Време за градинарство',{exact:false}).click()
   await ownerPage.waitForFunction(()=>Array.from(document.querySelectorAll('.notification-settings input')).filter(e=>e.checked).length===1)
+  const saveWeather=ownerPage.waitForResponse(r=>r.url().includes('/api/alerts')&&r.request().method()==='PATCH')
+  await settings.getByRole('button',{name:'Запази метео настройките',exact:true}).click()
+  await saveWeather
+  await settings.getByText('Настройките са запазени.',{exact:true}).waitFor()
   assert.deepEqual((await api('/api/alerts',owner)).body.enabled,['garden'])
   assert.equal((await api('/api/activity',owner)).body.enabled,false)
   cooldown();await ownerPage.getByRole('button',{name:'Затвори',exact:true}).click()

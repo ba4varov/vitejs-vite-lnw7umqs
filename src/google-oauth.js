@@ -1,11 +1,11 @@
 // Supabase requires persistence enabled to use a custom storage adapter.
 // Only PKCE state is persistent; the SDK cannot store an application session.
+const pkceKey = key => /^meteo-pulse-google-(?:code-verifier|flows-code-verifier|flow-[a-zA-Z0-9_-]+-code-verifier)$/.test(key)
 export function createPKCEStorage(storage) {
-  const verifierKey = 'meteo-pulse-google-code-verifier'
   return {
-    getItem: key => key === verifierKey ? storage.getItem(key) : null,
-    setItem: (key, value) => { if (key === verifierKey) storage.setItem(key, value) },
-    removeItem: key => { if (key === verifierKey) storage.removeItem(key) },
+    getItem: key => pkceKey(key) ? storage.getItem(key) : null,
+    setItem: (key, value) => { if (pkceKey(key)) storage.setItem(key, value) },
+    removeItem: key => { if (pkceKey(key)) storage.removeItem(key) },
   }
 }
 
@@ -14,10 +14,22 @@ export function createGoogleOAuth({ createClient, storage, location, history, pu
   const pendingKey = 'meteo-pulse-google-pending'
   const verifierKey = 'meteo-pulse-google-code-verifier'
   let callback
-  const clean = () => { storage.removeItem(pendingKey); storage.removeItem(verifierKey) }
+  const clean = () => {
+    const keys = ['meteo-pulse-google-flows-code-verifier']
+    try {
+      const flows = JSON.parse(storage.getItem('meteo-pulse-google-flows-code-verifier') || '[]')
+      if (Array.isArray(flows)) for (const id of flows) {
+        const key = `meteo-pulse-google-flow-${id}-code-verifier`
+        if (typeof id === 'string' && pkceKey(key)) keys.push(key)
+      }
+    } catch { /* Enumerate browser storage below if its index is unavailable. */ }
+    for (let i = 0; i < (storage.length || 0); i++) { const key = storage.key(i); if (key && pkceKey(key)) keys.push(key) }
+    keys.forEach(key => storage.removeItem(key))
+    storage.removeItem(pendingKey); storage.removeItem(verifierKey)
+  }
   const scrub = () => {
     const next = new URL(location.href)
-    for (const key of ['code', 'oauth', 'error', 'error_code', 'error_description']) next.searchParams.delete(key)
+    for (const key of ['code', 'oauth', 'error', 'error_code', 'error_description', 'sb_flow_id']) next.searchParams.delete(key)
     next.hash = ''
     history.replaceState({}, '', next.pathname + next.search)
   }
@@ -53,7 +65,7 @@ export function createGoogleOAuth({ createClient, storage, location, history, pu
           if (params.has('error') || params.has('error_code')) throw new Error('GOOGLE_DENIED')
           if (!code || !pending || Date.now() - pending > 10 * 60_000) throw new Error('GOOGLE_INTERRUPTED')
           client = createClient()
-          const { data, error } = await client.exchangeCodeForSession(code)
+          const { data, error } = await client.exchangeCodeForSession(code, params.get('sb_flow_id') ? { flowId: params.get('sb_flow_id') } : undefined)
           if (error || !data?.session?.access_token || !data.session.refresh_token || !data.session.user?.id) throw new Error('GOOGLE_CALLBACK_FAILED')
           onSession(data.session)
           return true

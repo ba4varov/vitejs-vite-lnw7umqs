@@ -12,6 +12,8 @@
     "test:admin:browser": "playwright test",
     "test:admin:sql": "node scripts/test-admin-sql.mjs",
     "typecheck": "tsc -b",
+    "test:signup:browser": "playwright test --config=playwright.signup.config.ts",
+    "test:signup:sql": "node scripts/test-signup-activity-sql.mjs",
     "test:activity:integration": "node scripts/test-activity-integration.mjs",
     "test:profile:build": "playwright test --config=playwright.profile-build.config.ts",
     "test:push:edge": "node scripts/test-push-edge.mjs"

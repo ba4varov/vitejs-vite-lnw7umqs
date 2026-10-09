@@ -57,3 +57,21 @@ test('public entry does not load unconditional Vercel analytics for guests',asyn
  const {readFile}=await import('node:fs/promises')
  assert.doesNotMatch(await readFile(new URL('../../index.html',import.meta.url),'utf8'), /insights\/script|google-analytics|gtag/)
 })
+
+test('onboarding uses narrow verified-user RPCs and rejects forged or ambiguous input',async()=>{
+ for (const [method,body,rpc,payload] of [
+  ['POST',{onboarding:'offer'},'claim_activity_offer',{}],
+  ['PATCH',{enabled:true,onboarding:true},'answer_activity_offer',{desired:true}],
+  ['PATCH',{enabled:false,onboarding:true},'answer_activity_offer',{desired:false}],
+ ]) {
+  const calls=[]
+  const result=await run(method,body,async(url,opts)=>{calls.push({url,opts});return{ok:true,json:async()=>url.endsWith('/user')?session.user:{offer:true}}})
+  assert.equal(result.statusCode,200)
+  assert.ok(calls[1].url.endsWith('/'+rpc));assert.deepEqual(JSON.parse(calls[1].opts.body),payload)
+  assert.equal(calls[1].opts.headers.Authorization,'Bearer isolated-token')
+ }
+ for(const [method,body] of [['POST',{onboarding:'offer',userId:id}],['PATCH',{enabled:true,onboarding:'true'}],['PATCH',{enabled:true,onboarding:true,metadata:{}}]]) {
+  assert.equal((await run(method,body,async()=>({ok:true,json:async()=>session.user}))).statusCode,400)
+ }
+ for(const method of ['POST','PATCH']) assert.equal((await run(method,{enabled:true,onboarding:true},async()=>({ok:false}))).statusCode,401)
+})
