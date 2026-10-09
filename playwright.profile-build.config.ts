@@ -3,7 +3,7 @@ process.env.PROFILE_BUILT_DIST = 'work/profile-built-preview'
 export default {
   ...config,
   fullyParallel: true,
-  testMatch: ['profile-redesign.spec.ts', 'profile-plan.spec.ts', 'profile-bundle.spec.ts', 'push.spec.ts'],
+  testMatch: ['profile-redesign.spec.ts', 'profile-height.spec.ts', 'profile-plan.spec.ts', 'profile-bundle.spec.ts', 'push.spec.ts'],
   outputDir: './work/built-profile-results',
   webServer: {
     ...config.webServer,

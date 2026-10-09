@@ -34,7 +34,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const [weatherBusy, setWeatherBusy] = useState(false), [pushBusy, setPushBusy] = useState(false), [privacyBusy, setPrivacyBusy] = useState(false)
   const settingsBusy = weatherBusy || pushBusy || privacyBusy
   const dialog = useRef<HTMLElement>(null)
-  const dirty = view === 'profile' && (name !== (profile?.name ?? '') || weatherDirty || pushDirty)
+  const dirty = view === 'profile' && ((Boolean(profile) && name !== (profile?.name ?? '')) || weatherDirty || pushDirty)
   const close = () => {
     if (busy || settingsBusy) return
     if (dirty && !window.confirm(lang === 'bg' ? 'Има незапазени промени. Да ги отхвърлим и затворим профила?' : 'You have unsaved changes. Discard them and close your profile?')) return
@@ -161,7 +161,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
         {view === 'register' && <PasswordField label={t.confirm} value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="new-password" showLabel={t.showPassword} hideLabel={t.hidePassword} />}
         {view === 'profile' && <label>{t.name}<input disabled={busy || !profile} maxLength={80} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>}
         {protectedView && captchaConfigured && <Turnstile key={view} siteKey={captchaSiteKey} lang={lang} resetKey={captchaReset} onTokenChange={onCaptchaTokenChange} labels={t.captcha} />}
-        {error && <p className="auth-error" role="alert">{error}</p>}{message && <p className="auth-success" role="status">{message}</p>}
+        {error && <p className="auth-error" role="alert">{view === 'profile' && !profile ? (lang === 'bg' ? 'Профилът и планът временно не могат да бъдат заредени. Затвори и опитай отново.' : 'Your profile and plan temporarily cannot be loaded. Close and try again.') : error}</p>}{message && <p className="auth-success" role="status">{message}</p>}
         <button className="auth-submit" disabled={busy || !authConfigured || (view === 'profile' && !profile) || (protectedView && captchaConfigured && !captchaToken)}>{busy ? t.loading : view === 'profile' ? t.save : view === 'login' ? t.login : view === 'register' ? t.register : t.send}</button>
       </form>
       {view === 'login' && <button className="auth-link" onClick={() => changeView('forgot')}>{t.forgot}</button>}

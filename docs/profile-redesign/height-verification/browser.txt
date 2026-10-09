@@ -1,0 +1,95 @@
+
+> vite-react-typescript-starter@0.0.0 test:profile:build
+> playwright test --config=playwright.profile-build.config.ts --workers=3
+
+[WebServer] (node:26391) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:26404) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] npm notice
+[WebServer] npm notice New major version of npm available! 11.9.0 -> 12.2.0
+[WebServer] npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+[WebServer] npm notice To update run: npm install -g npm@12.2.0
+[WebServer] npm notice
+[WebServer] (node:26427) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:26440) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 62 tests using 3 workers
+
+(node:26459) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26460) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26466) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 tests/profile-bundle.spec.ts:6:1 › built entry JS and CSS bytes contain the redesign and render the wide four-tab profile (3.4s)
+  ✓   1 tests/profile-height.spec.ts:3:107 › profile height and API states 390 bg loaded (4.5s)
+  ✓   3 tests/profile-height.spec.ts:3:107 › profile height and API states 390 bg failed (4.8s)
+  ✓   4 tests/profile-height.spec.ts:3:107 › profile height and API states 390 en loaded (3.6s)
+  ✓   5 tests/profile-height.spec.ts:3:107 › profile height and API states 390 en failed (4.1s)
+  ✓   6 tests/profile-height.spec.ts:3:107 › profile height and API states 768 bg loaded (3.8s)
+  ✓   7 tests/profile-height.spec.ts:3:107 › profile height and API states 768 bg failed (4.0s)
+  ✓   8 tests/profile-height.spec.ts:3:107 › profile height and API states 768 en loaded (4.0s)
+  ✓   9 tests/profile-height.spec.ts:3:107 › profile height and API states 768 en failed (3.3s)
+  ✓  10 tests/profile-height.spec.ts:3:107 › profile height and API states 1440 bg loaded (4.2s)
+  ✓  11 tests/profile-height.spec.ts:3:107 › profile height and API states 1440 bg failed (4.2s)
+  ✓  12 tests/profile-height.spec.ts:3:107 › profile height and API states 1440 en loaded (4.4s)
+  ✓  15 tests/profile-plan.spec.ts:10:48 › bg: confirmed free profile (2.4s)
+  ✓  14 tests/profile-height.spec.ts:37:1 › desktop height stays inside a short viewport (2.7s)
+  ✓  13 tests/profile-height.spec.ts:3:107 › profile height and API states 1440 en failed (3.8s)
+  ✓  17 tests/profile-plan.spec.ts:22:3 › bg: administrative upgrade and downgrade refresh without a new login (2.9s)
+  ✓  16 tests/profile-plan.spec.ts:10:48 › bg: confirmed pro profile (3.1s)
+  ✓  18 tests/profile-plan.spec.ts:34:3 › bg: pending and failed refresh hides the previous Free plan (3.4s)
+  ✓  19 tests/profile-plan.spec.ts:46:3 › bg: missing plan does not imply Free (3.1s)
+  ✓  20 tests/profile-plan.spec.ts:10:48 › en: confirmed free profile (3.5s)
+  ✓  21 tests/profile-plan.spec.ts:10:48 › en: confirmed pro profile (3.7s)
+  ✓  22 tests/profile-plan.spec.ts:22:3 › en: administrative upgrade and downgrade refresh without a new login (3.3s)
+  ✓  23 tests/profile-plan.spec.ts:34:3 › en: pending and failed refresh hides the previous Free plan (3.3s)
+  ✓  24 tests/profile-plan.spec.ts:46:3 › en: missing plan does not imply Free (3.0s)
+  ✓  25 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 bg light (4.9s)
+  ✓  26 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 bg dark (4.7s)
+  ✓  27 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 en light (4.5s)
+  ✓  28 tests/profile-redesign.spec.ts:4:105 › profile workspace 390 en dark (4.8s)
+  ✓  29 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 bg light (4.5s)
+  ✓  30 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 bg dark (5.2s)
+  ✓  31 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 en light (5.2s)
+  ✓  32 tests/profile-redesign.spec.ts:4:105 › profile workspace 768 en dark (5.3s)
+  ✓  33 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 bg light (4.9s)
+  ✓  34 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 bg dark (5.7s)
+  ✓  35 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 en light (5.9s)
+  ✓  36 tests/profile-redesign.spec.ts:4:105 › profile workspace 1440 en dark (5.9s)
+  ✓  37 tests/profile-redesign.spec.ts:53:1 › focus trap, backdrop cancellation, failed weather save retains draft, compact auth (4.0s)
+  ✓  38 tests/profile-redesign.spec.ts:78:40 › coordinate city draft lifecycle bg (3.9s)
+  ✓  39 tests/profile-redesign.spec.ts:78:40 › coordinate city draft lifecycle en (3.5s)
+  ✓  40 tests/push.spec.ts:40:61 › push section visible without SQL migration 390 bg (2.3s)
+  ✓  42 tests/push.spec.ts:40:61 › push section visible without SQL migration 1440 bg (2.2s)
+  ✓  41 tests/push.spec.ts:40:61 › push section visible without SQL migration 390 en (2.7s)
+  ✓  44 tests/push.spec.ts:65:1 › real Chromium PWA manifest, PNG sizes, root worker, no cache or fetch interception (1.7s)
+  ✓  43 tests/push.spec.ts:40:61 › push section visible without SQL migration 1440 en (2.9s)
+  ✓  45 tests/push.spec.ts:79:1 › default registration off, no prompts, preferences independent of bell and analytics (2.9s)
+  ✓  46 tests/push.spec.ts:89:46 › permission denied: no subscription or server write (2.7s)
+  ✓  47 tests/push.spec.ts:89:46 › permission default: no subscription or server write (2.4s)
+  ✓  48 tests/push.spec.ts:96:1 › explicit permission → register → server delete → local unsubscribe; delivery stays off (2.9s)
+  ✓  50 tests/push.spec.ts:113:31 › current Pro false: personal categories gated; free weather available (1.8s)
+  ✓  49 tests/push.spec.ts:106:1 › failed server registration rolls back subscription and exposes no success (2.6s)
+  ✓  51 tests/push.spec.ts:113:31 › current Pro true: personal categories gated; free weather available (1.6s)
+  ✓  52 tests/push.spec.ts:125:12 › feature detection Android Chrome (Chromium simulation) (2.2s)
+  ✓  53 tests/push.spec.ts:125:12 › feature detection Windows Chrome (Chromium simulation) (2.1s)
+  ✓  54 tests/push.spec.ts:125:12 › feature detection Windows Edge (Chromium simulation) (1.8s)
+  ✓  55 tests/push.spec.ts:125:12 › feature detection iOS tab (Chromium simulation) (1.9s)
+  ✓  56 tests/push.spec.ts:125:12 › feature detection iOS Home Screen (Chromium simulation) (2.1s)
+  ✓  57 tests/push.spec.ts:131:65 › push layout 390 bg (2.3s)
+  ✓  59 tests/push.spec.ts:131:65 › push layout 768 bg (1.7s)
+  ✓  58 tests/push.spec.ts:131:65 › push layout 390 en (2.3s)
+  ✓  60 tests/push.spec.ts:131:65 › push layout 768 en (2.5s)
+  ✓  61 tests/push.spec.ts:131:65 › push layout 1440 bg (1.9s)
+  ✓  62 tests/push.spec.ts:131:65 › push layout 1440 en (1.9s)
+
+  62 passed (1.2m)
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

@@ -44,7 +44,7 @@ for(const width of [390,1440])for(const lang of ['bg','en'])test(`push section v
  const panel=page.locator('.push-settings')
  await panel.scrollIntoViewIfNeeded();await expect(panel).toBeVisible()
  await expect(panel.getByRole('heading',{level:3})).toHaveText(lang==='bg'?'Push известия при затворен сайт':'Push notifications when the site is closed')
- await expect(panel.getByRole('status')).toHaveText(lang==='bg'?'Push подготовката още не е конфигурирана.':'Push preparation is not configured yet.')
+ await expect(panel.getByRole('status')).toHaveText(lang==='bg'?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')
  await expect(panel).toContainText(lang==='bg'?'автоматичната доставка е изключена':'automatic delivery is disabled')
  await expect(panel.getByRole('button')).toHaveCount(0)
  await expect(page.locator('.notification-settings')).toBeAttached()
