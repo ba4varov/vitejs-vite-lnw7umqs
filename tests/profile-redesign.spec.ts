@@ -45,6 +45,8 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'] as const)for(con
  await expect(push.getByRole('status')).toContainText(lang==='bg'?'запазени':'saved')
  await tabs.nth(3).click();await dialog.locator('.activity-consent input').check();await expect(dialog.locator('.activity-consent input')).toBeEnabled()
  expect(mutations).toEqual(['name','weather','push','consent'])
+ // The parent blocks closing until all section saves have settled.
+ await expect(dialog.getByRole('button',{name:lang==='bg'?'Затвори':'Close',exact:true})).toBeEnabled()
  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(opener).toBeFocused()
 })
 
