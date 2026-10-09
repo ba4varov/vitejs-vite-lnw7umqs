@@ -7,6 +7,14 @@ export function WeatherNotifications({session,lang,forecast,city,locationKey}:{s
  const guestRows=useRef<any[]>([]),requestVersion=useRef(0),controllerRef=useRef<AbortController|null>(null)
  const [personalUnavailable,setPersonalUnavailable]=useState(false)
  const [guestState,setGuestState]=useState<Record<string,string>>({})
+ const bellRef=useRef<HTMLButtonElement|null>(null)
+ const closePanel=()=>{setOpen(false);bellRef.current?.focus()}
+ useEffect(()=>{
+  if(!open)return
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpen(false);bellRef.current?.focus()}}
+  document.addEventListener('keydown',escape)
+  return()=>document.removeEventListener('keydown',escape)
+ },[open])
  const id=session?.user.id,token=session?.access_token,zone=forecast?.timeZone
  const scope=zone?{locationKey,zone}:undefined
  const view=JSON.stringify([id||'guest',locationKey,zone||null])
@@ -38,8 +46,8 @@ export function WeatherNotifications({session,lang,forecast,city,locationKey}:{s
  }
  const format=(row:any,epoch:number)=>new Intl.DateTimeFormat(bg?'bg-BG':'en-GB',{timeZone:row.zone,day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(epoch)
  const explanation=(e:any)=>['walk','garden','sport'].includes(e.kind)?`${e.feelsLikeMin}–${e.feelsLikeMax} °C · ${bg?'вятър':'wind'} ≤ ${e.wind} km/h · ${e.rain} mm (${e.rainProbability}%)`:`${e.min}–${e.max} ${e.kind==='storm'?'WMO':e.kind==='rain'?'mm/h':e.kind==='wind'?'km/h':'°C'}`
- return <div className="weather-notifications"><button type="button" aria-label={bg?'Известия':'Notifications'} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg> {bg?'Известия':'Notifications'}{unread>0&&<span className="notification-count">{unread}</span>}</button>
- {open&&<section className="notification-panel" aria-label={bg?'Метеорологични известия':'Weather notifications'}><h3>{bg?'Известия':'Notifications'}</h3><p>{bg?'Само за текущата прогноза. Проверявай официалните местни предупреждения.':'For the current forecast only. Check official local warnings.'}</p>{failed&&<p role="status">{bg?'Известията временно са недостъпни. Прогнозата остава достъпна.':'Notifications are temporarily unavailable. The forecast remains available.'}</p>}
+ return <div className="weather-notifications"><button ref={bellRef} type="button" aria-label={bg?'Известия':'Notifications'} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg> {bg?'Известия':'Notifications'}{unread>0&&<span className="notification-count">{unread}</span>}</button>
+ {open&&<section className="notification-panel" aria-label={bg?'Метеорологични известия':'Weather notifications'}><header className="notification-panel-header"><h3>{bg?'Известия':'Notifications'}</h3><button className="notification-close" type="button" aria-label={bg?'Затвори известията':'Close notifications'} title={bg?'Затвори известията':'Close notifications'} onClick={closePanel}><span aria-hidden="true">×</span></button></header><p>{bg?'Само за текущата прогноза. Проверявай официалните местни предупреждения.':'For the current forecast only. Check official local warnings.'}</p>{failed&&<p role="status">{bg?'Известията временно са недостъпни. Прогнозата остава достъпна.':'Notifications are temporarily unavailable. The forecast remains available.'}</p>}
  {personalUnavailable&&<p role="status">{bg?'Персоналните препоръки временно са недостъпни.':'Personal recommendations are temporarily unavailable.'}</p>}
  {visible.length===0&&<p>{bg?'Няма нови известия.':'No new notifications.'}</p>}
  {visible.length>0&&<button type="button" onClick={()=>session?void mutate('DELETE'):setGuestState(s=>({...s,...Object.fromEntries(rows.map(r=>[r.key,'hidden']))}))}>{bg?'Изчисти известията':'Clear notifications'}</button>}

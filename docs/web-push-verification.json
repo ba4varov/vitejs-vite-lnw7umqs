@@ -1,0 +1,46 @@
+{
+  "checkedOn": "2026-10-09",
+  "baseMain": "63a683000af8731b353abb2fd5a83ea535ea9f6f",
+  "deliveryEnabled": false,
+  "productionSqlExecuted": false,
+  "productionAccountsChanged": false,
+  "productionCronCreated": false,
+  "realPushSent": false,
+  "checks": {
+    "build": "PASS: TypeScript project references and Vite production bundle",
+    "lint": "PASS: oxlint",
+    "unit": "PASS: 256 unit tests including OAuth, Free/Pro, planner, alerts and push (follow-up verification)",
+    "chromium": "PASS: 145 tests; includes 24 X/Escape/bell close-reopen checks with unchanged read/hidden/unread state and API request history, plus 4 missing-migration Push visibility checks",
+    "localProductionPreview": "PASS: 4 Chromium tests against compiled Vite bundle served by vite preview; Push section visible with API 503 fixture at 390/1440 px in BG/EN; no real account APIs",
+    "sql": "PASS: disposable PostgreSQL 17 + PostgREST; current migrations and push SQL ownership/default gate/dedup/delete/cascade/rate limit; existing SQL/HTTP regressions",
+    "vercelBuilder": "PASS: @vercel/node 23.0.0, 9 official Lambda bundles; see vercel-functions-stage6ga.json",
+    "preview": "PASS: Vercel GitHub deployment status success for UI follow-up commit 6566f48a8e4a60e326129e0133de0e8491cebec0; hosted HTTP/UI smoke check BLOCKED by environment outbound proxy 403"
+  },
+  "preview": {
+    "url": "https://weather-git-feat-web-push-stage6ga-ba4varov-projects.vercel.app",
+    "deployment": "https://vercel.com/ba4varov-projects/weather/HZ5JrFoFrc4ELj4dTJP7R4CJwFFv",
+    "verifiedUiCommit": "6566f48a8e4a60e326129e0133de0e8491cebec0",
+    "pullRequest": "https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/61",
+    "remoteHttpCheck": "BLOCKED: environment proxy denies CONNECT/GET with 403 (server: envoy); no bypass or Vercel protection changes attempted",
+    "manualNextStep": "Allow this Preview host in the cloud environment network configuration, or open Preview manually to complete hosted UI/SW/header checks"
+  },
+  "notificationCloseFollowUp": {
+    "scope": "X close button, Escape, bell focus restoration and mobile position; alert read/hide/generate/persistence logic unchanged",
+    "labels": ["Затвори известията", "Close notifications"],
+    "touchTarget": "44x44 CSS px",
+    "hostedPreviewRetried": "2026-10-09: proxy still rejects CONNECT with 403 before the app is reached",
+    "missingMigrationFixture": "GET /api/push -> HTTP 503 PUSH_UNAVAILABLE; section heading/status remain visible, no subscribe action or automatic permission prompt",
+    "productionSqlRerun": false,
+    "localSqlRerun": false,
+    "localSqlReason": "UI-only follow-up; API, SQL migration and delivery code unchanged from prior successful disposable SQL suite",
+    "safePreviewConfig": "playwright.push-preview.config.ts; only PR #61 origin or local bundle; synthetic browser session and isolated API fixtures"
+  },
+  "limits": [
+    "Chromium permission/PushManager lifecycle uses isolated fixtures; no real provider delivery",
+    "Android/Windows/iOS compatibility detection is simulated in Chromium; physical OS and APNs delivery remain manual",
+    "Google OAuth unit regressions passed; no real Google account login performed",
+    "SQL uses disposable minimal Auth schema and real PostgREST; no Production or hosted Supabase migration",
+    "Edge Function is a permanent 503 scaffold; no scheduler, sender or VAPID private key exists",
+    "Costs are explicit scenario estimates, not measured Production traffic"
+  ]
+}
