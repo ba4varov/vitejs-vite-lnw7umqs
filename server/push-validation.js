@@ -18,7 +18,7 @@ export function validPushSubscription(s) {
  return typeof p==='string' && /^[A-Za-z0-9_-]{87}$/.test(p) && Buffer.from(p,'base64url').length===65 && Buffer.from(p,'base64url')[0]===4 && typeof a==='string' && /^[A-Za-z0-9_-]{22}$/.test(a) && Buffer.from(a,'base64url').length===16
 }
 export function validPushPreferences(p) {
- if(!exactObject(p,['enabled','cities','categories'])||typeof p.enabled!=='boolean'||!Array.isArray(p.cities)||p.cities.length>5||!Array.isArray(p.categories)||p.categories.length>8||new Set(p.categories).size!==p.categories.length||!p.categories.every(k=>alertKinds.includes(k)))return false
+ if((p?.language!==undefined&&!['bg','en'].includes(p.language))||!exactObject(p,['enabled','cities','categories','language'])||typeof p.enabled!=='boolean'||!Array.isArray(p.cities)||p.cities.length>5||!Array.isArray(p.categories)||p.categories.length>8||new Set(p.categories).size!==p.categories.length||!p.categories.every(k=>alertKinds.includes(k)))return false
  const identities=new Set()
  for(const city of p.cities) {
   if(!exactObject(city,['name','latitude','longitude','zone'])||typeof city.name!=='string'||city.name.trim().length<1||city.name.length>100||!Number.isFinite(city.latitude)||city.latitude< -90||city.latitude>90||!Number.isFinite(city.longitude)||city.longitude< -180||city.longitude>180||typeof city.zone!=='string'||city.zone.length>64)return false

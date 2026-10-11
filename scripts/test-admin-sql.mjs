@@ -45,6 +45,8 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/web-push.sql',root),'utf8')))
   sql(readFileSync(new URL('supabase/migrations/20261009050000_web_push_test_delivery.sql',root),'utf8'))
   console.log(sql(readFileSync(new URL('tests/sql/web-push-delivery.sql',root),'utf8')))
+  sql(readFileSync(new URL('supabase/migrations/20261011000000_weather_push_dispatcher.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/weather-push.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))

@@ -25,15 +25,17 @@ const docker=(args,allowFailure=false)=>{
 }
 const probe=name=>docker(['run','--rm','--pull','never','--network',`container:${name}`,'postgres:17-bookworm','timeout','30','bash','-c','exec 3<>/dev/tcp/127.0.0.1/9000; printf "POST / HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\nContent-Length: 0\\r\\n\\r\\n" >&3; cat <&3'],true)
 try {
- for(const [suffix,service,expected] of [['disabled','/app/supabase/functions/push-test',503],['fixture','/app/tests/edge-push',200]]){
+ for(const [suffix,service,expected] of [['disabled','/app/supabase/functions/push-test',503],['fixture','/app/tests/edge-push',200],['weather-disabled','/app/supabase/functions/push-check',503],['weather-fixture','/app/tests/edge-weather',200]]){
   const name=`${prefix}-${suffix}`
   docker(['run','-d','--pull','never','--name',name,'--network','none',
    '--mount',`type=bind,src=${root}/supabase/functions,dst=/app/supabase/functions,readonly`,
    '--mount',`type=bind,src=${root}/tests/edge-push,dst=/app/tests/edge-push,readonly`,
+   '--mount',`type=bind,src=${root}/tests/edge-weather,dst=/app/tests/edge-weather,readonly`,
+   '--mount',`type=bind,src=${root}/server,dst=/app/server,readonly`,
    '--mount',`type=bind,src=${cache},dst=/cache`,'--mount',`type=bind,src=${fixtures},dst=/fixtures,readonly`,
    '-e','DENO_DIR=/cache','-e','DENO_CERT=/fixtures/ca.pem','-e','DENO_TLS_CA_STORE=system',
    '-e','SSL_CERT_FILE=/fixtures/ca-bundle.pem',image,'start','--main-service',service,'--static','/fixtures/*'])
-  if(suffix==='fixture'){
+  if(suffix.endsWith('fixture')){
    docker(['run','-d','--pull','never','--name',`${prefix}-provider`,'--network',`container:${name}`,
     '--mount',`type=bind,src=${root}/tests/edge-push,dst=/tests,readonly`,
     '--mount',`type=bind,src=${fixtures},dst=/fixtures,readonly`,'node:24-bookworm-slim','node','/tests/provider.mjs'])
@@ -50,8 +52,10 @@ try {
   assert.match(result.stdout,new RegExp(`^HTTP/1.1 ${expected} `))
   const body=JSON.parse(result.stdout.slice(result.stdout.indexOf('\r\n\r\n')+4))
   if(suffix==='disabled')assert.deepEqual(body,{error:'PUSH_TEST_DISABLED',deliveryEnabled:false})
+  else if(suffix==='weather-disabled')assert.deepEqual(body,{error:'PUSH_WEATHER_DISABLED'})
+  else if(suffix==='weather-fixture'){assert.equal(body.staged,5);assert.equal(body.sent,5);assert.equal(body.accepted,5);assert.equal(body.encrypted,true);assert.equal(body.released,true);console.log(`Weather runtime five forecasts + five encrypted TLS sends: ${body.elapsedMs} ms`)}
   else assert.deepEqual(body,{cryptoReady:true,accepted:200,duplicate:409,sent:1,encrypted:true,tlsReady:true,redirectRefused:true,wrongNameRejected:true,tlsError:'NONE'})
   console.log(`PASS: Supabase Edge Runtime ${suffix} (${expected}); network none, no project secrets`)
-  docker(['rm','-f',name])
+  docker(['rm','-f',name]);if(suffix.endsWith('fixture'))docker(['rm','-f',`${prefix}-provider`])
  }
-}finally{for(const suffix of ['provider','disabled','fixture'])docker(['rm','-f',`${prefix}-${suffix}`],true);rmSync(fixtures,{recursive:true,force:true})}
+}finally{for(const suffix of ['provider','disabled','fixture','weather-disabled','weather-fixture'])docker(['rm','-f',`${prefix}-${suffix}`],true);rmSync(fixtures,{recursive:true,force:true})}

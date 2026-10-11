@@ -2,6 +2,7 @@ import {localHourEpoch, validatePlannerInput, calculatePlanner} from './planner-
 export const riskKinds=['rain','storm','wind','cold','heat']
 export const activityKinds=['walk','garden','sport']
 export const alertKinds=[...riskKinds,...activityKinds]
+export const riskHit=(kind,h)=>kind==='rain'?(h.rain!==null && h.rain>=10):kind==='storm'?[95,96,99].includes(h.code):kind==='wind'?(h.wind!==null && h.wind>=60):kind==='cold'?(h.feelsLike!==null && h.feelsLike<=-15):(h.feelsLike!==null && h.feelsLike>=40)
 // Hourly thresholds are indicative forecast heuristics, never official warnings.
 export function forecastRisks(forecast, now=Date.now()) {
   if(!validatePlannerInput({...forecast,activity:'walk'})) return []
@@ -10,7 +11,7 @@ export function forecastRisks(forecast, now=Date.now()) {
     let current=null
     for(const h of forecast.hours) {
       const start=localHourEpoch(h.time,forecast.timeZone)
-      const hit=kind==='rain'?(h.rain!==null && h.rain>=10):kind==='storm'?[95,96,99].includes(h.code):kind==='wind'?(h.wind!==null && h.wind>=60):kind==='cold'?(h.feelsLike!==null && h.feelsLike<=-15):(h.feelsLike!==null && h.feelsLike>=40)
+      const hit=riskHit(kind,h)
       if(start===null || start+3600000<=now || start+3600000>now+72*3600000 || !hit) {current=null;continue}
       const value=kind==='rain'?h.rain:kind==='storm'?h.code:kind==='wind'?h.wind:h.feelsLike
       if(current && current.end===start) {current.end=start+3600000;current.min=Math.min(current.min,value);current.max=Math.max(current.max,value)}

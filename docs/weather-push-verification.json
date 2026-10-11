@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-11",
+  "timezone": "Europe/Sofia",
+  "baseCommit": "90f2542a1b24938f603b49f2b5fdad6184b7374e",
+  "context": {
+    "use": "non-commercial; administratively assigned test Pro",
+    "vercel": "Hobby",
+    "supabase": "Free"
+  },
+  "checks": {
+    "build": "PASS",
+    "lint": "PASS",
+    "actionlint": "PASS",
+    "diffCheck": "PASS",
+    "unit": {
+      "passed": 280,
+      "failed": 0
+    },
+    "sql": {
+      "result": "PASS",
+      "runtime": "PostgreSQL 17 + PostgREST 13.0.7; disposable Docker network none",
+      "coverage": [
+        "all existing migrations and admin/profile/alerts/planner regressions",
+        "new migration and RLS/grants",
+        "default-off and population registration gates",
+        "VAPID binding and owner isolation",
+        "current consent/subscription/Free/Pro/ban/device revision",
+        "rolling-period/re-enrollment deduplication",
+        "leases/cadence/Retry-After",
+        "language and global city admission"
+      ]
+    },
+    "chromium": {
+      "regressionPassed": 147,
+      "finalPushPassed": 28,
+      "uniqueScenarios": 150,
+      "fixturesOnly": true
+    },
+    "denoFrozen": "PASS; Deno 2.5.6 and original dependency versions",
+    "edgeRuntime": {
+      "result": "PASS",
+      "image": "supabase/edge-runtime:v1.76.2@sha256:edd22bef4477b900d5c300e287ce9b18bff9b81a0291bee14ee0b7c7b71a2899",
+      "cases": [
+        "existing sender disabled",
+        "existing sender real TLS fixture",
+        "weather sender disabled",
+        "weather sender five forecasts + five encrypted native TLS sends"
+      ],
+      "weatherFixtureElapsedMs": 288,
+      "network": "none; simulated forecasts and local TLS provider; ephemeral keys",
+      "limit": "Wall-clock smoke measurement; not a hosted load/CPU benchmark"
+    }
+  },
+  "deployment": {
+    "productionChanges": false,
+    "sqlAppliedToProduction": false,
+    "realPushSent": false,
+    "cronCreatedOrEnabled": false,
+    "keysOrSecretsConfigured": false,
+    "newPaidServices": false,
+    "physicalDeviceSmokeTest": "NOT RUN; required before Production delivery"
+  },
+  "budgets": {
+    "userCities": 5,
+    "globalEnabledLocations": 20,
+    "cycleMinutes": 15,
+    "forecastMinimumIntervalMinutes": 60,
+    "maxForecastsPerCycle": 5,
+    "maxSendsPerCycle": 5,
+    "maxAttemptsPerDevicePer24Hours": 6,
+    "forecastCallsUpperBoundPer30Days": 14400,
+    "sendAttemptsUpperBoundPer30Days": 14400
+  },
+  "instructions": "docs/weather-push-bg.md"
+}
