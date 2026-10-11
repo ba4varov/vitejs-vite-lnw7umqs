@@ -30,7 +30,7 @@
 
 ## Запазени файлове и версии
 
-Пълен checkout запазва `supabase/config.toml`, `push-test/index.ts`, `push-test/deno.json`, `push-test/deno.lock`, `_shared/push-test.mjs` и `_shared/push-deno.ts`. `verify_jwt = false` остава само за конкретната функция; собственото операторско удостоверяване остава непроменено. `--no-verify-jwt` потвърждава същото при тази конкретна публикация. API bundling премахва необходимостта от локален CLI и от Docker за публикацията.
+Пълен checkout включва `supabase/config.toml`, `push-test/index.ts`, `push-test/deno.json`, `push-test/deno.lock`, `_shared/push-test.mjs` и `_shared/push-deno.ts`. Кодът, конфигурацията и import map са непроменени; lock файлът получава само описаните по-долу записи за проверка на Node типовете. `verify_jwt = false` остава само за конкретната функция; собственото операторско удостоверяване остава непроменено. `--no-verify-jwt` потвърждава същото при тази конкретна публикация. API bundling премахва необходимостта от локален CLI и от Docker за публикацията.
 
 - `actions/checkout` **v4.2.2**, фиксиран commit `11bd71901bbe5b1630ceea73d27597364c9af683`.
 - Официален Supabase CLI **2.75.0**, Linux amd64 архив с SHA-256 `e5597462f865d5ac72af0453358e37ecb0d85962ad6914a114a53de847303bde`.
@@ -39,10 +39,34 @@
 
 Версиите и checksum-ите на архивите са сверени с официалните GitHub releases; checkout SHA е сверена с официалния tag. Ubuntu runner е `ubuntu-24.04`; системните Python 3.12, Bash, curl, tar, unzip и sha256sum се предоставят от обновявания GitHub runner image, който не е неизменен. Собствената функция, защитната логика, Vercel, Production SQL, VAPID, потребителското съгласие и устройствата не се променят.
 
-## Проверки при подготовката на PR
+## Автоматични проверки на PR без Production достъп
 
-Преминаха: YAML parse, Bash синтаксис на всички `run` стъпки, `git diff --check`, проследяване на всички локални импорти, наличие и вътрешна свързаност на директните и транзитивните npm записи в lock файла, запазено `verify_jwt=false`, единствен dispatch trigger, main/confirmation/run-attempt guards, минимални permissions и една команда само за `push-test`. Сверени са официалните release checksum-и и CLI изходният код за import-map discovery и single-function API deploy.
+Отделният `.github/workflows/check-push-test.yml` се стартира само при `pull_request` към `main`, включително за draft PR. Не използва `pull_request_target`, environment, Supabase secrets, project reference, deploy команда или извикване на функцията. GitHub token има само `contents: read` и служебното `metadata: read`; checkout не запазва credentials.
 
-Неприключили проверки в работната среда: изпълнение на `actionlint`, `deno check --frozen` и CLI `--help/--version` не бе възможно, защото мрежовият proxy отказва връзка и инструментите не са инсталирани. Съществуващите unit тестове `push-delivery` и `push-transport` бяха опитани, но спряха при зареждане заради липсващ `web-push`; това не е преминал тест. Не е изпълнявана реална публикация или заявка към функцията.
+Проверява всички workflow YAML файлове с **actionlint 1.7.12**, изтеглен от официалния release и проверен с SHA-256 `8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8`. Стартира реалните Supabase CLI **2.75.0** (`--version`, `--help`) и Deno **2.5.6** (`--version`), след checksum проверка на същите архиви като ръчния workflow. CLI командите не използват Supabase API или project credentials; възможното съобщение за нова CLI версия идва от проверката за версия в GitHub.
 
-Преди сливане завършете `actionlint` и `deno check --frozen --config supabase/functions/push-test/deno.json supabase/functions/push-test/index.ts` в среда с достъп до зависимостите. Повторете двата съществуващи unit теста след инсталиране на заключените зависимости. Това са проверки без реален Supabase проект и без изпращане на известие. Workflow допълнително изпълнява Deno проверката преди публикацията и спира при грешка.
+В отделен job фиксира Node.js **24.14.0** чрез `actions/setup-node` v4.4.0, commit `49933ea5288caeca8642d1e84afbd3f7d6820020` (npm **11.9.0** от този Node release). Изпълнява `npm ci --ignore-scripts --no-audit --no-fund` по оригиналния `package-lock.json`: lifecycle scripts са изключени. Изпълнява съществуващите `push-delivery.test.mjs` и `push-transport.test.mjs` със симулирани получатели и локален TLS сървър. Няма реално известие или Production VAPID ключове.
+
+Проверката на Deno използва съществуващия `deno.json` и същия `deno.lock`, без изпълнение на entrypoint-а:
+
+```sh
+deno check --frozen --config supabase/functions/push-test/deno.json \
+  --lock supabase/functions/push-test/deno.lock \
+  supabase/functions/push-test/index.ts
+```
+
+### Минимална корекция, предложена за преглед
+
+Първият реален run [38113841149](https://github.com/ba4varov/vitejs-vite-lnw7umqs/actions/runs/38113841149) премина actionlint, binary version checks, npm ci и всичките 8 unit теста, но frozen Deno check отказа заради липсващите автоматично използвани Node типове. Това не е несъвместим формат на lock файла и не налага смяна на Deno.
+
+В PR е предложено минимално допълване на lock файла: specifier `npm:@types/node@*` е заключен към **24.2.0**, плюс записи **`@types/node@24.2.0`** и **`undici-types@7.10.0`** със SHA-512 integrity, посочени от реалната Deno диагностика и проверени при последвалото изтегляне. Всички съществуващи runtime записи, версии и integrity стойности са запазени. `deno.json`, импортите, кодът на функцията и `supabase/config.toml` не са променени. Не се изключва `--frozen` и не се генерира заместител на оригиналния lock файл по време на CI.
+
+Успешният реален run [38113928799](https://github.com/ba4varov/vitejs-vite-lnw7umqs/actions/runs/38113928799), commit `dff1a0fe51bad789599c011c61a992c826630724`, потвърди:
+
+- SHA-256 проверките на actionlint, Supabase CLI и Deno архивите: PASS.
+- Стартиране на фиксираните версии и lint на всички workflow YAML файлове: PASS.
+- `deno check --frozen` с Deno 2.5.6 и допълнения lock файл: PASS.
+- `npm ci` и съществуващите push unit тестове: **8 успешни, 0 неуспешни, 0 пропуснати**.
+- Проверка, че CI не променя `package.json`, `package-lock.json` или файловете в `supabase`: PASS.
+
+Двата job-а са успешни. За последния commit вижте Checks в PR №65. Публикуване, промяна на remote secrets и тестово известие не са извършвани. Workflow за публикуване остава единствено с `workflow_dispatch`; няма автоматично сливане.
