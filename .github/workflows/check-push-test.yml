@@ -1,0 +1,102 @@
+name: Check push-test PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-test-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# No deployment environment, secrets, Supabase target, or function invocation.
+env:
+  PUSH_TEST_DELIVERY_ENABLED: 'false'
+
+jobs:
+  tooling-and-deno:
+    name: Workflow lint and pinned CLI/Deno checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout PR merge commit without retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install checksum-verified actionlint, Supabase CLI and Deno
+        run: |
+          set -euo pipefail
+          tools_dir="$RUNNER_TEMP/push-test-check-tools"
+          mkdir -p "$tools_dir"
+          cd "$tools_dir"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            'https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz' \
+            --output actionlint.tar.gz
+          echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz' | sha256sum --check --strict
+          tar -xzf actionlint.tar.gz actionlint
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            'https://github.com/supabase/cli/releases/download/v2.75.0/supabase_linux_amd64.tar.gz' \
+            --output supabase.tar.gz
+          echo 'e5597462f865d5ac72af0453358e37ecb0d85962ad6914a114a53de847303bde  supabase.tar.gz' | sha256sum --check --strict
+          tar -xzf supabase.tar.gz supabase
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            'https://github.com/denoland/deno/releases/download/v2.5.6/deno-x86_64-unknown-linux-gnu.zip' \
+            --output deno.zip
+          echo 'fd4f6abc1b6a134fa9a4dba56519f1631f44c88e04e4e3e9a8ff5975dfa66e1a  deno.zip' | sha256sum --check --strict
+          unzip -q deno.zip deno
+          echo "$tools_dir" >> "$GITHUB_PATH"
+
+      - name: Verify actual binary versions without contacting Supabase
+        run: |
+          set -euo pipefail
+          actionlint -version
+          [[ "$(supabase --version)" == '2.75.0' ]]
+          supabase --help > "$RUNNER_TEMP/supabase-help.txt"
+          deno --version
+          deno --version | head -n 1 | grep -Fx 'deno 2.5.6 (stable, release, x86_64-unknown-linux-gnu)'
+
+      - name: Lint all GitHub workflow YAML with actionlint
+        run: actionlint -color
+
+      - name: Check original Deno entrypoint and frozen lock without execution
+        run: |
+          set -euo pipefail
+          deno check --frozen --config supabase/functions/push-test/deno.json \
+            --lock supabase/functions/push-test/deno.lock \
+            supabase/functions/push-test/index.ts
+          git diff --exit-code -- supabase
+
+  push-unit-tests:
+    name: Locked npm install and isolated push unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout PR merge commit without retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.14.0'
+          check-latest: false
+
+      - name: Install locked npm dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run existing mocked push delivery and transport tests
+        run: node --test tests/unit/push-delivery.test.mjs tests/unit/push-transport.test.mjs
+
+      - name: Confirm dependency and function files remain unchanged
+        run: git diff --exit-code -- package.json package-lock.json supabase
