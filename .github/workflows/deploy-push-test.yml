@@ -1,0 +1,111 @@
+name: Publish push-test manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type DEPLOY push-test to confirm publication (delivery stays disabled)'
+        required: true
+        type: string
+      delivery_disabled:
+        description: 'I verified PUSH_TEST_DELIVERY_ENABLED=false in the target Supabase project'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-push-test-publication
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_attempt == 1 &&
+      inputs.confirmation == 'DEPLOY push-test' &&
+      inputs.delivery_disabled == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: supabase-push-test
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Runner-only safeguard; this does not set the remote Supabase secret.
+      PUSH_TEST_DELIVERY_ENABLED: 'false'
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: Checkout the reviewed dispatch commit with all dependencies
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate target and original function configuration
+        run: |
+          set -euo pipefail
+          if [[ ! "$SUPABASE_PROJECT_REF" =~ ^[a-z]{20}$ ]]; then
+            echo '::error::Configure a valid SUPABASE_PROJECT_REF environment variable.'
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, pathlib, tomllib
+          config = tomllib.loads(pathlib.Path('supabase/config.toml').read_text())
+          function = config['functions']['push-test']
+          assert function['verify_jwt'] is False, 'push-test must retain operator authentication'
+          assert function.get('enabled', True) is True, 'push-test is disabled in config'
+          assert function.get('entrypoint', './functions/push-test/index.ts') == './functions/push-test/index.ts'
+          assert function.get('import_map', './functions/push-test/deno.json') == './functions/push-test/deno.json'
+          for name in ('push-test/index.ts', 'push-test/deno.json', 'push-test/deno.lock',
+                       '_shared/push-test.mjs', '_shared/push-deno.ts'):
+              assert pathlib.Path('supabase/functions', name).is_file(), f'Missing dependency: {name}'
+          imports = json.loads(pathlib.Path('supabase/functions/push-test/deno.json').read_text())['imports']
+          assert imports['web-push'] == 'npm:web-push@3.6.7'
+          assert imports['ipaddr.js'] == 'npm:ipaddr.js@2.5.0'
+          print('Function configuration and dependency files verified.')
+          PY
+
+      - name: Install verified official CLI and dependency checker
+        run: |
+          set -euo pipefail
+          tools_dir="$RUNNER_TEMP/push-test-tools"
+          mkdir -p "$tools_dir"
+          cd "$tools_dir"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            'https://github.com/supabase/cli/releases/download/v2.75.0/supabase_linux_amd64.tar.gz' \
+            --output supabase.tar.gz
+          echo 'e5597462f865d5ac72af0453358e37ecb0d85962ad6914a114a53de847303bde  supabase.tar.gz' | sha256sum --check --strict
+          tar -xzf supabase.tar.gz supabase
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            'https://github.com/denoland/deno/releases/download/v2.5.6/deno-x86_64-unknown-linux-gnu.zip' \
+            --output deno.zip
+          echo 'fd4f6abc1b6a134fa9a4dba56519f1631f44c88e04e4e3e9a8ff5975dfa66e1a  deno.zip' | sha256sum --check --strict
+          unzip -q deno.zip deno
+          [[ "$(./supabase --version)" == '2.75.0' ]]
+          ./deno --version | head -n 1 | grep -Fx 'deno 2.5.6 (stable, release, x86_64-unknown-linux-gnu)'
+          echo "$tools_dir" >> "$GITHUB_PATH"
+
+      - name: Resolve and check dependencies without running the function
+        run: |
+          set -euo pipefail
+          deno check --frozen --config supabase/functions/push-test/deno.json \
+            supabase/functions/push-test/index.ts
+          git diff --exit-code -- supabase
+
+      - name: Publish only push-test once
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_ACCESS_TOKEN" ]]; then
+            echo '::error::Configure the SUPABASE_ACCESS_TOKEN environment secret.'
+            exit 1
+          fi
+          # API bundling uses the original entrypoint, import map and shared files.
+          # No login, link, db push, secrets set, invocation, debug output or retries.
+          supabase functions deploy push-test --project-ref "$SUPABASE_PROJECT_REF" \
+            --use-api --no-verify-jwt
