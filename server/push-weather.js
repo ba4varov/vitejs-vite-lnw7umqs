@@ -15,10 +15,10 @@ export async function weatherSnapshot(city,fetcher=fetch,now=Date.now()) {
  if(data.timezone!==city.zone || !Number.isFinite(data.current?.time) || Math.abs(data.current.time*1000-now)>90*60000 || u?.time!=='unixtime' || u.apparent_temperature!=='°C' || u.precipitation_probability!=='%' || u.precipitation!=='mm' || u.wind_speed_10m!=='km/h' || u.weather_code!=='wmo code' || !Array.isArray(h?.time) || h.time.length<24 || h.time.length>72 || !fields.every(k=>Array.isArray(h[k])&&h[k].length===h.time.length))throw Error('INVALID_FORECAST')
  const hours=h.time.map((seconds,i)=>{
   const epoch=seconds*1000
-  if(!Number.isSafeInteger(seconds)||seconds%3600!==0||epoch<now-hour||epoch>now+72*hour||(i&&seconds-h.time[i-1]!==3600))throw Error('INVALID_FORECAST_TIME')
+  if(!Number.isSafeInteger(seconds)||epoch<now-hour||epoch>now+72*hour||(i&&seconds-h.time[i-1]!==3600))throw Error('INVALID_FORECAST_TIME')
   return {epoch,time:new Date(epoch).toISOString().slice(0,16),feelsLike:h.apparent_temperature[i],rainProbability:h.precipitation_probability[i],rain:h.precipitation[i],wind:h.wind_speed_10m[i],code:h.weather_code[i]}
  })
- if(hours[0].epoch>now+hour||!validatePlannerInput({activity:'walk',timeZone:'UTC',hours:hours.map(({epoch:_epoch,...h})=>h)}))throw Error('INVALID_FORECAST_VALUES')
+ if(hours[0].epoch>now+hour||!validatePlannerInput({activity:'walk',timeZone:'UTC',hours:hours.map(({epoch,...h})=>({...h,time:new Date(Math.floor(epoch/hour)*hour).toISOString().slice(0,16)}))}))throw Error('INVALID_FORECAST_VALUES')
  return {hours,city,fetchedAt:now,source:'server-open-meteo'}
 }
 export function weatherEvents(snapshot,now=Date.now()) {

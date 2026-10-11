@@ -13,7 +13,7 @@
     "actionlint": "PASS",
     "diffCheck": "PASS",
     "unit": {
-      "passed": 280,
+      "passed": 281,
       "failed": 0
     },
     "sql": {
@@ -27,7 +27,8 @@
         "current consent/subscription/Free/Pro/ban/device revision",
         "rolling-period/re-enrollment deduplication",
         "leases/cadence/Retry-After",
-        "language and global city admission"
+        "language and global city admission",
+        "PostgREST schema-cache readiness before unchanged authorization assertions"
       ]
     },
     "chromium": {
@@ -46,7 +47,7 @@
         "weather sender disabled",
         "weather sender five forecasts + five encrypted native TLS sends"
       ],
-      "weatherFixtureElapsedMs": 288,
+      "weatherFixtureElapsedMs": 301,
       "network": "none; simulated forecasts and local TLS provider; ephemeral keys",
       "limit": "Wall-clock smoke measurement; not a hosted load/CPU benchmark"
     }

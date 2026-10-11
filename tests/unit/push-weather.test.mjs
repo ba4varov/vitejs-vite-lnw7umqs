@@ -99,3 +99,13 @@ test('an expired event or encryption failure does not delete a valid device',asy
  assert.equal(calls.some(c=>c[0]==='finish_weather_push'),false)
  assert.equal(calls.some(c=>c[0]==='authorize_weather_push'),false)
 })
+
+test('non-integer timezone offsets preserve hourly epoch grids and valid values',async()=>{
+ const kathmandu={...city,zone:'Asia/Kathmandu'},data=forecast();data.timezone=kathmandu.zone
+ data.hourly.time=data.hourly.time.map(t=>t+900)
+ data.hourly.wind_speed_10m.fill(80)
+ const snapshot=await weatherSnapshot(kathmandu,async()=>response(data),now)
+ assert.equal(snapshot.hours[0].epoch%hour,15*60000)
+ const event=weatherEvents(snapshot,now).find(e=>e.kind==='wind')
+ assert.equal(event.end-event.start,24*hour)
+})
