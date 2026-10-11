@@ -27,14 +27,14 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   const response=await limited(`${base}/rest/v1/rpc/my_push`,{method:'POST',headers:{apikey:key,Authorization:req.headers.authorization,'Content-Type':'application/json'},body:JSON.stringify({payload})})
   if(!response.ok) {
    const error=await response.json().catch(()=>({}))
-   const status=error.message==='PUSH_RATE_LIMITED'?429:response.status===403?403:503
+   const status=error.message==='PUSH_CITY_CAPACITY'?409:error.message==='PUSH_RATE_LIMITED'?429:response.status===403?403:503
    if(status===429)res.setHeader('Retry-After','3')
-   return res.status(status).json({error:status===429?'PUSH_RATE_LIMITED':status===403?'PUSH_FORBIDDEN':'PUSH_UNAVAILABLE'})
+   return res.status(status).json({error:status===409?'PUSH_CITY_CAPACITY':status===429?'PUSH_RATE_LIMITED':status===403?'PUSH_FORBIDDEN':'PUSH_UNAVAILABLE'})
   }
   const data=await response.json()
   if(data.contractVersion!==1)return res.status(503).json({error:'PUSH_MIGRATION_REQUIRED'})
   const publicKey=env.PUSH_VAPID_PUBLIC_KEY||''
   const registrationEnabled=env.PUSH_REGISTRATION_ENABLED==='true' && data.registrationPublicKey===publicKey && /^[A-Za-z0-9_-]{87}$/.test(publicKey) && Buffer.from(publicKey,'base64url')[0]===4
-  return res.status(200).json({...data,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false})
+  return res.status(200).json({...data,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:data.deliveryEnabled===true})
  }catch{return res.status(503).json({error:'PUSH_UNAVAILABLE'})}
 }

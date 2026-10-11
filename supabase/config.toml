@@ -4,3 +4,7 @@ project_id = "meteo-puls"
 
 [functions.push-test]
 verify_jwt = false
+
+# Independent scheduler token and default-off server + DB gates.
+[functions.push-check]
+verify_jwt = false

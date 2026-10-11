@@ -15,6 +15,7 @@ concurrency:
 # No deployment environment, secrets, Supabase target, or function invocation.
 env:
   PUSH_TEST_DELIVERY_ENABLED: 'false'
+  PUSH_WEATHER_DELIVERY_ENABLED: 'false'
 
 jobs:
   tooling-and-deno:
@@ -71,6 +72,9 @@ jobs:
           deno check --frozen --config supabase/functions/push-test/deno.json \
             --lock supabase/functions/push-test/deno.lock \
             supabase/functions/push-test/index.ts
+          deno check --frozen --config supabase/functions/push-check/deno.json \
+            --lock supabase/functions/push-check/deno.lock \
+            supabase/functions/push-check/index.ts
           git diff --exit-code -- supabase
 
   push-unit-tests:
@@ -95,8 +99,16 @@ jobs:
       - name: Install locked npm dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Run existing mocked push delivery and transport tests
-        run: node --test tests/unit/push-delivery.test.mjs tests/unit/push-transport.test.mjs
+      - name: Build and lint without deployment
+        run: |
+          npm run build
+          npm run lint
+
+      - name: Run full isolated unit regressions
+        run: npm test
+
+      - name: Run disposable PostgreSQL and PostgREST regressions
+        run: npm run test:admin:sql
 
       - name: Confirm dependency and function files remain unchanged
         run: git diff --exit-code -- package.json package-lock.json supabase

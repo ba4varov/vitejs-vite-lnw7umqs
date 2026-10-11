@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test'
 const publicKey=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url')
 const preferences={enabled:false,cities:[],categories:[]}
-async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false}:{permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean}={}) {
+async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false,deliveryEnabled=false,lastDelivery=null,capacity=false}:{deliveryEnabled?:boolean;lastDelivery?:any;capacity?:boolean;permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean}={}) {
  await page.addInitScript(({permission,publicKey}:any)=>{
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}))
   const scope:any=window;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
@@ -24,6 +24,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
  await page.route('**/api/push',async(r:any)=>{
   const method=r.request().method(),body=r.request().postDataJSON();calls.push({method,body})
   if(missingMigration)return r.fulfill({status:503,json:{error:'PUSH_UNAVAILABLE'}})
+  if(method==='PATCH'&&capacity&&body.enabled)return r.fulfill({status:409,json:{error:'PUSH_CITY_CAPACITY'}})
   if(method==='PATCH')prefs=body
   if(method==='POST') {
    if(failure)return r.fulfill({status:503,json:{error:'PUSH_UNAVAILABLE'}})
@@ -31,7 +32,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
    devices=[{id:'00000000-0000-0000-0000-000000000003',label:body.label,fingerprint:hash,createdAt:new Date().toISOString()}]
   }
   if(method==='DELETE')devices=[]
-  return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false}})
+  return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled,lastDelivery}})
  })
  await page.goto('/');await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
  await page.getByRole('tab',{name:'Push известия',exact:true}).click()
@@ -152,4 +153,26 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'])test(`push layou
  await page.getByRole('tab',{name:lang==='en'?'Push notifications':'Push известия',exact:true}).click()
  const panel=page.locator('.push-settings');await expect(panel).toBeVisible()
  const overflow=await panel.evaluate((e:any)=>e.scrollWidth>e.clientWidth+1);expect(overflow).toBe(false)
+})
+
+for(const lang of ['bg','en'])test(`weather push active state, saved locale and provider failure ${lang}`,async({page})=>{
+ const state=await setup(page,{deliveryEnabled:true,lastDelivery:{status:'uncertain',at:new Date().toISOString()}})
+ if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('button.lang-btn').click();await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click();await page.getByRole('tab',{name:'Push notifications',exact:true}).click()}
+ const panel=page.locator('.push-settings')
+ await expect(panel).toContainText(lang==='bg'?'Автоматичната доставка е включена':'Automatic delivery is enabled')
+ await expect(panel).toContainText(lang==='bg'?'Последната доставка не е потвърдена':'The latest delivery is unconfirmed')
+ expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
+ await panel.getByLabel(lang==='bg'?'Следи избраните градове и категории':'Monitor selected cities and categories').check()
+ await panel.getByRole('button',{name:lang==='bg'?'Добави София':'Add София',exact:true}).click()
+ await panel.getByLabel(lang==='bg'?'Силен вятър':'Strong wind',{exact:true}).check()
+ await panel.getByRole('button',{name:lang==='bg'?'Запази push настройките':'Save push preferences'}).click()
+ await expect(panel.getByRole('status')).toContainText(lang==='bg'?'настройките са запазени':'preferences saved')
+ expect(state.calls.find(c=>c.method==='PATCH').body.language).toBe(lang)
+})
+test('service capacity refusal is visible and rolls back saved enabled state without permission request',async({page})=>{
+ const state=await setup(page,{capacity:true}),panel=page.locator('.push-settings')
+ await panel.getByLabel('Следи избраните градове и категории').check();await panel.getByRole('button',{name:'Добави София',exact:true}).click();await panel.getByLabel('Силен вятър',{exact:true}).check()
+ await panel.getByRole('button',{name:'Запази push настройките'}).click()
+ await expect(panel.getByRole('status')).toContainText('Достигнат е общият лимит')
+ expect(state.preferences().enabled).toBe(false);expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
 })

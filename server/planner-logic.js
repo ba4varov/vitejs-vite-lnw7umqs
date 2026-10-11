@@ -43,8 +43,14 @@ export function localHourEpoch(time, timeZone) {
 
 export function calculatePlanner(body, now) {
   if (!validatePlannerInput(body) || !Number.isFinite(now)) throw new TypeError('INVALID_INPUT')
-  const limits=activities[body.activity], horizon=now+72*3600000
+  const horizon=now+72*3600000
   const hours=body.hours.map(h=>({...h,epoch:localHourEpoch(h.time,body.timeZone)})).filter(h=>h.epoch!==null && h.epoch>=now && h.epoch+3600000<=horizon)
+  return plannerWindows(body.activity,body.timeZone,hours)
+}
+
+// Shared selection rules for server-verified epoch hours, including DST folds.
+export function plannerWindows(activity,timeZone,hours) {
+  const limits=activities[activity]
   const complete=h=>keys.slice(1).every(k=>h[k]!==null)
   const suitable=h=>complete(h) && Number(h.time.slice(11,13))>=7 && Number(h.time.slice(11,13))<20 && h.code<=3 && h.feelsLike>=limits.min && h.feelsLike<=limits.max && h.wind<=limits.wind && h.rainProbability<=limits.probability && h.rain<=limits.rain
   const candidates=[]
@@ -61,5 +67,5 @@ export function calculatePlanner(body, now) {
     if(windows.length===3) break
   }
   windows.sort((a,b)=>a.start-b.start)
-  return {status:windows.length?'ok':hours.filter(complete).length<2 || hours.some(h=>!complete(h))?'insufficient':'unsuitable',timeZone:body.timeZone,windows,source:'client-supplied-forecast'}
+  return {status:windows.length?'ok':hours.filter(complete).length<2 || hours.some(h=>!complete(h))?'insufficient':'unsuitable',timeZone,windows,source:'client-supplied-forecast'}
 }

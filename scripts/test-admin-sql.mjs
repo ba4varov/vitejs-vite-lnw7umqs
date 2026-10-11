@@ -45,6 +45,8 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/web-push.sql',root),'utf8')))
   sql(readFileSync(new URL('supabase/migrations/20261009050000_web_push_test_delivery.sql',root),'utf8'))
   console.log(sql(readFileSync(new URL('tests/sql/web-push-delivery.sql',root),'utf8')))
+  sql(readFileSync(new URL('supabase/migrations/20261011000000_weather_push_dispatcher.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/weather-push.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-security.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-favorites.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/admin-stage3.sql',root),'utf8')))
@@ -61,6 +63,16 @@ try {
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'bash','-c','exec 3<>/dev/tcp/127.0.0.1/3000'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgREST startup timed out')
   const admin='00000000-0000-0000-0000-000000000001', ordinary='00000000-0000-0000-0000-000000000002'
+  // A listening socket precedes schema-cache readiness on faster CI runners.
+  // Retry only the documented temporary 503; never relax authorization assertions.
+  ready=false
+  for(let i=0;i<60;i++) {
+    const probe=request('/rpc/admin_statistics',jwt(ordinary))
+    if(probe.status===403){ready=true;break}
+    assert.equal(probe.status,503,'Unexpected PostgREST readiness response')
+    await delay(250)
+  }
+  assert.ok(ready,'PostgREST schema cache startup timed out')
   for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users','/rpc/admin_advanced_statistics','/rpc/admin_audit_entries','/rpc/admin_management_users','/rpc/admin_management_summary','/rpc/admin_user_activity']) {
     assert.equal(request(endpoint,jwt(ordinary)).status,403,'Ordinary direct RPC must fail')
     assert.equal(request(endpoint,null).status,401,'Anonymous direct RPC must fail')

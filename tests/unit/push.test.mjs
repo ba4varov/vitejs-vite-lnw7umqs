@@ -99,12 +99,12 @@ test('forecast fetched server side from fixed provider; malformed, stale, oversi
  await assert.rejects(async()=>evaluatePushForecast(good,selected,{plan:'pro',permissions:['planner:advanced']},now+16*60000))
  assert.deepEqual(evaluatePushForecast(good,{...selected,enabled:false},{plan:'pro',permissions:['planner:advanced']},now),[])
 })
-test('SW never caches/intercepts fetch or opens external notification payload URLs; Edge stub always off',async()=>{
+test('SW never caches/intercepts fetch or opens external notification payload URLs; weather sender defaults off',async()=>{
  const handlers={},notifications=[],opened=[]
  const self={addEventListener:(name,fn)=>handlers[name]=fn,location:{origin:'https://meteo.invalid'},registration:{showNotification:async(t,o)=>notifications.push({t,o})},clients:{claim:async()=>{},matchAll:async()=>[],openWindow:async url=>opened.push(url)},skipWaiting:()=>{}}
  vm.runInNewContext(readFileSync(new URL('../../public/push-sw.js',import.meta.url),'utf8'),{self,URL})
  assert.equal(handlers.fetch,undefined)
  let waiting;handlers.push({data:{json:()=>({title:'test',url:'https://evil.invalid'})},waitUntil:p=>waiting=p});await waiting;assert.equal(notifications[0].o.data.url,'/')
  handlers.notificationclick({notification:{close(){}},waitUntil:p=>waiting=p});await waiting;assert.deepEqual(opened,['https://meteo.invalid/'])
- let handler;vm.runInNewContext(readFileSync(new URL('../../supabase/functions/push-check/index.ts',import.meta.url),'utf8'),{Deno:{serve:fn=>handler=fn},Response,JSON});assert.equal(handler().status,503)
+ const {createWeatherHandler}=await import('../../supabase/functions/_shared/push-weather.mjs');const handler=createWeatherHandler({env:{},rpc:()=>{throw Error('must not query')}});assert.equal((await handler(new Request('https://edge.invalid/push-check'))).status,503)
 })

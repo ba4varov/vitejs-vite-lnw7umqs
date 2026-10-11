@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "web-push": "npm:web-push@3.6.7",
+    "ipaddr.js": "npm:ipaddr.js@2.5.0"
+  }
+}
