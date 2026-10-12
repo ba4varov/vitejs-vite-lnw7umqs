@@ -27,6 +27,9 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   const response=await limited(`${base}/rest/v1/rpc/my_push`,{method:'POST',headers:{apikey:key,Authorization:req.headers.authorization,'Content-Type':'application/json'},body:JSON.stringify({payload})})
   if(!response.ok) {
    const error=await response.json().catch(()=>({}))
+   if(['PGRST202','42883','42P01','42703'].includes(error.code))return res.status(503).json({error:'PUSH_MIGRATION_REQUIRED'})
+   if(error.code==='22023')return res.status(400).json({error:'INVALID_BODY'})
+   if(response.status===401)return res.status(401).json({error:'INVALID_SESSION'})
    const status=error.message==='PUSH_RATE_LIMITED'?429:response.status===403?403:503
    if(status===429)res.setHeader('Retry-After','3')
    return res.status(status).json({error:status===429?'PUSH_RATE_LIMITED':status===403?'PUSH_FORBIDDEN':'PUSH_UNAVAILABLE'})

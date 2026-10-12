@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
-import {pushRequest,type PushSnapshot,type PushPreferences,type PushCity} from './push-client'
+import {pushRequest,pushPreferencesEqual,type PushSnapshot,type PushPreferences,type PushCity} from './push-client'
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
@@ -9,12 +9,35 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const bg=lang==='bg',support=pushSupport()
  const [data,setData]=useState<PushSnapshot|null>(null),[draft,setDraft]=useState<PushPreferences>({enabled:false,cities:[],categories:[]}),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[worker,setWorker]=useState<ServiceWorkerRegistration|null>(null)
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
+ const [saveError,setSaveError]=useState('')
  const live=useRef(true)
  const apply=(d:PushSnapshot)=>{if(live.current){setData(d);setDraft(d.preferences)}}
- useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{live.current=false}},[session.user.id,session.access_token])
+ // pushRequest obtains the current token itself. A token refresh must not reload over a draft.
+ // The per-effect guard also rejects the discarded StrictMode mount's late response.
+ useEffect(()=>{let active=true;live.current=true;void pushRequest(session).then(d=>{if(active)apply(d)}).catch(()=>{if(active)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{active=false;live.current=false}},[session.user.id])
  useEffect(()=>{let active=true;if(support==='supported')void preparePushWorker().then(r=>{if(active)setWorker(r)}).catch(()=>{if(active)setMessage(bg?'Service Worker е недостъпен.':'Service Worker is unavailable.')});return()=>{active=false}},[support])
  const fail=(error:any)=>setMessage(error.message==='KEY_ROTATION_REQUIRED'?(bg?'Ключът е обновен. Отпиши това устройство от списъка или изчисти известията за сайта в браузъра, после го регистрирай отново.':'The key has changed. Remove this device from the list or reset this site’s notifications in browser settings, then register it again.'):error.message==='DENIED'?(bg?'Разрешението е отказано. Можеш да го промениш от настройките на браузъра.':'Permission denied. Change it in browser settings.'):error.message==='DISMISSED'?(bg?'Разрешението не е дадено. Няма регистрирано устройство.':'Permission was not granted. No device registered.'):(bg?'Промяната не е потвърдена. Обнови и опитай отново.':'Change was not confirmed. Refresh and retry.'))
- const save=async(p:PushPreferences)=>{setBusy(true);setMessage('');try{apply(await pushRequest(session,'PATCH',p));setMessage(bg?'Push настройките са запазени. Доставката остава изключена.':'Push preferences saved. Delivery remains disabled.')}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
+ const save=async(p:PushPreferences)=>{
+  setBusy(true);setMessage('');setSaveError('')
+  try{
+   const result=await pushRequest(session,'PATCH',p)
+   if(!pushPreferencesEqual(result.preferences,p))throw Error('PUSH_SAVE_NOT_CONFIRMED')
+   // Confirm a fresh load agrees before replacing the draft or reporting success.
+   const confirmed=await pushRequest(session)
+   if(!pushPreferencesEqual(confirmed.preferences,p))throw Error('PUSH_SAVE_NOT_CONFIRMED')
+   if(live.current){apply(confirmed);setMessage(bg?'Push настройките са запазени. Доставката остава изключена.':'Push preferences saved. Delivery remains disabled.')}
+  }catch(e){
+   const code=e instanceof Error?e.message:''
+   const reason=['401','INVALID_SESSION','SESSION_CHANGED'].includes(code)?(bg?'Сесията е изтекла или променена. Влез отново.':'Your session expired or changed. Sign in again.'):
+    ['403','PUSH_FORBIDDEN'].includes(code)?(bg?'Нямаш разрешение за тази промяна.':'You do not have permission for this change.'):
+    ['429','PUSH_RATE_LIMITED'].includes(code)?(bg?'Твърде много заявки. Изчакай и опитай отново.':'Too many requests. Wait and retry.'):
+    code==='PUSH_MIGRATION_REQUIRED'?(bg?'Настройките са временно недостъпни. Нужно е обновяване от администратора.':'Preferences are temporarily unavailable. An administrator update is required.'):
+    ['400','INVALID_BODY'].includes(code)?(bg?'Провери избраните градове и категории.':'Check the selected cities and categories.'):
+    ['INVALID_RESPONSE','PUSH_SAVE_NOT_CONFIRMED'].includes(code)?(bg?'Върнатите настройки не потвърждават промяната. Опитай отново.':'The returned preferences do not confirm the change. Please retry.'):
+    (bg?'Провери връзката си и опитай отново.':'Check your connection and retry.')
+   if(live.current)setSaveError((bg?'Записването на Push настройките не е потвърдено. Незапазените промени остават във формата. ':'Saving Push preferences was not confirmed. Unsaved changes remain in the form. ')+reason)
+  }finally{if(live.current)setBusy(false)}
+ }
  const subscribe=()=>{
   if(!worker||!data?.publicKey)return
   setBusy(true);setMessage('')
@@ -24,7 +47,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(fail).finally(()=>{if(live.current)setBusy(false)})
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
- const dirty=!!data&&JSON.stringify(draft)!==JSON.stringify(data.preferences)
+ const dirty=!!data&&!pushPreferencesEqual(draft,data.preferences)
  const unsavedInputs=Boolean(city.name.trim() || (label.trim() && !data?.devices.some(device=>device.label===label.trim())))
  useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
  useEffect(()=>{onBusyChange?.(busy)},[busy,onBusyChange])
@@ -41,6 +64,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   <p>{support==='ios-install'?(bg?'За iPhone/iPad: iOS 16.4 или по-нова версия → Добави към началния екран → отвори приложението от иконата.':'For iPhone/iPad: iOS 16.4 or later → Add to Home Screen → open from the icon.'):support==='unsupported'?(bg?'Този браузър не поддържа Web Push. Нужни са HTTPS и съвместим браузър.':'This browser does not support Web Push. HTTPS and a compatible browser are required.'):(bg?'Поддържан браузър. Разрешението се иска само с бутона за регистрация.':'Supported browser. Permission is requested only by the registration button.')}</p>
   {!data&&!message&&<p role="status">{bg?'Зареждане на Push настройките…':'Loading Push preferences…'}</p>}
   {message&&<p role="status">{message}</p>}
+  {saveError&&<p role="alert" className="auth-error">{saveError}</p>}
   {support==='supported'&&Notification.permission==='denied'&&<p>{bg?'Разрешението е отказано. За ново включване промени настройките за известия на този сайт в браузъра.':'Permission is denied. To enable notifications again, change this site’s notification settings in your browser.'}</p>}
   {data&&<>
    <fieldset disabled={busy}><legend>{bg?'Градове и категории за бъдеща доставка':'Cities and categories for future delivery'}</legend>

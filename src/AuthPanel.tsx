@@ -181,7 +181,7 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
         {offerFailed && <p role="alert" className="auth-error">{stats.failure}</p>}
         <div className="statistics-actions"><button type="button" disabled={busy} onClick={() => void answerOffer(true)}>{stats.allow}</button><button type="button" disabled={busy} onClick={() => void answerOffer(false)}>{stats.deny}</button></div>
       </>}
-      {dirty && <p className="profile-draft-note" role="status">{lang === 'bg' ? 'Има незапазени промени. Те се запазват при смяна на раздела.' : 'You have unsaved changes. They are kept when switching sections.'}</p>}
+      {dirty && <p className="profile-draft-note" role="status">{lang === 'bg' ? 'Има незапазени промени. Те остават само във формата при смяна на раздела. Запази ги преди презареждане или затваряне.' : 'You have unsaved changes. They remain only in the form when switching sections. Save them before reloading or closing.'}</p>}
       {!authConfigured && <p className="auth-error">{t.unavailable}</p>}
       {googleAuthConfigured && (view === 'login' || view === 'register') && <button type="button" className="auth-google" disabled={busy} onClick={googleLogin}>{t.google}</button>}
       {view === 'profile' && session && <>

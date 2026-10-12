@@ -82,6 +82,18 @@ test('registration public key must agree with DB gate; caller cannot choose a di
  const saved=await api('POST',{subscription:sub,label:'Phone'},settings)
  assert.equal(JSON.parse(saved.calls[1].opts.body).payload.vapidPublicKey,key)
 })
+test('preference failures expose safe actionable codes without leaking database errors',async()=>{
+ for(const code of ['PGRST202','42883','42P01','42703']){
+  const {res}=await api('PATCH',prefs,{},404,{code,message:'private database detail'})
+  assert.equal(res.code,503);assert.deepEqual(res.data,{error:'PUSH_MIGRATION_REQUIRED'})
+ }
+ const invalid=await api('PATCH',prefs,{},400,{code:'22023',message:'private database detail'})
+ assert.equal(invalid.res.code,400);assert.deepEqual(invalid.res.data,{error:'INVALID_BODY'})
+ const expired=await api('PATCH',prefs,{},401,{code:'PGRST301'})
+ assert.equal(expired.res.code,401);assert.deepEqual(expired.res.data,{error:'INVALID_SESSION'})
+ const denied=await api('PATCH',prefs,{},403,{code:'42501'})
+ assert.equal(denied.res.code,403);assert.deepEqual(denied.res.data,{error:'PUSH_FORBIDDEN'})
+})
 const now=Date.parse('2026-10-09T00:00Z')
 const forecastData=()=>({timezone:'UTC',current:{time:now/1000},hourly_units:{time:'unixtime',apparent_temperature:'°C',precipitation_probability:'%',precipitation:'mm',wind_speed_10m:'km/h'},hourly:{time:Array.from({length:72},(_,i)=>now/1000+i*3600),apparent_temperature:Array(72).fill(20),precipitation_probability:Array(72).fill(0),precipitation:Array(72).fill(0),wind_speed_10m:Array(72).fill(65),weather_code:Array(72).fill(0)}})
 test('forecast fetched server side from fixed provider; malformed, stale, oversized data rejected',async()=>{
