@@ -99,7 +99,7 @@ for(const lang of ['bg','en'] as const)test(`coordinate city draft lifecycle ${l
  await expect(page.locator('.profile-draft-note')).toBeVisible()
  fail=true
  const save=panel.getByRole('button',{name:lang==='bg'?'Запази push настройките':'Save push preferences'})
- await save.click();await expect(panel.getByRole('status')).toContainText(lang==='bg'?'не е потвърдена':'not confirmed')
+ await save.click();await expect(panel.getByRole('alert')).toContainText(lang==='bg'?'не е потвърдено':'not confirmed')
  await expect(page.locator('.profile-draft-note')).toBeVisible()
  fail=false;await save.click();await expect(panel.getByRole('status')).toContainText(lang==='bg'?'запазени':'saved')
  await expect(page.locator('.profile-draft-note')).toHaveCount(0)

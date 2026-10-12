@@ -13,6 +13,7 @@ import { localAlertDate, activityAlerts } from '../server/alerts-logic.js'
 import { handlePlanner } from '../server/planner-core.js'
 import { handleAdminManagement } from '../server/admin-management-core.js'
 import { handleProfile } from '../server/profile-core.js'
+import { handlePush } from '../server/push-core.js'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const prefix = `meteo-gotrue-${process.pid}`
@@ -98,6 +99,7 @@ try {
       if(url.pathname==='/api/activity')return await handleActivity(req,res,appEnv)
       if(url.pathname==='/api/admin')return await handleAdmin(req,res,appEnv)
       if(url.pathname==='/api/profile')return await handleProfile(req,res,appEnv)
+      if(url.pathname==='/api/push')return await handlePush(req,res,appEnv)
       res.writeHead(404);res.end()
     } catch {res.writeHead(500);res.end('{"error":"LOCAL_GATEWAY_FAILURE"}')}
   })
@@ -123,6 +125,25 @@ try {
   const refreshed=await json(base+'/auth/v1/token?grant_type=refresh_token','POST',undefined,{refresh_token:owner.refresh_token},{apikey:anon})
   assert.equal(refreshed.status,200);Object.assign(owner,refreshed.body)
   pass('Actual GoTrue refresh-token rotation')
+  // Preferences must persist independently of the default-disabled registration/delivery gates.
+  const pushPreferences={enabled:true,cities:[{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'}],categories:['rain']}
+  const initialPush=await api('/api/push',owner)
+  assert.equal(initialPush.status,200);assert.equal(initialPush.body.preferences.enabled,false)
+  const savedPush=await api('/api/push',owner,'PATCH',pushPreferences)
+  assert.equal(savedPush.status,200);assert.deepEqual(savedPush.body.preferences,pushPreferences)
+  assert.equal(savedPush.body.registrationEnabled,false);assert.equal(savedPush.body.publicKey,null);assert.equal(savedPush.body.deliveryEnabled,false)
+  assert.deepEqual((await api('/api/push',owner)).body.preferences,pushPreferences)
+  const pushRelogin=await json(base+'/auth/v1/token?grant_type=password','POST',undefined,{email:owner.email,password},{apikey:anon})
+  assert.equal(pushRelogin.status,200)
+  assert.deepEqual((await api('/api/push',pushRelogin.body)).body.preferences,pushPreferences)
+  assert.deepEqual(JSON.parse(sql(`select json_build_object('enabled',enabled,'cities',cities,'categories',categories) from public.push_preferences where user_id='${owner.user.id}';`)),pushPreferences)
+  assert.deepEqual((await api('/api/push',other)).body.preferences,{enabled:false,cities:[],categories:[]})
+  assert.equal((await json(base+'/rest/v1/push_preferences','GET',owner.access_token,undefined,{apikey:anon})).status,403)
+  for(const session of [null,{access_token:'invalid'},{access_token:owner.access_token.slice(0,-8)+'tampered'}])
+    assert.equal((await api('/api/push',session,'PATCH',pushPreferences)).status,401)
+  assert.equal((await api('/api/push',owner,'PATCH',{...pushPreferences,user_id:other.user.id})).status,400)
+  assert.deepEqual((await api('/api/push',owner)).body.preferences,pushPreferences)
+  pass('Push: real PATCH → database row → independent GET/new login; RLS, JWT and account isolation; registration/delivery stay off')
   assert.equal((await api('/api/activity',owner,'POST',{onboarding:'offer'})).body.offer,true)
   assert.equal((await api('/api/activity',owner,'POST',{onboarding:'offer'})).body.offer,false)
   assert.equal((await api('/api/activity',other,'PATCH',{enabled:false,onboarding:true})).body.enabled,false)
@@ -257,7 +278,7 @@ try {
     'import.meta.env.VITE_GOOGLE_AUTH_ENABLED':JSON.stringify('false'),'import.meta.env.VITE_TURNSTILE_SITE_KEY':JSON.stringify('')
   }})
   await vite.listen();const site=`http://127.0.0.1:${vite.httpServer.address().port}`
-  const {chromium}=await import('@playwright/test')
+  const {chromium,expect}=await import('@playwright/test')
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium'})
   const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage()
   // Abort non-local network; never mock or fulfill API/Auth requests.
@@ -298,12 +319,31 @@ try {
   }
   await ownerContext.route('https://api.open-meteo.com/**',route=>route.fulfill({json:weather()}))
   const cooldown=()=>sql(`update public.alert_generation_state set last_generated=now()-interval '31 seconds' where user_id='${owner.user.id}';`)
+  assert.equal((await api('/api/push',owner,'PATCH',{enabled:false,cities:[],categories:[]})).status,200)
   await ownerPage.clock.install({time:new Date()})
   await ownerPage.goto(site+'/');await ownerPage.locator('.auth-nav').getByRole('button',{name:'Вход',exact:true}).click()
   await ownerPage.getByLabel('Имейл',{exact:true}).fill(owner.email)
   await ownerPage.locator('input[autocomplete="current-password"]').fill(password)
   await ownerPage.locator('form').getByRole('button',{name:'Вход',exact:true}).click()
   await ownerPage.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+  await ownerPage.getByRole('tab',{name:'Push известия',exact:true}).click()
+  const pushPanel=ownerPage.locator('.push-settings')
+  await pushPanel.getByLabel('Следи избраните градове и категории').check()
+  await pushPanel.getByLabel('Силни валежи',{exact:true}).check()
+  await pushPanel.getByRole('button',{name:'Добави Варна',exact:true}).click()
+  await expect(ownerPage.locator('.profile-draft-note')).toBeVisible()
+  await pushPanel.getByRole('button',{name:'Запази push настройките'}).click()
+  await expect(pushPanel.getByRole('status')).toContainText('Push настройките са запазени')
+  await expect(ownerPage.locator('.profile-draft-note')).toHaveCount(0)
+  await ownerPage.reload()
+  await ownerPage.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+  await ownerPage.getByRole('tab',{name:'Push известия',exact:true}).click()
+  await expect(pushPanel.getByLabel('Следи избраните градове и категории')).toBeChecked()
+  await expect(pushPanel.getByLabel('Силни валежи',{exact:true})).toBeChecked()
+  await expect(pushPanel.locator('li')).toContainText('Варна')
+  await expect(ownerPage.locator('.profile-draft-note')).toHaveCount(0)
+  assert.deepEqual((await api('/api/push',owner)).body.preferences,pushPreferences)
+  pass('Push Chromium: real login → enable/rain/Varna → save → confirmed clean form → full reload → persisted values; no API/Auth/Push mocks')
   await ownerPage.getByRole('tab',{name:'Метео известия',exact:true}).click()
   const settings=ownerPage.locator('.notification-settings')
   await settings.getByRole('button',{name:'Изключи всички',exact:true}).click()
@@ -320,7 +360,7 @@ try {
   const generateResponse=()=>ownerPage.waitForResponse(r=>r.url().includes('/api/alerts')&&r.request().method()==='POST')
   const initialGeneration=generateResponse();await ownerPage.reload();await initialGeneration
   await ownerPage.getByRole('button',{name:'Известия',exact:true}).click()
-  const panel=ownerPage.locator('.notification-panel'),{expect}=await import('@playwright/test')
+  const panel=ownerPage.locator('.notification-panel')
   await expect(panel.locator('li')).toHaveCount(1);await expect(panel.locator('.notification-window')).toHaveCount(1)
   const scopePath='/api/alerts?locationKey=432:279&zone=UTC'
   const original=(await api(scopePath,owner)).body.alerts[0]
