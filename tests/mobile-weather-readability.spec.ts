@@ -5,12 +5,15 @@ import { clickHeaderControl } from './header-navigation'
 const longCity = 'Свети Константин и Елена – LongSettlementNameWithoutSpacesForWrapping'
 const advice = '  Оригинален AI съвет / Original AI advice. '.repeat(14) + '\nПоследен ред / Final line.  '
 
-async function setup(page: Page, lang: 'bg' | 'en', bright = true, severe = false) {
+async function setup(page: Page, lang: 'bg' | 'en', bright = true, severe = false, initialAdvice = advice) {
   let requests = 0
-  let text = advice
+  let text = initialAdvice
   let pending = false
   const releases: (() => void)[] = []
-  await page.addInitScript(lang => localStorage.setItem('meteoPulseLanguage', lang), lang)
+  await page.addInitScript(lang => {
+    // Sandboxed advertising frames have opaque origins and no localStorage.
+    if (window === window.top) localStorage.setItem('meteoPulseLanguage', lang)
+  }, lang)
   await page.route('**/*', async route => {
     const url = new URL(route.request().url())
     if (url.pathname === '/api/weather-advice') {
@@ -27,7 +30,7 @@ async function setup(page: Page, lang: 'bg' | 'en', bright = true, severe = fals
     return route.fulfill({ json: {} })
   })
   await page.goto('/')
-  await expect(page.locator('.weather-advice-text')).toHaveText(advice, { timeout: 15000 })
+  await expect(page.locator('.weather-advice-text')).toHaveText(initialAdvice, { timeout: 15000 })
   return { count: () => requests, next: (value: string, wait = false) => { text = value; pending = wait }, release: () => releases.splice(0).forEach(resolve => resolve()) }
 }
 
@@ -142,3 +145,100 @@ for (const dark of [false,true]) test(`mobile contrast over the brightest possib
     for (const value of colors) expect(value).toEqual({ color: 'rgb(255, 255, 255)', opacity: '1' })
   }
 })
+
+
+for (const width of [320,360,390,430,640]) for (const lang of ['bg','en'] as const) for (const dark of [false,true]) {
+  test(`advice actual line overflow ${width} ${lang} ${dark}`, async ({ page }) => {
+    const layoutErrors: string[] = []
+    page.on('pageerror', error => layoutErrors.push(error.message))
+    page.on('console', message => { if (message.type() === 'error' && /ResizeObserver|flushSync/.test(message.text())) layoutErrors.push(message.text()) })
+    await page.setViewportSize({ width, height: 900 })
+    const one = lang === 'bg' ? 'Вземи чадър.' : 'Bring an umbrella.'
+    const two = lang === 'bg' ? 'Вземи чадър.\nОблечи яке.' : 'Bring an umbrella.\nWear a jacket.'
+    const api = await setup(page, lang, true, false, one)
+    if (dark) {
+      await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
+      await page.locator('.mobile-menu-toggle').click()
+    }
+    const text = page.locator('#current-weather-advice'), toggle = page.locator('.advice-toggle')
+    const lines = () => text.evaluate(element => element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight))
+    await expect(toggle).toHaveCount(0)
+    expect(await lines()).toBeCloseTo(1, 1)
+    const compact = async () => {
+      const gap = await text.evaluate(element => {
+        const parent = element.parentElement!, padding = parseFloat(getComputedStyle(parent).paddingBottom)
+        return parent.getBoundingClientRect().bottom - element.getBoundingClientRect().bottom - padding
+      })
+      expect(Math.abs(gap)).toBeLessThan(1)
+    }
+    await compact()
+    api.next(two)
+    await page.locator('.city-btn').nth(1).click()
+    await expect(text).toHaveText(two)
+    await expect(toggle).toHaveCount(0)
+    expect(await text.textContent()).toBe(two)
+    expect(await lines()).toBeCloseTo(2, 1)
+    await compact()
+    api.next(advice)
+    await page.locator('.city-btn').nth(2).click()
+    await expect(text).toHaveText(advice)
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(await lines()).toBeCloseTo(2, 1)
+    const requests = api.count()
+    await toggle.focus(); await page.keyboard.press('Enter')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(await lines()).toBeGreaterThan(2)
+    expect(await text.textContent()).toBe(advice)
+    await page.keyboard.press('Space')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(api.count()).toBe(requests)
+    expect(layoutErrors).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}
+
+for (const lang of ['bg','en'] as const) for (const dark of [false,true]) {
+  test(`advice remeasures width language and font ${lang} ${dark}`, async ({ page }) => {
+    const layoutErrors: string[] = []
+    page.on('pageerror', error => layoutErrors.push(error.message))
+    page.on('console', message => { if (message.type() === 'error' && /ResizeObserver|flushSync/.test(message.text())) layoutErrors.push(message.text()) })
+    await page.setViewportSize({ width: 320, height: 900 })
+    const original = lang === 'bg' ? 'Вземи чадър или непромокаемо яке – вероятността за валеж е 98%.' : 'Bring an umbrella or a waterproof jacket – the chance of rain is 98%. Stay warm and keep your shoes dry.'
+    const api = await setup(page, lang, true, false, original)
+    if (dark) {
+      await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
+      await page.locator('.mobile-menu-toggle').click()
+    }
+    const text = page.locator('#current-weather-advice'), toggle = page.locator('.advice-toggle')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await page.setViewportSize({ width: 640, height: 900 })
+    await expect(toggle).toHaveCount(0)
+    await expect(text).toHaveText(original)
+    expect(await text.evaluate(e => e.scrollHeight <= e.clientHeight)).toBe(true)
+    await page.setViewportSize({ width: 320, height: 900 })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    const before = api.count()
+    await clickHeaderControl(page, page.locator('.lang-btn'))
+    await expect(toggle).toHaveText(lang === 'bg' ? 'Read full advice' : 'Прочети целия съвет')
+    await page.locator('.mobile-menu-toggle').click()
+    expect(await text.textContent()).toBe(original)
+    await page.setViewportSize({ width: 641, height: 900 })
+    await expect(toggle).toHaveCount(0)
+    expect(await text.evaluate(e => getComputedStyle(e).display)).toBe('inline')
+    await page.setViewportSize({ width: 320, height: 900 })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(api.count()).toBe(before)
+    // Changing the rendered font without changing text must trigger remeasurement.
+    await page.addStyleTag({ content: '.main-card .weather-advice { font-size: 8px !important; }' })
+    await expect(toggle).toHaveCount(0)
+    await page.addStyleTag({ content: '.main-card .weather-advice { font-size: 24px !important; }' })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    api.next(lang === 'bg' ? 'Да.' : 'Yes.')
+    await page.locator('.city-btn').nth(1).click()
+    await expect(text).toHaveText(lang === 'bg' ? 'Да.' : 'Yes.')
+    await expect(toggle).toHaveCount(0)
+    expect(layoutErrors).toEqual([])
+  })
+}

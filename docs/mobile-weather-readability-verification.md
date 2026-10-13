@@ -63,3 +63,32 @@ Normal comparison runs against the changed app omit `--update-snapshots`.
 The reference operation validates 40 mobile forecast images against unchanged main. Initial snapshot failures reflected fractional placement and a blank final row when a rounded clip extended past the viewport edge. Capture positioning was corrected without relaxing the pixel comparison or changing forecast UI/styles. The references come from unchanged main with that same corrected capture, rather than from the modified app. Parallel isolated runs used temporary configs on ports 4175/4176 with separate output directories; profile/push fixtures used their matching local Preview URL variables. Cold-start advice readiness uses a 15-second wait, matching the existing forecast fixture, instead of the default five-second assertion timeout.
 
 Services, accounts and weather/background data in browser tests are synthetic. Physical iOS/Android and screen-reader checks are not claimed. SQL/migration integration scripts are not run. The push Edge Runtime harness is unavailable here (Deno is not installed and the required test dependency cache is absent). No merge, production deployment, SQL migrations or secret changes.
+
+## PR #76 correction: show advice controls only for actual overflow
+
+Short advice now has no disclosure button and no reserved button margin/height. `WeatherAdvice` measures an invisible, inaccessible, absolutely positioned copy of the original text at the live span's exact width, with the same inherited typography and whitespace. The copy is unclamped and removed synchronously after measuring. A button is rendered only when the natural text height exceeds two computed line heights (with a half-pixel rounding tolerance). This uses rendered geometry, never character counts. It also works while expanded; measuring the expanded live span's scrollHeight would incorrectly remove the collapse control.
+
+Initial measurement uses a layout effect before the first paint. A ResizeObserver watches wrapping width and line-height changes, ignoring height-only expansion notifications. Its work is coalesced in one animation frame outside observer delivery, preventing resize notifications caused by synchronous commits during RO delivery. Native font-load and mobile breakpoint events also remeasure; advice/language changes recreate the measurement effect. If text starts fitting, expansion resets and the button is removed. Listeners, pending frames and stale font-ready callbacks are cleaned up on unmount. The existing forecast/advice key and API stale-response guards are unchanged. No product CSS, forecast, warning, metric or desktop styling was changed in this correction.
+
+Added browser coverage: 20 combinations of 320/360/390/430/640px × BG/EN × light/dark, each checking a one-line advice, an exactly two-line original advice, no button/empty bottom space, and long advice with keyboard expansion/collapse and no extra request. Four additional cases verify 320↔640↔641 resizing while expanded, language switching, font-size changes at a fixed width, content replacement, preserved raw text and absence of page errors/ResizeObserver-loop/flushSync errors. Language initialization in the test fixture is restricted to the top-level document, because sandboxed advertising frames intentionally have no localStorage. A longer English resize fixture is used to cross the actual two-line threshold at 320px; the original shorter English wording correctly fits and has no button.
+
+Correction validation:
+- Build and lint passed on the corrected source.
+- All 20 short/two-line/long matrix cases and both existing stale-response cases passed with the final observer scheduling. All four resize/language/font/content cases passed in the final rerun.
+- The 68 existing readability/contrast/stale cases and 24 current-metric cases passed during the affected browser run. The newly added error assertions initially exposed the sandboxed-frame test initialization and the observer-delivery issue; both were corrected and affected cases rerun. All 24 current-metric cases also passed in the final rerun, with no ResizeObserver/flushSync errors in its log.
+- All 12 unchanged-main desktop comparisons passed at 641/768/1440px in BG/EN and both themes.
+- All 20 mobile forecast screenshot/interaction cases passed; all 40 committed baseline images matched without updating snapshots.
+
+Commands (temporary isolated configs only change port/output directory):
+
+```sh
+npm run build
+npm run lint
+CHROMIUM_PATH=/usr/bin/chromium npx playwright test tests/mobile-weather-readability.spec.ts tests/mobile-weather-card.spec.ts --workers=3 --fully-parallel --timeout=60000
+CHROMIUM_PATH=/usr/bin/chromium npx playwright test --config=work/playwright.task76.overflow.config.ts --grep 'advice actual line overflow|advice remeasures|advice absence' --workers=3 --fully-parallel --timeout=60000
+CHROMIUM_PATH=/usr/bin/chromium npx playwright test --config=work/playwright.task76.overflow.config.ts --grep 'advice remeasures' --workers=2 --fully-parallel --timeout=60000
+BASELINE_URL=http://127.0.0.1:4174 CHROMIUM_PATH=/usr/bin/chromium npx playwright test --config=work/playwright.task76.desktop.config.ts --workers=2 --fully-parallel --timeout=120000
+CHROMIUM_PATH=/usr/bin/chromium npx playwright test --config=work/playwright.forecast-cards.config.ts --grep 'forecast cards (320|360|390|430|640) ' --workers=2 --fully-parallel --timeout=60000
+```
+
+The correction remains on the original draft PR #76. No new PR, merge, production deployment, SQL migrations or secret changes. Browser results use Chromium fixtures; a physical Android retest is still a separate check.
