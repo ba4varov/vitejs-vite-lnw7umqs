@@ -1,7 +1,7 @@
 import {createTestHandler,sendPinned} from '../_shared/push-test.mjs'
 import {denoConnector} from '../_shared/push-deno.ts'
 
-// No client SDK, user JWT sender, CORS or logs. Supabase secrets only.
+// No client SDK, user JWT sender or CORS. Log only bounded diagnostic fields.
 const env=Object.fromEntries(['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','PUSH_TEST_DELIVERY_ENABLED','PUSH_TEST_OPERATOR_TOKEN','PUSH_VAPID_PUBLIC_KEY','PUSH_VAPID_PRIVATE_KEY','PUSH_VAPID_SUBJECT'].map(name=>[name,Deno.env.get(name)]))
 async function rpc(name:string,payload:unknown) {
  const base=env.SUPABASE_URL,key=env.SUPABASE_SERVICE_ROLE_KEY
@@ -14,4 +14,4 @@ async function rpc(name:string,payload:unknown) {
  if(name==='finish_push_test')return null // PostgreSQL void may be HTTP 204 with no JSON body.
  return response.json()
 }
-Deno.serve(createTestHandler({env,rpc,send:(details,resolver)=>sendPinned(details,resolver,denoConnector())}))
+Deno.serve(createTestHandler({env,rpc,diagnose:(diagnostic:Record<string,string|number>)=>console.info(JSON.stringify({event:'push_test_result',...diagnostic})),send:(details,resolver)=>sendPinned(details,resolver,denoConnector())}))

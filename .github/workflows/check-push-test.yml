@@ -96,7 +96,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Run existing mocked push delivery and transport tests
-        run: node --test tests/unit/push-delivery.test.mjs tests/unit/push-transport.test.mjs
+        run: node --test tests/unit/push-delivery.test.mjs tests/unit/push-transport.test.mjs tests/unit/push-diagnostics.test.mjs
 
       - name: Confirm dependency and function files remain unchanged
         run: git diff --exit-code -- package.json package-lock.json supabase
