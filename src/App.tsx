@@ -1,6 +1,7 @@
 import { trackActivity } from './activity-client'
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import { WeatherAdvice } from './WeatherAdvice'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
 import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
 import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
@@ -1185,7 +1186,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                         <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
                       </span>
                     )}
-                    <button onClick={toggleFavorite} className="star-btn" title={t.favorite} style={{ marginLeft: '4px' }}>
+                    <button type="button" onClick={toggleFavorite} className="star-btn" title={t.favorite} aria-label={t.favorite} aria-pressed={!!currentFavorite} style={{ marginLeft: '4px' }}>
                       {currentFavorite ? '⭐' : '☆'}
                     </button>
                   </h2>
@@ -1198,11 +1199,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                   )}
                   
                  {/* Тук се появява AI съветът от Gemini */}
-                  {aiAdvice && (
-                    <div style={{ marginTop: '12px', marginBottom: '12px', padding: '12px 16px', background: 'rgba(255,255,255,0.15)', borderRadius: '8px', fontStyle: 'italic', fontSize: '0.95rem', lineHeight: '1.4' }}>
-                      🤖 <strong>{lang === 'bg' ? 'Метео съвет:' : 'Meteo advice:'}</strong> {aiAdvice}
-                    </div>
-                  )}
+                  {aiAdvice?.trim() && <WeatherAdvice key={`${weatherRequestIdRef.current}:${aiAdvice}`} advice={aiAdvice} lang={lang} />}
 
                   <div className="big-temp">{weather.temp}°C</div>
                   <div className="mobile-weather-summary">

@@ -954,3 +954,40 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .header-btns .notification-panel button { min-height: 44px; }
   .header-btns .notification-panel { top: 82px; max-height: calc(100dvh - 98px); }
 }
+
+/* Task 5: contrast and advice disclosure affect only the current mobile card. */
+.advice-toggle { display: none; }
+@media (max-width: 640px) {
+  .main-card > div:last-child {
+    background: linear-gradient(145deg, rgba(8,25,43,.66) 0%, rgba(8,25,43,.60) 48%, rgba(8,25,43,.62) 100%);
+  }
+  .main-card .main-top { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px; }
+  .main-card .main-info-left { display: contents; }
+  .main-card .main-info-left h2 {
+    grid-column: 1; grid-row: 1; display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 44px; align-items: start !important;
+    gap: 6px !important; min-width: 0; margin: 0 0 8px !important;
+  }
+  .main-card .main-info-left h2 > span { min-width: 0; }
+  .main-card .main-info-left h2 > span:nth-child(2) { grid-column: 1; width: auto; }
+  .main-card .star-btn { grid-column: 2; grid-row: 1; margin: 0 !important; color: #fff; }
+  .main-card .big-icon { position: static; grid-column: 2; grid-row: 1; width: 64px; height: 64px; margin: 0; }
+  .main-card .big-icon > * { font-size: 3.3rem !important; }
+  .main-card .big-temp { grid-column: 1 / -1; grid-row: 2; padding-right: 0; }
+  .main-card .desc { grid-column: 1 / -1; grid-row: 3; opacity: 1; }
+  .main-card .mobile-weather-summary { grid-column: 1 / -1; grid-row: 4; }
+  .main-card .main-info-left > p:not(.desc) { grid-column: 1 / -1; grid-row: 5; }
+  .main-card .weather-advice { grid-column: 1 / -1; grid-row: 6; background: rgba(8,25,43,.55) !important; overflow-wrap: anywhere; }
+  .main-card .weather-advice-text {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden; margin-top: 4px; white-space: pre-wrap;
+  }
+  .main-card .weather-advice.is-expanded .weather-advice-text { display: block; overflow: visible; -webkit-line-clamp: unset; }
+  .main-card .advice-toggle {
+    display: block; min-height: 44px; margin-top: 6px; padding: 8px 12px;
+    max-width: 100%; border: 1px solid #fff; border-radius: 8px;
+    background: rgba(8,25,43,.8); color: #fff; font: inherit;
+    font-style: normal; font-weight: 600; text-align: left; cursor: pointer;
+  }
+  .main-card .advice-toggle:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+}
