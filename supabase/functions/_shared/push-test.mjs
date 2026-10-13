@@ -207,6 +207,11 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
    const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus})}
    report(diagnostic)
    return reply(503,'PUSH_TEST_UNCERTAIN',diagnostic)
+  }finally{
+   // Also handles DNS/preparation failures and a refused claim. No retries.
+   try {await rpc('close_push_operator',{permit_id:body.permitId})}catch{
+    report({category:'gate_cleanup_failed',phase:'cleanup'})
+   }
   }
  }
 }

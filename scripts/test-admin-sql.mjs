@@ -55,12 +55,24 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/weather-alerts.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/alert-location-scope.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/daily-pro-recommendations.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('scripts/push-operator-compatibility.sql',root),'utf8')))
+  // One psql session preserves temporary before/after snapshots of an existing device.
+  console.log(sql(['tests/sql/push-operator-before.sql','supabase/migrations/20261013050000_push_operator.sql','tests/sql/push-operator.sql']
+    .map(path=>readFileSync(new URL(path,root),'utf8')).join('\n')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
   for(let i=0;i<60;i++) { if(docker(['exec',pg,'bash','-c','exec 3<>/dev/tcp/127.0.0.1/3000'],undefined,true).status===0){ready=true;break} await delay(500) }
   assert.ok(ready,'PostgREST startup timed out')
   const admin='00000000-0000-0000-0000-000000000001', ordinary='00000000-0000-0000-0000-000000000002'
+  // Listening TCP is not schema-cache readiness. Probe a denied read-only fixture RPC.
+  // Only local disposable PostgREST is polled; this never calls the Push sender.
+  ready=false
+  for(let i=0;i<60;i++){
+    try{if(request('/rpc/admin_statistics',jwt(ordinary)).status===403){ready=true;break}}catch{/* Cache/server still starting. */}
+    await delay(500)
+  }
+  assert.ok(ready,'PostgREST schema cache readiness timed out')
   for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users','/rpc/admin_advanced_statistics','/rpc/admin_audit_entries','/rpc/admin_management_users','/rpc/admin_management_summary','/rpc/admin_user_activity']) {
     assert.equal(request(endpoint,jwt(ordinary)).status,403,'Ordinary direct RPC must fail')
     assert.equal(request(endpoint,null).status,401,'Anonymous direct RPC must fail')
