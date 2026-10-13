@@ -1,41 +1,37 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {options,runOperator} from '../../scripts/push-operator.mjs'
-const id='b0000000-0000-0000-0000-000000000001'
-const o=options(['a'.repeat(20),id,id,id,'wind'])
+const id='b0000000-0000-0000-0000-000000000001',o=options(['a'.repeat(20),id,id])
 function fixture({approve=true,fail,diagnostic={category:'accepted',providerStatus:201}}={}){
- const sql=[],calls=[],output=[]
- return {sql,calls,output,deps:{
-  db:async s=>{sql.push(s);if(s.includes('prepare_'))return id;if(fail==='arm'&&s.includes('arm_'))throw Error('private');if(fail==='cleanup'&&s.includes('close_'))throw Error('private');return 't'},
-  edge:async b=>{calls.push(b);if(b.permitId){if(fail==='send')throw Error('private token');return {diagnostic}}return {error:'PUSH_TEST_READY'}},
-  confirm:async phrase=>{assert.equal(phrase,`SEND ONE ${o.project} ${o.user} ${o.device}`);return approve},output:s=>output.push(s),
- }}
+ const calls=[],output=[]
+ return {calls,output,deps:{requestId:id,edge:async b=>{
+  calls.push(b);if(b.operation==='prepare')return {error:'PUSH_TEST_READY',permitId:id,userId:o.user,deviceId:o.device,category:o.category}
+  if(b.operation==='cancel'){if(fail==='cancel')throw Error('private');return {error:'PUSH_TEST_CLOSED'}}
+  if(fail==='send')throw Error('private-token');return {diagnostic}
+ },confirm:async phrase=>{assert.equal(phrase,`SEND ONE ${o.user} ${o.device}`);return approve},output:s=>output.push(s)}}
 }
-test('strict selection prevents SQL/URL injection and arbitrary recipients',()=>{
- for(const args of [[],['https://evil',id,id,id,'wind'],['a'.repeat(20),id+"';",id,id,'wind'],['a'.repeat(20),id,id,id,'unknown']])assert.throws(()=>options(args))
+test('strict Production selection requires no psql, approver argument or DB credentials',()=>{
+ assert.equal(o.category,'wind')
+ for(const args of [[],['https://evil',id,id],['a'.repeat(20),id+"';",id],['a'.repeat(20),id,id,'unknown']])assert.throws(()=>options(args))
 })
-test('cancelled confirmation never arms or sends and revokes the prepared permit',async()=>{
+test('cancelled confirmation never sends; server owns preparation and cancellation',async()=>{
  const f=fixture({approve:false});await runOperator(o,f.deps)
- assert.equal(f.calls.filter(b=>b.permitId).length,0)
- assert.equal(f.sql.some(s=>s.includes('arm_')),false)
- assert.match(f.sql.at(-1),/close_push_operator/)
+ assert.deepEqual(f.calls.map(b=>b.operation),['prepare','cancel'])
 })
-test('single confirmed send, cleanup after accepted/rejected/unknown/DB failures',async()=>{
- for(const fail of [undefined,'send','arm']){
+test('one confirmed send even after uncertainty; cancellation is never a delivery retry',async()=>{
+ for(const fail of [undefined,'send']){
   const f=fixture({fail});if(fail)await assert.rejects(runOperator(o,f.deps));else await runOperator(o,f.deps)
-  assert.equal(f.calls.filter(b=>b.permitId).length,fail==='arm'?0:1)
-  assert.match(f.sql.at(-1),/close_push_operator/)
+  assert.deepEqual(f.calls.map(b=>b.operation),['prepare','send','cancel'])
  }
+})
+test('actual provider status/category survives; untrusted diagnostics are never printed',async()=>{
  const f=fixture({diagnostic:{category:'provider_auth_rejected',providerStatus:403}});await runOperator(o,f.deps)
- assert.ok(f.output.some(s=>s.includes('provider_auth_rejected')&&s.includes('403')))
+ assert.ok(f.output.some(s=>s.includes('403')&&s.includes('provider_auth_rejected')))
+ const bad=fixture({diagnostic:{category:'private-token',providerStatus:'private-token',endpoint:'private-token'}});await runOperator(o,bad.deps)
+ assert.equal(bad.output.join().includes('private-token'),false)
 })
-test('untrusted Edge diagnostics cannot inject secret output',async()=>{
- const f=fixture({diagnostic:{category:'secret-token',providerStatus:'secret-token',endpoint:'secret-token'}})
- await runOperator(o,f.deps);assert.equal(f.output.join().includes('secret-token'),false)
-})
-test('cleanup failure is explicit, never retried; preflight failure never opens a gate',async()=>{
- const f=fixture({fail:'cleanup'});await assert.rejects(runOperator(o,f.deps),/CLEANUP_UNCONFIRMED/)
- assert.equal(f.sql.filter(s=>s.includes('close_')).length,1)
- const x=fixture();x.deps.edge=async()=>({error:'PUSH_TEST_DISABLED'})
- await assert.rejects(runOperator(o,x.deps),/EDGE_NOT_READY/);assert.equal(x.sql.length,0)
+test('failed cleanup is explicit; failed preflight never confirms or sends',async()=>{
+ const f=fixture({fail:'cancel'});await runOperator(o,f.deps);assert.ok(f.output.some(s=>s.includes('не е потвърдено')))
+ const x=fixture();x.deps.edge=async b=>{x.calls.push(b);return {error:'FORBIDDEN'}}
+ await assert.rejects(runOperator(o,x.deps),/NOT_READY/);assert.equal(x.calls.length,1)
 })

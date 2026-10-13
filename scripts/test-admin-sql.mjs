@@ -55,8 +55,10 @@ try {
   console.log(sql(readFileSync(new URL('tests/sql/weather-alerts.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/alert-location-scope.sql',root),'utf8')))
   console.log(sql(readFileSync(new URL('tests/sql/daily-pro-recommendations.sql',root),'utf8')))
-  sql(readFileSync(new URL('supabase/migrations/20261013050000_push_operator.sql',root),'utf8'))
-  console.log(sql(readFileSync(new URL('tests/sql/push-operator.sql',root),'utf8')))
+  console.log(sql(readFileSync(new URL('scripts/push-operator-compatibility.sql',root),'utf8')))
+  // One psql session preserves temporary before/after snapshots of an existing device.
+  console.log(sql(['tests/sql/push-operator-before.sql','supabase/migrations/20261013050000_push_operator.sql','tests/sql/push-operator.sql']
+    .map(path=>readFileSync(new URL(path,root),'utf8')).join('\n')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
