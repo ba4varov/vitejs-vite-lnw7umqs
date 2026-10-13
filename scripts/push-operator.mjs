@@ -26,9 +26,9 @@ export async function runOperator(o,{edge,confirm,output,requestId=randomUUID()}
 }
 function prompt(text,hidden=false) {
  if(!process.stdin.isTTY || !process.stdout.isTTY)throw Error('TTY_REQUIRED')
- process.stdout.write(text+'\n> ')
  return new Promise((resolve,reject)=>{
   let value='';process.stdin.setRawMode(true);process.stdin.resume()
+  process.stdout.write(text+'\n> ')
   const done=()=>{process.stdin.off('data',read);process.stdin.setRawMode(false);process.stdin.pause();process.stdout.write('\n')}
   const read=chunk=>{for(const c of chunk.toString()){
    if(c==='\u0003'){done();reject(Error('CANCELLED'));return}
@@ -44,7 +44,7 @@ async function main() {
  let token=await prompt('Съществуващ операторски token (скрит; само в паметта):',true)
  if(!/^[A-Za-z0-9_-]{43,128}$/.test(token))throw Error('INVALID_TOKEN')
  let session=await prompt('Текущ access token от входа на избрания администратор (скрит):',true)
- if(!/^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(session))throw Error('INVALID_SESSION')
+ if(!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(session))throw Error('INVALID_SESSION')
  const edge=async body=>{
   const response=await fetch(`https://${o.project}.supabase.co/functions/v1/push-test`,{method:'POST',redirect:'error',signal:AbortSignal.timeout(20000),headers:{authorization:'Bearer '+token+'.'+session,'content-type':'application/json'},body:JSON.stringify(body)})
   const reader=response.body.getReader();let text='',size=0
