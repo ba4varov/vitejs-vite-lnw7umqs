@@ -1,3 +1,4 @@
+import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 import {calculatePlanner} from '../server/planner-logic.js'
 
@@ -26,8 +27,8 @@ for(const plan of ['guest','free','pro']) for(const width of [390,768,1440]) for
   test(`planner ${plan} ${width} ${lang} ${dark?'dark':'light'}`,async({page})=>{
     await page.setViewportSize({width,height:1000});const state=await fixture(page,plan)
     await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
-    if(lang==='en')await page.locator('button.lang-btn').click()
-    if(dark)await page.getByRole('button',{name:'🌙',exact:true}).click()
+    if(lang==='en')await clickHeaderControl(page, page.locator('button.lang-btn'))
+    if(dark)await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
     const planner=page.locator('.weather-planner')
     await expect(planner).toContainText(lang==='bg'?'Моят метео планер':'My Weather Planner')
     if(plan==='pro'){
@@ -72,6 +73,6 @@ test('logout discards a late calculation and leaves Free weather available',asyn
   let release:()=>void
   const pending=new Promise<void>(resolve=>{release=resolve})
   await page.route('**/api/planner',async r=>{await pending;await r.fulfill({json:{status:'ok',timeZone:'Europe/Sofia',windows:[{start:1791518400000,end:1791525600000,feelsLikeMin:20,feelsLikeMax:20,rainProbability:10,rain:0,wind:5}]}}).catch(()=>{})})
-  await planner.getByRole('button').click();await page.locator('.auth-nav').getByRole('button',{name:'Изход',exact:true}).click();release!()
+  await planner.getByRole('button').click();await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Изход',exact:true}));release!()
   await expect(planner.locator('select')).toHaveCount(0);await expect(planner.locator('li')).toHaveCount(0);await expect(page.locator('.weather-forecast-view')).toBeVisible()
 })

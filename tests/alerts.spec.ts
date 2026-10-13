@@ -1,3 +1,4 @@
+import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 import {calculatePlanner} from '../server/planner-logic.js'
 import {forecastRisks,activityAlerts,alertKey} from '../server/alerts-logic.js'
@@ -58,8 +59,8 @@ async function alertFixture(page:any,plan:string){
 for(const plan of ['guest','free','pro'])for(const width of [390,1440])for(const lang of ['bg','en'])for(const dark of [false,true])test(`notification close and reopen ${plan} ${width} ${lang} ${dark?'dark':'light'}`,async({page})=>{
  await page.setViewportSize({width,height:1000});const state=await alertFixture(page,plan);await page.goto('/')
  await expect(page.locator('.weather-forecast-view')).toBeVisible()
- if(lang==='en')await page.locator('button.lang-btn').click()
- if(dark)await page.getByRole('button',{name:'🌙',exact:true}).click()
+ if(lang==='en')await clickHeaderControl(page, page.locator('button.lang-btn'))
+ if(dark)await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
  const bell=page.getByRole('button',{name:lang==='bg'?'Известия':'Notifications',exact:true}),panel=page.locator('.notification-panel')
  await bell.click();await expect(panel.locator('li')).toHaveCount(plan==='pro'?2:1)
  await panel.getByRole('button',{name:lang==='bg'?'Прочетено':'Mark read',exact:true}).first().click()
@@ -86,8 +87,8 @@ for(const plan of ['guest','free','pro'])for(const width of [390,1440])for(const
 for(const plan of ['guest','free','pro'])for(const width of [390,768,1440])for(const lang of ['bg','en'])for(const dark of [false,true])test(`alerts ${plan} ${width} ${lang} ${dark?'dark':'light'}`,async({page})=>{
  await page.setViewportSize({width,height:1000});await alertFixture(page,plan);await page.goto('/')
  await expect(page.locator('.weather-forecast-view')).toBeVisible()
- if(lang==='en')await page.locator('button.lang-btn').click()
- if(dark)await page.getByRole('button',{name:'🌙',exact:true}).click()
+ if(lang==='en')await clickHeaderControl(page, page.locator('button.lang-btn'))
+ if(dark)await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
  await page.getByRole('button',{name:lang==='bg'?'Известия':'Notifications',exact:true}).click()
  const panel=page.locator('.notification-panel');await expect(panel.locator('li')).toHaveCount(plan==='pro'?2:1)
  await expect(panel).toContainText(lang==='bg'?'Ориентировъчно предупреждение по прогноза':'Indicative forecast warning')
@@ -104,7 +105,7 @@ test('notification outage keeps weather and Bobby available; profile settings re
 })
 test('settings saved, activities only Pro, forecast refresh does not repeat read notifications',async({page})=>{
  await alertFixture(page,'pro');await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
- await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:/Метео известия|Weather notifications/}).click()
  const settings=page.locator('.notification-settings');await expect(settings).toBeVisible();await expect(settings.locator('input')).toHaveCount(8)
  await settings.getByText('Време за градинарство',{exact:false}).click();await expect(settings.locator('input').nth(6)).toBeChecked();await settings.getByRole('button',{name:'Запази метео настройките'}).click()
@@ -179,9 +180,9 @@ test('client rejects mixed location or time-zone rows even in a malformed scoped
 for(const lang of ['bg','en'])test(`daily garden hide survives disjoint new forecast, reload, 15-minute update and city switches ${lang}`,async({page})=>{
  const state=await alertFixture(page,'pro')
  await page.goto('/');await expect(page.locator('.weather-forecast-view')).toBeVisible()
- if(lang==='en')await page.locator('button.lang-btn').click()
+ if(lang==='en')await clickHeaderControl(page, page.locator('button.lang-btn'))
  const button=(bg:string,en:string)=>lang==='bg'?bg:en
- await page.locator('.auth-nav').getByRole('button',{name:button('Моят профил','My profile'),exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:button('Моят профил','My profile'),exact:true}))
  await page.getByRole('tab',{name:/Метео известия|Weather notifications/}).click()
  const settings=page.locator('.notification-settings')
  await settings.getByRole('button',{name:button('Изключи всички','Disable all'),exact:true}).click()

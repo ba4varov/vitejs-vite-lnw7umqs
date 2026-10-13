@@ -1,3 +1,4 @@
+import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 import {fixture} from './profile-fixture'
 for(const width of [390,768,1440])for(const lang of ['bg','en'] as const)for(const failed of [false,true])test(`profile height and API states ${width} ${lang} ${failed?'failed':'loaded'}`,async({page})=>{
@@ -5,7 +6,7 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'] as const)for(con
  if(failed){
   for(const endpoint of ['profile','alerts','push','activity'])await page.route(`**/api/${endpoint}**`,r=>r.fulfill({status:503,json:{error:'ISOLATED_UNAVAILABLE'}}))
  }
- await page.locator('.auth-nav').getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true}))
  const dialog=page.getByRole('dialog'),tabs=dialog.getByRole('tab'),header=dialog.locator('.auth-dialog-header')
  await expect(dialog.locator('.profile-plan')).toContainText(failed?(lang==='bg'?'Планът не е наличен':'Plan unavailable'):(lang==='bg'?'Pro план':'Pro plan'))
  await expect(dialog.locator('.profile-plan')).not.toContainText(lang==='bg'?'Безплатен':'Free')
@@ -36,7 +37,7 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'] as const)for(con
 
 test('desktop height stays inside a short viewport',async({page})=>{
  await page.setViewportSize({width:1440,height:480});await fixture(page,'bg')
- await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:'Push известия',exact:true}).click()
  const box=(await page.getByRole('dialog').boundingBox())!
  expect(box.y).toBeGreaterThanOrEqual(16);expect(box.y+box.height).toBeLessThanOrEqual(464)
