@@ -718,7 +718,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .hourly-row, .daily-grid {
     gap: 8px !important;
     align-items: stretch;
-    touch-action: pan-x pinch-zoom;
+    touch-action: manipulation;
   }
   .forecast-period-card {
     flex-basis: clamp(136px, calc((100% - 12px) / 2), 158px);

@@ -78,7 +78,7 @@ for (const width of [320, 360, 390, 430, 640, 641, 768, 1440]) for (const lang o
         expect(geometry!.height).toBeLessThanOrEqual(230)
         expect(geometry!.width).toBeLessThanOrEqual(158)
         const style = await strip.evaluate(e => ({ touch: getComputedStyle(e).touchAction, snap: getComputedStyle(e).scrollSnapType }))
-        expect(style).toEqual({ touch: 'pan-x pinch-zoom', snap: 'x mandatory' })
+        expect(style).toEqual({ touch: 'manipulation', snap: 'x mandatory' })
         if (width === 360 || width === 390) expect(await strip.evaluate(e => e.clientWidth / (e.querySelector('button')!.getBoundingClientRect().width + 8))).toBeGreaterThanOrEqual(1.85)
         // Persistent, reviewable baselines use the dedicated forecast config.
         if (testInfo.config.configFile?.endsWith('playwright.forecast-cards.config.ts')) {
@@ -121,6 +121,79 @@ for (const width of [320, 360, 390, 430, 640, 641, 768, 1440]) for (const lang o
     }
   })
 }
+
+test.describe('native gestures starting on forecast cards', () => {
+  test.use({ isMobile: true })
+  for (const width of [320, 360, 390, 430, 640]) for (const lang of ['bg', 'en'] as const) for (const dark of [false, true]) {
+    test(`horizontal, vertical and pinch ${width} ${lang} ${dark}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await fixture(page, lang)
+      if (dark) {
+        await openHeaderMenu(page)
+        await page.locator('.header-menu > .icon-btn').click()
+        await page.locator('.mobile-menu-toggle').click()
+      }
+      const cdp = await page.context().newCDPSession(page)
+      const settled = async () => {
+        const position = () => page.evaluate(() => [scrollY, ...Array.from(document.querySelectorAll('.hourly-row, .daily-grid'), e => e.scrollLeft)])
+        await expect.poll(async () => {
+          const before = await position()
+          await page.waitForTimeout(100)
+          return (await position()).join(',') === before.join(',')
+        }).toBe(true)
+      }
+      const swipe = async (x: number, y: number, dx: number, dy: number) => {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 0 }] })
+        for (let step = 1; step <= 10; step++) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * step / 10, y: y + dy * step / 10, id: 0 }] })
+          await page.waitForTimeout(16) // Deliver a real sequence of gesture frames.
+        }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      }
+      for (const row of ['.hourly-row', '.daily-grid']) {
+        const strip = page.locator(row), card = strip.locator('.forecast-period-card').first()
+        await card.evaluate(e => e.scrollIntoView({ block: 'center' }))
+        let box = (await card.boundingBox())!
+        const beforeHorizontal = await page.evaluate(() => scrollY)
+        await swipe(box.x + box.width - 10, box.y + box.height / 2, -120, 8)
+        await expect.poll(() => strip.evaluate(e => e.scrollLeft)).toBeGreaterThan(0)
+        await settled()
+        expect(await page.evaluate(() => scrollY)).toBe(beforeHorizontal)
+        await expect(page.locator('.popup-card')).toHaveCount(0)
+
+        await strip.evaluate(e => { e.scrollLeft = 0 })
+        await expect.poll(() => strip.evaluate(e => e.scrollLeft)).toBeLessThanOrEqual(3)
+        await card.evaluate(e => e.scrollIntoView({ block: 'center' }))
+        box = (await card.boundingBox())!
+        const beforeVertical = await page.evaluate(() => scrollY)
+        const horizontalOffset = await strip.evaluate(e => e.scrollLeft)
+        // Start on the card, rather than its surrounding section or page gutter.
+        await swipe(box.x + box.width / 2, box.y + box.height / 2, 8, -140)
+        await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(beforeVertical + 60)
+        await settled()
+        expect(await strip.evaluate(e => e.scrollLeft)).toBe(horizontalOffset)
+        await expect(page.locator('.popup-card')).toHaveCount(0)
+
+        await card.evaluate(e => e.scrollIntoView({ block: 'center' }))
+        box = (await card.boundingBox())!
+        const centerX = box.x + box.width / 2, centerY = box.y + box.height / 2
+        const scale = await page.evaluate(() => visualViewport!.scale)
+        // Headless Chromium supports page zoom through its touchpad pinch path.
+        // Assert actual viewport scaling rather than forcing an emulated scale.
+        await cdp.send('Input.synthesizePinchGesture', { x: centerX, y: centerY, scaleFactor: 1.5, gestureSourceType: 'mouse' })
+        await expect.poll(() => page.evaluate(() => visualViewport!.scale)).toBeGreaterThan(scale + .1)
+        await expect(page.locator('.popup-card')).toHaveCount(0)
+        await cdp.send('Input.synthesizePinchGesture', { x: centerX, y: centerY, scaleFactor: 1 / 1.5, gestureSourceType: 'mouse' })
+        await expect.poll(() => page.evaluate(base => Math.abs(visualViewport!.scale - base), scale)).toBeLessThan(.01)
+        await card.tap()
+        await expect(page.locator('.popup-card')).toBeVisible()
+        await expect(card).toHaveAttribute('aria-pressed', 'true')
+        await page.locator('.popup-card button').first().click()
+      }
+      await cdp.detach()
+    })
+  }
+})
 
 for (const width of [320, 360, 390, 430, 640]) for (const lang of ['bg', 'en']) for (const dark of [false, true]) {
   test(`long and missing content ${width} ${lang} ${dark}`, async ({ page }, testInfo) => {
