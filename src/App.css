@@ -844,3 +844,33 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .statistics-dialog .statistics-actions { margin-bottom: 0; }
 .registration-dialog .auth-google { margin-bottom: 6px; }
 .registration-dialog .auth-link { margin-top: 8px; }
+
+/* Current weather only: desktop keeps its existing layout and all values. */
+.mobile-weather-summary, .metrics-toggle { display: none; }
+@media (max-width: 640px) {
+  .main-card > div:last-child { padding: 16px !important; min-height: 0 !important; background: rgba(8, 25, 43, .38); color: #fff; }
+  .main-card .main-top { margin-bottom: 14px !important; }
+  .main-card .main-info-left { width: 100%; min-width: 0; display: flex; flex-direction: column; }
+  .main-card .main-info-left h2 { order: 0; padding-right: 0; font-size: 1.4rem; line-height: 1.3; overflow-wrap: anywhere; }
+  .main-card .big-temp { order: 1; margin-top: 6px; padding-right: 80px; font-size: 3.5rem; line-height: 1.15; }
+  .main-card .desc { order: 2; font-size: 1rem; line-height: 1.4; }
+  .main-card .mobile-weather-summary { display: block; order: 3; font-size: .9rem; line-height: 1.5; }
+  .main-card .mobile-weather-summary p { margin: 2px 0; }
+  .main-card .main-info-left > p:not(.desc) { order: 4; margin-top: 8px; opacity: 1 !important; }
+  .main-card .main-info-left > div:not(.big-temp):not(.mobile-weather-summary) { order: 5; margin-block: 8px !important; padding: 8px 10px !important; }
+  .main-card .big-icon { top: 50px; right: 0; width: 76px; height: 76px; transform: none; display: flex; align-items: center; justify-content: center; }
+  .main-card .big-icon > * { font-size: 3.7rem !important; }
+  .main-card .current-weather-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; overflow: visible; }
+  .main-card .current-weather-metrics .stat-box { min-width: 0; min-height: 0; padding: 10px 8px; background: rgba(8,25,43,.62); overflow-wrap: anywhere; }
+  .main-card .current-weather-metrics .label { margin: 4px 0; font-size: .85rem; opacity: 1; }
+  .main-card .current-weather-metrics .value { font-size: 1rem; }
+  .main-card .current-weather-metrics:not(.is-expanded) > :not(.metric-humidity):not(.metric-precipProb):not(.metric-wind):not(.metric-cloudCover),
+  .main-card .current-weather-metrics > .metric-summary { display: none; }
+  .main-card .metric-humidity { order: -4; }
+  .main-card .metric-precipProb { order: -3; }
+  .main-card .metric-wind { order: -2; }
+  .main-card .metric-cloudCover { order: -1; }
+  .main-card .metrics-toggle { display: block; margin-top: 10px; min-height: 44px; width: 100%; padding: 10px 14px; border: 1px solid #fff; border-radius: 10px; color: #fff; background: rgba(8,25,43,.8); font: inherit; font-weight: 600; cursor: pointer; }
+  .main-card .metrics-toggle:focus-visible, .main-card .star-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .main-card .star-btn { min-width: 44px; min-height: 44px; }
+}
