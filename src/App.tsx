@@ -11,6 +11,7 @@ import { WeatherNotifications } from './WeatherNotifications'
 import { WeatherPlanner } from './WeatherPlanner'
 import { AdminLink } from './AdminLink'
 import { HeaderNavigation } from './HeaderNavigation'
+import { ForecastSectionOrder } from './ForecastSectionOrder'
 import { loadLanguage, saveLanguage } from './language-storage.js'
 import { subscribeSession, type AuthSession } from './auth-client'
 import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, setPlaceIdentity, type Place } from './places-client'
@@ -431,6 +432,7 @@ const WeatherApp = () => {
   const weatherRequestIdRef = useRef(0)
   const locationChoiceRef = useRef(false)
   const chatMessagesRef = useRef<HTMLDivElement>(null)
+  const forecastDashboardRef = useRef<HTMLElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
   const chatRequestIdRef = useRef(0)
   const placesGuardRef = useRef(createPlacesSessionGuard())
@@ -1132,7 +1134,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       )}
 
       {!loading && !error && weather && (
-        <main className="forecast-dashboard">
+        <main ref={forecastDashboardRef} className="forecast-dashboard">
           {activeAlerts.length > 0 && (
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
@@ -1236,7 +1238,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
           </div>
 
-          <section className="card weather-chat" aria-labelledby="weather-chat-title">
+          <ForecastSectionOrder dashboardRef={forecastDashboardRef}>
+          <section key="chat" className="card weather-chat" aria-labelledby="weather-chat-title">
             <div className="chat-heading">
               <div className="chat-avatar" aria-hidden="true">🤖</div>
               <div>
@@ -1271,7 +1274,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             <p className="chat-disclaimer">{lang === 'bg' ? 'Съветите са информативни. При опасно време следвай указанията на местните власти.' : 'Advice is informational. During severe weather, follow local authority guidance.'}</p>
           </section>
 
-          <section className="card hourly-section">
+          <section key="hourly" className="card hourly-section">
             <div className="forecast-heading"><h3>{t.hours24}</h3><div className="forecast-scroll-controls">
               {[-1, 1].map(direction => <button type="button" key={direction} aria-label={lang === 'bg' ? (direction < 0 ? 'Предишни часове' : 'Следващи часове') : (direction < 0 ? 'Previous hours' : 'Next hours')} onClick={event => {
                 const row = event.currentTarget.closest('section')?.querySelector('.hourly-row')
@@ -1286,7 +1289,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
           </section>
 
-          <section className="card forecast-section">
+          <section key="daily" className="card forecast-section">
             <div className="forecast-heading"><h3>{t.days14}</h3><div className="forecast-scroll-controls">
               {[-1, 1].map(direction => <button type="button" key={direction} aria-label={lang === 'bg' ? (direction < 0 ? 'Предишни дни' : 'Следващи дни') : (direction < 0 ? 'Previous days' : 'Next days')} onClick={event => {
                 const row = event.currentTarget.closest('section')?.querySelector('.daily-grid')
@@ -1304,6 +1307,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               })}
             </div>
           </section>
+
+          </ForecastSectionOrder>
 
           <Chart hourly={hourly} darkMode={darkMode} t={t} />
           <WeatherPlanner lang={lang} session={session} forecast={plannerForecast} city={city} />

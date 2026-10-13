@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test'
 export default defineConfig({
+  snapshotPathTemplate: '{testDir}/../work/visual-snapshots/{testFileName}/{arg}{-projectName}{-snapshotSuffix}{ext}',
   testDir: './tests', testIgnore: 'signup-activity.spec.ts', outputDir: './work/browser-results',
   use: { baseURL: 'http://127.0.0.1:4173', launchOptions: { executablePath: process.env.CHROMIUM_PATH || undefined } },
   webServer: { command: 'npm run dev -- --host 127.0.0.1 --port 4173', url: 'http://127.0.0.1:4173', reuseExistingServer: false,
