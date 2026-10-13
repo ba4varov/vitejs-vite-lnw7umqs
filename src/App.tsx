@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { WeatherAdvice } from './WeatherAdvice'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
-import { CHART_METRICS, chartSummary, chartTheme, chartValues, valueRange, visibleTimeIndexes } from './chart-utils.js'
+import { Chart, SingleChart } from './WeatherCharts'
 import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
@@ -231,161 +231,6 @@ const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
       {icon}
     </span>
   )
-}
-
-type ChartType = 'temp' | 'rain' | 'wind' | 'pressure' | 'aqi'
-
-const formatChartValue = (value: number, type: ChartType) =>
-  type === 'rain' ? value.toLocaleString('bg-BG', { maximumFractionDigits: 2 }) : Math.round(value).toString()
-
-const SingleChart = ({ hourly, darkMode, type, label, unit, color, height }: any) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const frameRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(0)
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
-  const metric = CHART_METRICS[type as ChartType] || { icon: '◌', color, kind: 'line' }
-  const chartColor = color || metric.color
-  const values = chartValues(hourly, type) as Array<number | null>
-  const summary = chartSummary(values) as { current: number, min: number, max: number } | null
-  const allZeroRain = type === 'rain' && values.some(Number.isFinite) && values.every(value => value === null || value === 0)
-  const mobile = width > 0 && width < 520
-  const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const theme = chartTheme(darkMode, mobile, reducedMotion)
-  const chartHeight = height || (mobile ? 232 : 264)
-  const labels = hourly.slice(0, 24).map((item: any) => item?.hour || '--:--')
-
-  useEffect(() => {
-    const frame = frameRef.current
-    if (!frame) return
-    const observer = new ResizeObserver(entries => setWidth(Math.round(entries[0].contentRect.width)))
-    observer.observe(frame)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !width || allZeroRain) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    canvas.width = Math.round(width * dpr)
-    canvas.height = Math.round(chartHeight * dpr)
-    canvas.style.width = `${width}px`; canvas.style.height = `${chartHeight}px`
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, chartHeight)
-
-    const pad = { left: mobile ? 42 : 48, right: 22, top: 16, bottom: 36 }
-    const plotW = width - pad.left - pad.right, plotH = chartHeight - pad.top - pad.bottom
-    const range = valueRange(values, type)
-    const x = (index: number) => pad.left + (values.length <= 1 ? plotW / 2 : index * plotW / (values.length - 1))
-    const y = (value: number) => pad.top + plotH - ((value - range.min) / (range.max - range.min)) * plotH
-
-    ctx.font = `13px ${getComputedStyle(document.body).fontFamily}`
-    ctx.fillStyle = theme.text; ctx.strokeStyle = theme.grid; ctx.lineWidth = 1
-    const tickValues: number[] = []
-    if (type === 'pressure') {
-      const bottom = Math.floor(range.min), top = Math.ceil(range.max)
-      for (let value = bottom; value <= top; value += range.step) tickValues.push(value)
-      if (tickValues.length < 2) tickValues.push(bottom + range.step)
-    } else {
-      for (let i = 0; i <= 4; i++) tickValues.push(range.min + (range.max - range.min) * i / 4)
-    }
-    ;[...new Set(tickValues.map(value => type === 'rain' ? Number(value.toFixed(1)) : Math.round(value)))].forEach(value => {
-      const yy = y(value)
-      if (yy < pad.top - 1 || yy > pad.top + plotH + 1) return
-      ctx.beginPath(); ctx.moveTo(pad.left, yy); ctx.lineTo(width - pad.right, yy); ctx.stroke()
-      ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(value), pad.left - 7, yy)
-    })
-
-    ctx.textBaseline = 'bottom'; ctx.textAlign = 'center'
-    visibleTimeIndexes(values.length, mobile).forEach(index => ctx.fillText(index === 0 ? 'Сега' : labels[index], x(index), chartHeight - 5))
-
-    const drawSegment = (fill: boolean) => {
-      let drawing = false
-      values.forEach((value, index) => {
-        if (value === null) { drawing = false; return }
-        if (!drawing) { ctx.moveTo(x(index), y(value)); drawing = true } else ctx.lineTo(x(index), y(value))
-      })
-      if (fill) {
-        const last = values.findLastIndex(Number.isFinite), first = values.findIndex(Number.isFinite)
-        if (first >= 0) { ctx.lineTo(x(last), pad.top + plotH); ctx.lineTo(x(first), pad.top + plotH); ctx.closePath() }
-      }
-    }
-
-    if (metric.kind === 'bar') {
-      const slot = plotW / Math.max(values.length, 1), barWidth = Math.min(18, Math.max(4, slot * .58))
-      values.forEach((value, index) => {
-        if (value === null) return
-        const top = y(value), bottom = y(0), h = Math.max(value > 0 ? 2 : 0, bottom - top)
-        ctx.fillStyle = chartColor; ctx.beginPath(); ctx.roundRect(x(index) - barWidth / 2, bottom - h, barWidth, h, [4, 4, 0, 0]); ctx.fill()
-      })
-    } else {
-      if (type !== 'pressure') {
-        const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH)
-        gradient.addColorStop(0, `${chartColor}24`); gradient.addColorStop(1, `${chartColor}00`)
-        ctx.beginPath(); drawSegment(true); ctx.fillStyle = gradient; ctx.fill()
-      }
-      ctx.beginPath(); drawSegment(false); ctx.strokeStyle = chartColor; ctx.lineWidth = 2.25; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke()
-    }
-    if (activeIndex !== null && values[activeIndex] !== null) {
-      ctx.beginPath(); ctx.arc(x(activeIndex), y(values[activeIndex]!), 4, 0, Math.PI * 2)
-      ctx.fillStyle = chartColor; ctx.fill(); ctx.strokeStyle = darkMode ? '#0f172a' : '#fff'; ctx.lineWidth = 2; ctx.stroke()
-    }
-  }, [activeIndex, allZeroRain, chartColor, chartHeight, darkMode, hourly, metric.kind, mobile, theme.grid, theme.text, type, values, width])
-
-  const choosePoint = (clientX: number) => {
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect || !values.length) return
-    const left = mobile ? 42 : 48
-    setActiveIndex(Math.max(0, Math.min(values.length - 1, Math.round((clientX - rect.left - left) / Math.max(1, rect.width - left - 22) * (values.length - 1)))))
-  }
-  const currentValue = activeIndex === null ? null : values[activeIndex]
-  const summaryText = !summary ? 'Няма налични данни за периода' : type === 'wind'
-    ? `Сега ${formatChartValue(summary.current, type)} ${unit} · Макс. ${formatChartValue(summary.max, type)} ${unit}`
-    : type === 'rain' ? `Общо ${formatChartValue(values.reduce((sum: number, value) => sum + (value || 0), 0), type)} ${unit} · Макс. ${formatChartValue(summary.max, type)} ${unit}`
-    : `Сега ${formatChartValue(summary.current, type)}${type === 'temp' ? '°' : ` ${unit}`} · Мин. ${formatChartValue(summary.min, type)}${type === 'temp' ? '°' : ` ${unit}`} · Макс. ${formatChartValue(summary.max, type)}${type === 'temp' ? '°' : ` ${unit}`}`
-  const accessible = `${label}. ${summaryText}. Период: следващите 24 часа.`
-
-  return <article className="mini-chart" aria-label={accessible}>
-    <header className="chart-header"><span className="chart-icon" style={{ color: chartColor }} aria-hidden="true">{metric.icon}</span><div><h4>{label}</h4><p>{summaryText}</p></div></header>
-    <p className="sr-only">{accessible} Използвайте стрелките наляво и надясно върху графиката за почасовите стойности.</p>
-    <div className="chart-frame" ref={frameRef} style={{ height: chartHeight }}>
-      {allZeroRain ? <div className="no-rain" role="status"><span aria-hidden="true">🌧️</span><p>Не се очакват валежи през следващите 24 часа.</p></div> : <>
-        <canvas ref={canvasRef} tabIndex={0} role="img" aria-label={accessible}
-          onMouseMove={event => choosePoint(event.clientX)} onMouseLeave={() => setActiveIndex(null)}
-          onTouchStart={event => choosePoint(event.touches[0].clientX)}
-          onFocus={() => setActiveIndex(index => index ?? 0)} onBlur={() => setActiveIndex(null)}
-          onKeyDown={event => { if (event.key === 'ArrowRight') setActiveIndex(i => Math.min(values.length - 1, (i ?? -1) + 1)); if (event.key === 'ArrowLeft') setActiveIndex(i => Math.max(0, (i ?? 1) - 1)) }} />
-        {activeIndex !== null && currentValue !== null && <div className="chart-tooltip" role="status" style={{ left: `${Math.min(Math.max(78, width - 78), Math.max(78, 48 + activeIndex / Math.max(1, values.length - 1) * (width - 62)))}px`, background: theme.tooltipBackground, color: theme.tooltipText }}>{labels[activeIndex]} — {formatChartValue(currentValue, type)}{type === 'temp' ? '°C' : ` ${unit}`}</div>}
-      </>}
-    </div>
-  </article>
-}
-
-const Chart = ({ hourly, darkMode, t }: any) => {
-  const chartsData = [
-    { key: 'temp', label: t.temp, unit: '°C' }, { key: 'rain', label: t.rain, unit: t.mm },
-    { key: 'wind', label: t.windChart, unit: t.windUnit }, { key: 'pressure', label: t.pressureChart, unit: t.hpa }
-  ]
-  const [selectedChart, setSelectedChart] = useState<ChartType>('temp')
-  const [mobileCharts, setMobileCharts] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
-
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 760px)')
-    const updateLayout = () => setMobileCharts(query.matches)
-    query.addEventListener('change', updateLayout)
-    return () => query.removeEventListener('change', updateLayout)
-  }, [])
-
-  const visibleCharts = mobileCharts ? chartsData.filter(chart => chart.key === selectedChart) : chartsData
-
-  return <section className="card charts-section" aria-labelledby="charts-title">
-    <h3 id="charts-title">{t.chart}</h3>
-    {mobileCharts && <div className="chart-selector" role="tablist" aria-label={t.chart}>
-      {chartsData.map(chart => <button key={chart.key} type="button" role="tab" aria-selected={selectedChart === chart.key} className={selectedChart === chart.key ? 'active' : ''} onClick={() => setSelectedChart(chart.key as ChartType)}>{chart.label}</button>)}
-    </div>}
-    <div className="charts-grid">{visibleCharts.map(chart => <SingleChart key={chart.key} hourly={hourly} darkMode={darkMode} type={chart.key} label={chart.label} unit={chart.unit} />)}</div>
-  </section>
 }
 
 const WeatherApp = () => {
@@ -1307,7 +1152,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
           </ForecastSectionOrder>
 
-          <Chart hourly={hourly} darkMode={darkMode} t={t} />
+          <Chart hourly={hourly} darkMode={darkMode} t={t} lang={lang} />
           <WeatherPlanner lang={lang} session={session} forecast={plannerForecast} city={city} />
 
           <section className="card map-section">
@@ -1333,7 +1178,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
               </div>
               <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
-                <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} />
+                <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
               </div>
             </section>
           )}
