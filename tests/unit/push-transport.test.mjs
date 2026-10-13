@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process'
 import {mkdtempSync,readFileSync,rmSync,mkdirSync} from 'node:fs'
 import {join,resolve} from 'node:path'
 import webpush from 'web-push'
+import {fixtureKeys} from './push-fixtures.mjs'
 import {sendPinned,connectNode} from '../../supabase/functions/_shared/push-test.mjs'
 
 test('real local TLS simulated provider exercises Node/Deno https IP target, SNI, headers and redirect refusal',async()=>{
@@ -15,10 +16,10 @@ test('real local TLS simulated provider exercises Node/Deno https IP target, SNI
  let mode=201,hits=0,pins=0,received
  const server=createServer({key,cert},(req,res)=>{
   hits++;assert.equal(req.url,'/wp/isolated');assert.equal(req.headers.host,'fcm.googleapis.com');assert.equal(req.headers['content-encoding'],'aes128gcm');assert.match(req.headers.authorization,/^vapid /)
-  const chunks=[];req.on('data',c=>chunks.push(c));req.on('end',()=>{received=Buffer.concat(chunks);res.writeHead(mode,{location:'https://untrusted.example.invalid/'});res.end()})
+  const chunks=[];req.on('data',c=>chunks.push(c));req.on('end',()=>{received=Buffer.concat(chunks);res.writeHead(mode,{location:'https://untrusted.example.invalid/'});res.end(Buffer.alloc(12000,1))})
  })
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
- const vapid=webpush.generateVAPIDKeys(),subscriber=webpush.generateVAPIDKeys()
+ const vapid=fixtureKeys(),subscriber=fixtureKeys(2)
  const details=webpush.generateRequestDetails({endpoint:'https://fcm.googleapis.com/wp/isolated',keys:{p256dh:subscriber.publicKey,auth:Buffer.alloc(16,1).toString('base64url')}},'isolated',{contentEncoding:'aes128gcm',vapidDetails:{...vapid,subject:'mailto:test@example.invalid'}})
  const resolver=async()=>[{address:'8.8.8.8',family:4}]
  // Test-only adapter substitutes loopback for the validated IP, preserving verified provider SNI.

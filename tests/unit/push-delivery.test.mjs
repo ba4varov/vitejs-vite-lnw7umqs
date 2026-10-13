@@ -2,10 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createECDH,createDecipheriv,hkdfSync,randomBytes} from 'node:crypto'
 import webpush from 'web-push'
+import {fixtureKeys} from './push-fixtures.mjs'
 import {validVapid,validEndpoint,publicAddress,pinnedLookup,retryDelay,preparePush,sendPinned,createTestHandler} from '../../supabase/functions/_shared/push-test.mjs'
 
 // Ephemeral in-memory keys only. No provider requests or saved keys.
-const keys=webpush.generateVAPIDKeys(),other=webpush.generateVAPIDKeys()
+const keys=fixtureKeys(),other=fixtureKeys(2)
 const config={publicKey:keys.publicKey,privateKey:keys.privateKey,subject:'mailto:test@example.invalid'}
 const receiver=createECDH('prime256v1');receiver.generateKeys()
 const auth=randomBytes(16),id='b0000000-0000-0000-0000-000000000001'

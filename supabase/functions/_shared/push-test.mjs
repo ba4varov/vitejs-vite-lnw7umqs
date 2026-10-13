@@ -79,14 +79,16 @@ export function preparePush(device, config, eventId) {
  }),{TTL:60,urgency:'very-low',contentEncoding:'aes128gcm',vapidDetails:{subject:config.subject,publicKey:config.publicKey,privateKey:config.privateKey}})
 }
 export async function connectNode(target,signal) {
+ if(signal.aborted)throw Error('TIMEOUT')
  const socket=tlsConnect({host:target.address,port:target.port || 443,servername:target.hostname,rejectUnauthorized:true,ALPNProtocols:['http/1.1'],...(target.testCa?{ca:target.testCa}:{})})
  const close=()=>socket.destroy()
  signal.addEventListener('abort',close,{once:true})
- await new Promise((resolve,reject)=>{socket.once('secureConnect',resolve);socket.once('error',()=>reject(Error('TLS_FAILED')))})
- const iterator=socket[Symbol.asyncIterator]()
+ try {await new Promise((resolve,reject)=>{socket.once('secureConnect',resolve);socket.once('error',()=>reject(Error('TLS_FAILED')));socket.once('close',()=>reject(Error('TLS_FAILED')))})}
+ catch(error){signal.removeEventListener('abort',close);close();throw error}
+ const iterator=socket[Symbol.asyncIterator]();let pending=Buffer.alloc(0)
  return {
   write:bytes=>new Promise((resolve,reject)=>socket.write(bytes,error=>error?reject(Error('WRITE_FAILED')):resolve(bytes.length))),
-  read:async buffer=>{const {value,done}=await iterator.next();if(done)return null;if(value.length>buffer.length)throw Error('RESPONSE_LIMIT');buffer.set(value);return value.length},
+  read:async buffer=>{if(!pending.length){const {value,done}=await iterator.next();if(done)return null;pending=value}const n=Math.min(buffer.length,pending.length);buffer.set(pending.subarray(0,n));pending=pending.subarray(n);return n},
   close:()=>{signal.removeEventListener('abort',close);close()},
  }
 }
@@ -106,15 +108,27 @@ export async function sendPinned(details, resolver=lookup, connector=connectNode
   const head=`POST ${endpoint.pathname}${endpoint.search} HTTP/1.1\r\n`+fields.map(([name,value])=>`${name}: ${value}\r\n`).join('')+'\r\n'
   if(Buffer.byteLength(head)>4096 || details.body.length>2048)throw Error('REQUEST_LIMIT')
   const bytes=Buffer.concat([Buffer.from(head),details.body]);let written=0
-  while(written<bytes.length){const n=await connection.write(bytes.subarray(written));if(!Number.isInteger(n)||n<1||n>bytes.length-written)throw Error('WRITE_FAILED');written+=n}
-  const response=new Uint8Array(4096);let used=0
-  while(used<response.length){
-   const n=await connection.read(response.subarray(used));if(!Number.isInteger(n)||n<1||n>response.length-used)throw Error('RESPONSE_FAILED');used+=n
+  while(written<bytes.length){let n;try{n=await connection.write(bytes.subarray(written))}catch{throw Error('WRITE_FAILED')};if(!Number.isInteger(n)||n<1||n>bytes.length-written)throw Error('WRITE_FAILED');written+=n}
+  const response=new Uint8Array(4096);let used=0,total=0,interim=0
+  while(total<response.length || Buffer.from(response.subarray(0,used)).indexOf('\r\n\r\n')>=0){
+   // Parse buffered headers before reading again (interim + final may share a packet).
+   let n=0
+   if(Buffer.from(response.subarray(0,used)).indexOf('\r\n\r\n')<0){
+    try{n=await connection.read(response.subarray(used,used+response.length-total))}catch{throw Error('RESPONSE_FAILED')}
+   }
+   if(!Number.isInteger(n)||n<0||n>response.length-total || (n===0 && Buffer.from(response.subarray(0,used)).indexOf('\r\n\r\n')<0))throw Error('RESPONSE_FAILED');used+=n;total+=n
    const end=Buffer.from(response.subarray(0,used)).indexOf('\r\n\r\n')
    if(end<0)continue
    const lines=Buffer.from(response.subarray(0,end)).toString('latin1').split('\r\n')
-   const match=/^HTTP\/1\.[01] ([2-5][0-9]{2})(?: [^\r\n]*)?$/.exec(lines.shift())
+   const match=/^HTTP\/1\.[01] ([1-5][0-9]{2})(?: [^\r\n]*)?$/.exec(lines.shift())
    if(!match)throw Error('INVALID_RESPONSE')
+   if(lines.some(line=>line.indexOf(':')<1 || invalidHeaderText(line)))throw Error('INVALID_RESPONSE')
+   // Interim responses are not delivery outcomes. Bound total bytes and count.
+   if(Number(match[1])<200){
+    if(Number(match[1])===101 || ++interim>4)throw Error('INVALID_RESPONSE')
+    const consumed=end+4;response.copyWithin(0,consumed,used);used-=consumed
+    continue
+   }
    let retryAfter
    for(const line of lines){
     const colon=line.indexOf(':');if(colon<1 || invalidHeaderText(line))throw Error('INVALID_RESPONSE')
@@ -124,11 +138,19 @@ export async function sendPinned(details, resolver=lookup, connector=connectNode
   }
   throw Error('RESPONSE_LIMIT')
  }
- try {return await Promise.race([deliver(),timeout])}catch{throw Error('PROVIDER_UNCERTAIN')}
+ try {return await Promise.race([deliver(),timeout])}catch(error){
+  const safe=['TLS_FAILED','CONNECT_FAILED','WRITE_FAILED','RESPONSE_FAILED','RESPONSE_LIMIT','INVALID_RESPONSE','INVALID_HEADERS','REQUEST_LIMIT']
+  const uncertain=Error('PROVIDER_UNCERTAIN')
+  uncertain.diagnosticCode=controller.signal.aborted?'timeout':safe.includes(error?.message)?error.message.toLowerCase():'transport_failed'
+  throw uncertain
+ }
  finally{clearTimeout(timer);controller.abort();connection?.close()}
 }
-const reply=(status,error)=>new Response(JSON.stringify({error,deliveryEnabled:false}),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
-export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,resolver=lookup}) {
+export function providerDiagnostic(status) {
+ return status>=200 && status<300?'accepted':[404,410].includes(status)?'subscription_expired':[401,403].includes(status)?'provider_auth_rejected':status===429?'rate_limited':status>=500?'provider_unavailable':status>=300 && status<400?'redirect_refused':[400,413].includes(status)?'request_rejected':'provider_rejected'
+}
+const reply=(status,error,diagnostic)=>new Response(JSON.stringify({error,deliveryEnabled:false,...(diagnostic?{diagnostic}:{})}),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
+export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,resolver=lookup,diagnose=(_diagnostic)=>{}}) {
  return async req=>{
   if(env.PUSH_TEST_DELIVERY_ENABLED!=='true')return reply(503,'PUSH_TEST_DISABLED')
   if(req.method!=='POST')return reply(405,'METHOD_NOT_ALLOWED')
@@ -153,7 +175,8 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
   }catch{return reply(400,'INVALID_REQUEST')}
   const config={publicKey:env.PUSH_VAPID_PUBLIC_KEY,privateKey:env.PUSH_VAPID_PRIVATE_KEY,subject:env.PUSH_VAPID_SUBJECT}
   if(!validVapid(config.publicKey,config.privateKey,config.subject))return reply(503,'PUSH_TEST_UNCONFIGURED')
-  let claim
+  let claim,phase='claim',providerStatus
+  const report=diagnostic=>{try{diagnose(diagnostic)}catch{/* Diagnostics must not affect authorization or delivery. */}}
   try {
    claim=await rpc('claim_push_test',{permit_id:body.permitId,key_public:config.publicKey})
    if(!claim)return reply(409,'PUSH_TEST_NOT_ALLOWED')
@@ -161,18 +184,29 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
     await rpc('finish_push_test',{permit_id:body.permitId,claim_id:claim.claimId,outcome:'invalid',retry_seconds:0})
     return reply(409,'INVALID_SUBSCRIPTION')
    }
+   phase='prepare'
    const details=prepare(claim,config,body.permitId)
    // DNS resolution occurs before final DB authorization, to minimize the consent race window.
+   phase='dns'
    const dns=await pinnedLookup(new URL(details.endpoint).hostname,resolver)
+   phase='authorize'
    const authorized=await rpc('authorize_push_test',{permit_id:body.permitId,claim_id:claim.claimId,key_public:config.publicKey})
    if(!authorized)return reply(409,'PUSH_TEST_NOT_ALLOWED')
+   phase='transport'
    const result=await send(details,async()=>new Promise((resolve,reject)=>dns('',{all:true},(e,a)=>e?reject(e):resolve(a))))
+   if(!Number.isInteger(result.status) || result.status<200 || result.status>599)throw Error('INVALID_RESPONSE')
+   providerStatus=result.status
+   const diagnostic={category:providerDiagnostic(result.status),providerStatus:result.status}
+   report(diagnostic)
    const outcome=result.status>=200 && result.status<300?'sent':[404,410].includes(result.status)?'expired':result.status===429?'throttled':'failed'
+   phase='finish'
    await rpc('finish_push_test',{permit_id:body.permitId,claim_id:claim.claimId,outcome,retry_seconds:outcome==='throttled'?retryDelay(result.retryAfter):0})
-   return reply(outcome==='sent'?200:502,outcome==='sent'?'PUSH_TEST_ACCEPTED':'PUSH_TEST_NOT_CONFIRMED')
-  }catch{
+   return reply(outcome==='sent'?200:502,outcome==='sent'?'PUSH_TEST_ACCEPTED':'PUSH_TEST_NOT_CONFIRMED',diagnostic)
+  }catch(error){
    // Reservations are never replayed. Unknown provider/DB outcomes stay uncertain.
-   return reply(503,'PUSH_TEST_UNCERTAIN')
+   const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus})}
+   report(diagnostic)
+   return reply(503,'PUSH_TEST_UNCERTAIN',diagnostic)
   }
  }
 }
