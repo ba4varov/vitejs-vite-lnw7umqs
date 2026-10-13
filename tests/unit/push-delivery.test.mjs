@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createECDH,createDecipheriv,hkdfSync,randomBytes} from 'node:crypto'
-import webpush from 'web-push'
 import {fixtureKeys} from './push-fixtures.mjs'
 import {validVapid,validEndpoint,publicAddress,pinnedLookup,retryDelay,preparePush,sendPinned,createTestHandler} from '../../supabase/functions/_shared/push-test.mjs'
 
@@ -83,7 +82,8 @@ test('single simulated delivery burns authorization; duplicates, current consent
  const handler=createTestHandler({env,rpc,resolver,send:async()=>{assert.equal(authorized,true);sent++;return {status:201}}})
  const responses=await Promise.all([handler(request()),handler(request())])
  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);assert.equal(sent,1)
- assert.equal(calls.at(-1)[1].outcome,'sent')
+ assert.equal(calls.find(([name])=>name==='finish_push_test')[1].outcome,'sent')
+ assert.equal(calls.at(-1)[0],'close_push_operator')
  const deny=createTestHandler({env,resolver,rpc:async name=>name==='claim_push_test'?device:false,send:async()=>{throw Error('must not send')}})
  assert.equal((await deny(request())).status,409)
  let attempts=0
@@ -95,7 +95,9 @@ test('provider 404/410 invalidate; 429 forwards Retry-After; redirects fail with
   const calls=[];let sent=0
   const handler=createTestHandler({env,resolver,rpc:async(name,payload)=>{calls.push([name,payload]);return name==='claim_push_test'?device:true},send:async()=>{sent++;return {status,retryAfter:'123'}}})
   assert.equal((await handler(request())).status,502);assert.equal(sent,1)
-  assert.equal(calls.at(-1)[1].outcome,outcome)
-  assert.equal(calls.at(-1)[1].retry_seconds,status===429?123:0)
+  const finish=calls.find(([name])=>name==='finish_push_test')[1]
+  assert.equal(finish.outcome,outcome)
+  assert.equal(finish.retry_seconds,status===429?123:0)
+  assert.equal(calls.at(-1)[0],'close_push_operator')
  }
 })

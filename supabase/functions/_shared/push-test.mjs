@@ -171,10 +171,18 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
     chunks.push(Buffer.from(item.value))
    }
    body=JSON.parse(Buffer.concat(chunks).toString('utf8'))
-   if(!body || Array.isArray(body) || Object.keys(body).length!==1 || typeof body.permitId!=='string' || !uuid.test(body.permitId))return reply(400,'INVALID_REQUEST')
+   if(!body || Array.isArray(body) || Object.keys(body).length!==1 || !(body.operation==='preflight' || typeof body.preflightPermitId==='string' && uuid.test(body.preflightPermitId) || typeof body.permitId==='string' && uuid.test(body.permitId)))return reply(400,'INVALID_REQUEST')
   }catch{return reply(400,'INVALID_REQUEST')}
   const config={publicKey:env.PUSH_VAPID_PUBLIC_KEY,privateKey:env.PUSH_VAPID_PRIVATE_KEY,subject:env.PUSH_VAPID_SUBJECT}
   if(!validVapid(config.publicKey,config.privateKey,config.subject))return reply(503,'PUSH_TEST_UNCONFIGURED')
+  if(body.operation==='preflight')return reply(200,'PUSH_TEST_READY')
+  if(body.preflightPermitId){
+   try{
+    const device=await rpc('inspect_push_operator',{permit_id:body.preflightPermitId})
+    validateDevice(device,config,body.preflightPermitId)
+    return reply(200,'PUSH_TEST_READY')
+   }catch{return reply(409,'PUSH_TEST_NOT_READY')}
+  }
   let claim,phase='claim',providerStatus
   const report=diagnostic=>{try{diagnose(diagnostic)}catch{/* Diagnostics must not affect authorization or delivery. */}}
   try {
@@ -207,6 +215,11 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
    const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus})}
    report(diagnostic)
    return reply(503,'PUSH_TEST_UNCERTAIN',diagnostic)
+  }finally{
+   // Also handles DNS/preparation failures and a refused claim. No retries.
+   try {await rpc('close_push_operator',{permit_id:body.permitId})}catch{
+    report({category:'gate_cleanup_failed',phase:'cleanup'})
+   }
   }
  }
 }
