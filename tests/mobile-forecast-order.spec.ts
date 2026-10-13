@@ -4,8 +4,8 @@ import { openHeaderMenu } from './header-navigation'
 
 const sections = '.forecast-dashboard > .main-card, .forecast-dashboard > .weather-chat, .forecast-dashboard > .hourly-section, .forecast-dashboard > .forecast-section, .forecast-dashboard > .charts-section'
 async function order(page: import('@playwright/test').Page, width: number) {
-  const names = await page.locator(sections).evaluateAll(nodes => nodes.map(n => n.className))
-  expect(names).toEqual(width <= 640
+  // matchMedia change notifications arrive asynchronously after viewport resize.
+  await expect.poll(() => page.locator(sections).evaluateAll(nodes => nodes.map(n => n.className))).toEqual(width <= 640
     ? ['card main-card weather-forecast-view', 'card hourly-section', 'card forecast-section', 'card weather-chat', 'card charts-section']
     : ['card main-card weather-forecast-view', 'card weather-chat', 'card hourly-section', 'card forecast-section', 'card charts-section'])
   const boxes = await page.locator(sections).evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().top))
@@ -103,11 +103,16 @@ for (const lang of ['bg','en'] as const) test(`forecast scroll and selection sur
   for (const row of ['.hourly-row','.daily-grid']) {
     await page.locator(row).evaluate(e => { e.scrollLeft = 180 })
     await expect.poll(() => page.locator(row).evaluate(e => e.scrollLeft)).toBeGreaterThan(100)
-    const scroll = await page.locator(row).evaluate(e => e.scrollLeft)
+    const snappedIndex = () => page.locator(row).evaluate(e => {
+      const cards = e.querySelectorAll('button')
+      const stride = cards[1].getBoundingClientRect().left - cards[0].getBoundingClientRect().left
+      return Math.round(e.scrollLeft / stride)
+    })
+    const index = await snappedIndex()
     for (const width of [641,390]) {
       await page.setViewportSize({ width, height: 900 })
-      // Existing responsive margins can shift the same snapped card by 4px.
-      await expect.poll(() => page.locator(row).evaluate((e, left) => Math.abs(e.scrollLeft - left), scroll)).toBeLessThanOrEqual(8)
+      // Responsive card widths change pixel offsets; keep the same snapped item.
+      await expect.poll(snappedIndex).toBe(index)
     }
     const selected = page.locator(row + ' button').nth(2)
     await selected.click()
