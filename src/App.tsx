@@ -29,6 +29,8 @@ const translations = {
     loading: '⏳ Зареждане...',
     tryAgain: 'Опитай отново',
     favorite: 'Любим град',
+    allMetrics: 'Всички показатели',
+    fewerMetrics: 'По-малко показатели',
     humidity: 'Влажност',
     wind: 'Вятър',
     windUnit: 'км/ч',
@@ -112,6 +114,8 @@ const translations = {
     loading: '⏳ Loading...',
     tryAgain: 'Try Again',
     favorite: 'Favorite City',
+    allMetrics: 'All metrics',
+    fewerMetrics: 'Fewer metrics',
     humidity: 'Humidity',
     wind: 'Wind',
     windUnit: 'km/h',
@@ -394,6 +398,7 @@ const WeatherApp = () => {
   const [darkMode, setDarkMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [metricsExpanded, setMetricsExpanded] = useState(false)
   const [weather, setWeather] = useState<any>(null)
   const [hourly, setHourly] = useState<any[]>([])
   const [notificationForecast,setNotificationForecast]=useState<any>(null)
@@ -1197,18 +1202,22 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                   )}
 
                   <div className="big-temp">{weather.temp}°C</div>
+                  <div className="mobile-weather-summary">
+                    <p>{t.feelsLike}: <strong>{weather.feelsLike}°C</strong></p>
+                    <p>{t.minMaxTemp}: <strong>{weather.minTemp}° / {weather.maxTemp}°</strong></p>
+                  </div>
                 </div>
                 <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
               </div>
               
-              <div className="stats-grid" style={{ padding: 0 }}>
-                <div className="stat-box"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
-                <div className="stat-box"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
-                <div className="stat-box"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{weather.precipProb}%</p></div>
+              <div id="current-weather-metrics" className={`stats-grid current-weather-metrics${metricsExpanded ? " is-expanded" : ""}`} style={{ padding: 0 }}>
+                <div className="stat-box metric-summary"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
+                <div className="stat-box metric-summary"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
+                <div className="stat-box metric-precipProb"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{weather.precipProb}%</p></div>
                 <div className="stat-box"><p>🌧️</p><p className="label">{t.precipSum}</p><p className="value">{weather.precipSum} {t.mm}</p></div>
-                <div className="stat-box"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{weather.cloudCover}%</p></div>
-                <div className="stat-box"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-                <div className="stat-box"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
+                <div className="stat-box metric-cloudCover"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{weather.cloudCover}%</p></div>
+                <div className="stat-box metric-humidity"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
+                <div className="stat-box metric-wind"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
                 <div className="stat-box"><p>🌪️</p><p className="label">{t.maxWind}</p><p className="value">{weather.maxWindSpeedDaily} {t.windUnit}</p></div>
                 <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
                 <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
@@ -1219,6 +1228,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
                 )}
               </div>
+              <button type="button" className="metrics-toggle" aria-expanded={metricsExpanded} aria-controls="current-weather-metrics" onClick={() => setMetricsExpanded(expanded => !expanded)}>
+                {metricsExpanded ? t.fewerMetrics : t.allMetrics}
+              </button>
 
             </div>
           </div>
