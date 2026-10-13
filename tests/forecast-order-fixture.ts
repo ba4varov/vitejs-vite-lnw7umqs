@@ -6,7 +6,7 @@ for (const [field, value] of Object.entries({ temperature_2m: 18, apparent_tempe
 const days = times.filter((_, i) => i % 24 === 0).map(time => time.slice(0, 10))
 const daily: Record<string, string[] | number[]> = { time: days, sunrise: days.map(day => `${day}T07:15`), sunset: days.map(day => `${day}T18:45`) }
 for (const [field, value] of Object.entries({ weather_code: 2, temperature_2m_max: 22, temperature_2m_min: 14, precipitation_sum: 1.2, precipitation_probability_max: 35, wind_speed_10m_max: 18, uv_index_max: 3, apparent_temperature_max: 21 })) daily[field] = days.map(() => value)
-const weather = { timezone: 'Europe/Sofia', current: { time: times[0], temperature_2m: 18, apparent_temperature: 17, weather_code: 2, relative_humidity_2m: 72, wind_speed_10m: 12, surface_pressure: 1015, uv_index: 3 }, hourly, daily }
+export const weather = { timezone: 'Europe/Sofia', current: { time: times[0], temperature_2m: 18, apparent_temperature: 17, weather_code: 2, relative_humidity_2m: 72, wind_speed_10m: 12, surface_pressure: 1015, uv_index: 3 }, hourly, daily }
 
 export async function fixture(page: Page, lang: 'bg' | 'en' = 'bg', account: 'guest' | 'user' | 'admin' = 'guest', url = '/') {
   const requests: string[] = []

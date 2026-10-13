@@ -82,7 +82,31 @@ for (const width of [320, 360, 390, 430, 640, 641, 768, 1440]) for (const lang o
         if (width === 360 || width === 390) expect(await strip.evaluate(e => e.clientWidth / (e.querySelector('button')!.getBoundingClientRect().width + 8))).toBeGreaterThanOrEqual(1.85)
         // Persistent, reviewable baselines use the dedicated forecast config.
         if (testInfo.config.configFile?.endsWith('playwright.forecast-cards.config.ts')) {
-          await expect(page.locator(section)).toHaveScreenshot(`${width}-${lang}-${dark}-${section.slice(1)}.png`, { animations: 'disabled' })
+          const target = page.locator(section)
+          await target.scrollIntoViewIfNeeded()
+          // Keep the complete clip away from the viewport edge: Chromium can
+          // otherwise include a blank last row when it rounds fractional bounds.
+          await target.evaluate(element => {
+            const top = element.getBoundingClientRect().top + window.scrollY
+            window.scrollTo({ top: Math.floor(top) - 100, behavior: 'instant' })
+          })
+          // Current-card height can change the section's fractional page position.
+          // Align only screenshot capture to device pixels; retain strict comparison
+          // and restore its original positioning before exercising the controls.
+          const originalPosition = await target.evaluate(element => {
+            const target = element as HTMLElement
+            const original = { position: target.style.position, top: target.style.top, left: target.style.left }
+            const box = target.getBoundingClientRect()
+            target.style.position = 'relative'
+            target.style.top = `${Math.round(box.y) - box.y}px`
+            target.style.left = `${Math.round(box.x) - box.x}px`
+            return original
+          })
+          try {
+            await expect(target).toHaveScreenshot(`${width}-${lang}-${dark}-${section.slice(1)}.png`, { animations: 'disabled' })
+          } finally {
+            await target.evaluate((element, original) => { Object.assign((element as HTMLElement).style, original) }, originalPosition)
+          }
         }
       } else {
         expect(geometry!.width).toBe(174)
