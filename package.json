@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "node --test tests/unit/*.test.mjs src/*.test.mjs",
+    "test:forecast:browser": "playwright test --config=playwright.forecast-cards.config.ts",
     "test:admin:browser": "playwright test",
     "test:admin:sql": "node scripts/test-admin-sql.mjs",
     "typecheck": "tsc -b",
