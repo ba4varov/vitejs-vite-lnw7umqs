@@ -1,3 +1,4 @@
+import { clickHeaderControl } from './header-navigation'
 // @ts-nocheck
 import { test, expect } from '@playwright/test'
 const times=Array.from({length:360},(_,i)=>new Date(Date.UTC(2026,9,8,i)).toISOString().slice(0,16));
@@ -22,7 +23,7 @@ for (const width of [360,390,430,640,641,1440]) for (const lang of ['bg','en']) 
     await page.goto('/')
     const card=page.locator('.main-card'), toggle=card.locator('.metrics-toggle')
     await expect(card.locator('.big-temp')).toBeVisible()
-    if(dark) await page.locator('.header-btns > .icon-btn').click()
+    if(dark) await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
     const overflow=async()=> expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
     await overflow()
     if(width>640) {
@@ -52,7 +53,7 @@ for (const width of [360,390,430,640,641,1440]) for (const lang of ['bg','en']) 
     await expect(card.locator('.stat-box:visible')).toHaveCount(4)
     await expect(toggle).toBeFocused()
     await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','true')
-    await page.locator('.lang-btn').click()
+    await clickHeaderControl(page, page.locator('.lang-btn'))
     await expect(toggle).toHaveText(lang==='bg'?'Fewer metrics':'По-малко показатели')
     await toggle.click();await expect(card.locator('.stat-box:visible')).toHaveCount(4)
     await page.setViewportSize({width:1440,height:900})

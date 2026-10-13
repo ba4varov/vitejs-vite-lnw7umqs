@@ -1,3 +1,4 @@
+import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 const publicKey=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url')
 const preferences={enabled:false,cities:[],categories:[]}
@@ -33,14 +34,14 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   if(method==='DELETE')devices=[]
   return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false}})
  })
- await page.goto('/');await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+ await page.goto('/');await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:'Push известия',exact:true}).click()
  await expect(page.locator('.push-settings')).toBeVisible()
  return {calls,preferences:()=>prefs}
 }
 for(const width of [390,1440])for(const lang of ['bg','en'])test(`push section visible without SQL migration ${width} ${lang}`,async({page})=>{
  await page.setViewportSize({width,height:1000});const state=await setup(page,{missingMigration:true})
- if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('button.lang-btn').click();await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click()}
+ if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await clickHeaderControl(page, page.locator('button.lang-btn'));await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))}
  await page.getByRole('tab',{name:lang==='en'?'Push notifications':'Push известия',exact:true}).click()
  const panel=page.locator('.push-settings')
  await panel.scrollIntoViewIfNeeded();await expect(panel).toBeVisible()
@@ -69,8 +70,8 @@ for(const lang of ['bg','en'])test(`key rotation asks for explicit resubscriptio
  if(lang==='en'){
   page.once('dialog',d=>d.accept())
   await page.getByRole('button',{name:'Затвори',exact:true}).click()
-  await page.locator('button.lang-btn').click()
-  await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click()
+  await clickHeaderControl(page, page.locator('button.lang-btn'))
+  await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
   await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
   await page.locator('.push-settings').getByLabel('Name of this device').fill('Test device')
  }
@@ -92,7 +93,7 @@ test('real Chromium PWA manifest, PNG sizes, root worker, no cache or fetch inte
  }
  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href','/pwa/apple-touch-icon.png')
  const result=await page.evaluate(async()=>{const worker=await navigator.serviceWorker.ready;return {scope:worker.scope,script:worker.active?.scriptURL,caches:await caches.keys(),permission:Notification.permission,initial:(window as any).initialPushPermission}})
- expect(result.scope).toBe('http://127.0.0.1:4173/');expect(result.script).toContain('/push-sw.js');expect(result.caches).toEqual([]);expect(result.permission).toBe(result.initial)
+ expect(result.scope).toBe(new URL('/',page.url()).href);expect(result.script).toContain('/push-sw.js');expect(result.caches).toEqual([]);expect(result.permission).toBe(result.initial)
 })
 test('default registration off, no prompts, preferences independent of bell and analytics',async({page})=>{
  const state=await setup(page,{registrationEnabled:false})
@@ -148,7 +149,7 @@ for(const [name,ua,installed] of [
 })
 for(const width of [390,768,1440])for(const lang of ['bg','en'])test(`push layout ${width} ${lang}`,async({page})=>{
  await page.setViewportSize({width,height:1000});await setup(page)
- if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await page.locator('button.lang-btn').click();await page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}).click()}
+ if(lang==='en'){await page.getByRole('button',{name:'Затвори',exact:true}).click();await clickHeaderControl(page, page.locator('button.lang-btn'));await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))}
  await page.getByRole('tab',{name:lang==='en'?'Push notifications':'Push известия',exact:true}).click()
  const panel=page.locator('.push-settings');await expect(panel).toBeVisible()
  const overflow=await panel.evaluate((e:any)=>e.scrollWidth>e.clientWidth+1);expect(overflow).toBe(false)

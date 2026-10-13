@@ -10,6 +10,7 @@ import { AuthPanel } from './AuthPanel'
 import { WeatherNotifications } from './WeatherNotifications'
 import { WeatherPlanner } from './WeatherPlanner'
 import { AdminLink } from './AdminLink'
+import { HeaderNavigation } from './HeaderNavigation'
 import { loadLanguage, saveLanguage } from './language-storage.js'
 import { subscribeSession, type AuthSession } from './auth-client'
 import { addPlace, fetchPlaces, importPlaces, localPlaces, removePlace, saveLocalPlaces, setDefaultPlace, setPlaceIdentity, type Place } from './places-client'
@@ -1050,17 +1051,16 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <h1><a className="brand-home" href={import.meta.env.BASE_URL} aria-label={lang === 'bg' ? 'Метео Пулс — начална страница' : 'Meteo Pulse — home'}>{t.title}</a></h1>
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
-        <div className="header-btns">
+        <HeaderNavigation lang={lang} notifications={<WeatherNotifications locationKey={`${Math.round(coords.lat*10)}:${Math.round(coords.lon*10)}`} key={session?.user.id||'guest'} lang={lang} session={session} forecast={plannerLocation?.lat===coords.lat && plannerLocation?.lon===coords.lon ? notificationForecast : null} city={city} />}>
           <AuthPanel lang={lang} />
-          <WeatherNotifications locationKey={`${Math.round(coords.lat*10)}:${Math.round(coords.lon*10)}`} key={session?.user.id||'guest'} lang={lang} session={session} forecast={plannerLocation?.lat===coords.lat && plannerLocation?.lon===coords.lon ? notificationForecast : null} city={city} />
           <AdminLink lang={lang} />
-          <button className="lang-btn" onClick={toggleLanguage}>
+          <button className="lang-btn" aria-label={lang === 'bg' ? 'Switch to English' : 'Превключи на български'} onClick={toggleLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
           </button>
-          <button className="icon-btn" onClick={() => setDarkMode(!darkMode)}>
+          <button className="icon-btn" aria-label={lang === 'bg' ? (darkMode ? 'Светла тема' : 'Тъмна тема') : (darkMode ? 'Light theme' : 'Dark theme')} aria-pressed={darkMode} onClick={() => setDarkMode(!darkMode)}>
             {darkMode ? '☀️' : '🌙'}
           </button>
-        </div>
+        </HeaderNavigation>
       </div>
 
       <div className="search-wrapper">
@@ -1103,6 +1103,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {t.quickCities.map((c: any) => {
           return (
             <button key={c.name}
+              aria-pressed={city === c.name}
               onClick={() => { forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}

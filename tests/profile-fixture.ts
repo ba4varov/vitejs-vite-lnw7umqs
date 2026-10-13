@@ -1,3 +1,4 @@
+import { openHeaderMenu } from './header-navigation'
 import { expect, type Page } from '@playwright/test'
 export async function fixture(page: Page, lang: 'bg' | 'en', initialPlan = 'free') {
   let plan = initialPlan, failed = false, hold = false
@@ -29,6 +30,7 @@ export async function fixture(page: Page, lang: 'bg' | 'en', initialPlan = 'free
   daily.sunrise=daily.time.map((d:string)=>d+'T07:00');daily.sunset=daily.time.map((d:string)=>d+'T19:00')
   await page.route('https://api.open-meteo.com/**',(r:any)=>r.fulfill({json:{timezone:'Europe/Sofia',current:{time:'2026-10-09T03:00',weather_code:0,temperature_2m:20,relative_humidity_2m:50,wind_speed_10m:5,apparent_temperature:20,surface_pressure:1010,uv_index:2},hourly,daily}}))
   await page.goto(process.env.PROFILE_PREVIEW_URL || '/')
+  await openHeaderMenu(page)
   await expect(page.getByRole('button', { name: lang === 'bg' ? 'Моят профил' : 'My profile', exact: true })).toBeVisible()
   // Let the planner's independent initial entitlement read finish before holding the profile request.
   await expect.poll(() => requests.length).toBeGreaterThan(0)

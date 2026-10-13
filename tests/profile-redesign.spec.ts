@@ -1,3 +1,4 @@
+import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 import {fixture} from './profile-fixture'
 const destination=process.env.PROFILE_SCREENSHOT_DIR || 'work/profile-screenshots'
@@ -10,7 +11,7 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'] as const)for(con
  await page.route('**/api/alerts**',r=>{if(r.request().method()==='PATCH'){enabled=r.request().postDataJSON().enabled;mutations.push('weather')}return r.fulfill({json:{contractVersion:2,pro:true,enabled,alerts:[]}})})
  await page.route('**/api/activity',r=>{if(r.request().method()==='PATCH'){consent=r.request().postDataJSON().enabled;mutations.push('consent')}return r.fulfill({json:{enabled:consent,revision:null}})})
  await page.route('**/api/push',r=>{if(r.request().method()==='PATCH'){prefs=r.request().postDataJSON();mutations.push('push')}return r.fulfill({json:{contractVersion:1,pro:true,preferences:prefs,devices:[],registrationEnabled:false,publicKey:null,deliveryEnabled:false}})})
- if(dark)await page.getByRole('button',{name:'🌙',exact:true}).click()
+ if(dark)await clickHeaderControl(page, page.locator('.header-menu > .icon-btn'))
  const opener=page.locator('.auth-nav').getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true})
  await opener.click()
  const dialog=page.getByRole('dialog'), tabs=dialog.getByRole('tab')
@@ -52,7 +53,7 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'] as const)for(con
 
 test('focus trap, backdrop cancellation, failed weather save retains draft, compact auth',async({page})=>{
  await fixture(page,'bg')
- await page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:'Метео известия'}).click()
  const panel=page.locator('.notification-settings')
  await expect(panel.locator('input').nth(5)).toBeDisabled()
@@ -64,13 +65,13 @@ test('focus trap, backdrop cancellation, failed weather save retains draft, comp
  await page.keyboard.press('Shift+Tab');await expect(last).toBeFocused()
  page.once('dialog',d=>d.dismiss());await page.locator('.auth-backdrop').click({position:{x:2,y:2}});await expect(page.getByRole('dialog')).toBeVisible()
  page.once('dialog',d=>d.accept());await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0)
- await page.locator('.auth-nav').getByRole('button',{name:'Изход',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Изход',exact:true}))
  for(const action of ['Вход','Регистрация']){
-  await page.locator('.auth-nav').getByRole('button',{name:action,exact:true}).click()
+  await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:action,exact:true}))
   expect((await page.getByRole('dialog').boundingBox())!.width).toBeLessThanOrEqual(440)
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0)
  }
- await page.locator('.auth-nav').getByRole('button',{name:'Вход',exact:true}).click();await page.getByRole('button',{name:'Забравена парола?',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Вход',exact:true}));await page.getByRole('button',{name:'Забравена парола?',exact:true}).click()
  expect((await page.getByRole('dialog').boundingBox())!.width).toBeLessThanOrEqual(440)
  await page.keyboard.press('Escape')
 })
@@ -85,7 +86,7 @@ for(const lang of ['bg','en'] as const)test(`coordinate city draft lifecycle ${l
   }
   return r.fulfill({json:{contractVersion:1,pro:false,preferences,devices:[],registrationEnabled:false,publicKey:null,deliveryEnabled:false}})
  })
- await page.locator('.auth-nav').getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true}).click()
+ await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:lang==='bg'?'Моят профил':'My profile',exact:true}))
  await page.getByRole('tab',{name:lang==='bg'?'Push известия':'Push notifications',exact:true}).click()
  const panel=page.locator('.push-settings'),details=panel.locator('details')
  await details.locator('summary').click()

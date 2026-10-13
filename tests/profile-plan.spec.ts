@@ -1,8 +1,9 @@
+import { clickHeaderControl } from './header-navigation'
 import { test, expect } from '@playwright/test'
 import { fixture } from './profile-fixture'
 
 for (const lang of ['bg', 'en'] as const) {
-  const open = (page: Page) => page.getByRole('button', { name: lang === 'bg' ? 'Моят профил' : 'My profile', exact: true }).click()
+  const open = (page: Page) => clickHeaderControl(page, page.getByRole('button', { name: lang === 'bg' ? 'Моят профил' : 'My profile', exact: true }))
   const close = (page: Page) => page.getByRole('button', { name: lang === 'bg' ? 'Затвори' : 'Close', exact: true }).click()
   const labels = lang === 'bg' ? { free: 'Безплатен', pro: 'Pro план', loading: 'Зареждане…', unavailable: 'Планът не е наличен' }
     : { free: 'Free', pro: 'Pro plan', loading: 'Loading…', unavailable: 'Plan unavailable' }
