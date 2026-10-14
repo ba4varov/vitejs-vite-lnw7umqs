@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
-import {pushRequest,type PushSnapshot,type PushPreferences,type PushCity} from './push-client'
-import {pushSupport,preparePushWorker,enrollPush,removePushDevice} from './push-browser.js'
+import {pushRequest,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
+import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
 const presets:PushCity[]=[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'},{name:'Пловдив',latitude:42.1354,longitude:24.7453,zone:'Europe/Sofia'},{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'},{name:'Бургас',latitude:42.5048,longitude:27.4626,zone:'Europe/Sofia'}]
@@ -9,6 +9,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const bg=lang==='bg',support=pushSupport()
  const [data,setData]=useState<PushSnapshot|null>(null),[draft,setDraft]=useState<PushPreferences>({enabled:false,cities:[],categories:[]}),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[worker,setWorker]=useState<ServiceWorkerRegistration|null>(null)
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
+ const [checks,setChecks]=useState<Record<string,string>>({})
  const live=useRef(true)
  const apply=(d:PushSnapshot)=>{if(live.current){setData(d);setDraft(d.preferences)}}
  useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{live.current=false}},[session.user.id,session.access_token])
@@ -24,6 +25,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(fail).finally(()=>{if(live.current)setBusy(false)})
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
+ const check=async(device:PushDevice)=>{setBusy(true);setChecks({});try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}
  const dirty=!!data&&JSON.stringify(draft)!==JSON.stringify(data.preferences)
  const unsavedInputs=Boolean(city.name.trim() || (label.trim() && !data?.devices.some(device=>device.label===label.trim())))
  useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
@@ -60,8 +62,9 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
    </fieldset>
    <button type="button" disabled={busy} onClick={()=>void save({...data.preferences,enabled:false,categories:data.pro?data.preferences.categories:data.preferences.categories.filter(k=>!personal.includes(k))})}>{bg?'Спри всички push известия':'Stop all push notifications'}</button>
    <h4>{bg?'Моите устройства':'My devices'}</h4>
+   {!!data.devices.length&&<p>{bg?'Проверката сравнява този браузър с избраното устройство. За Note 13 Pro отвори Meteo Pulse в Chrome на този телефон.':'The check compares this browser with the selected device. For Note 13 Pro, open Meteo Pulse in Chrome on that phone.'}</p>}
    {!data.devices.length&&<p>{bg?'Няма регистрирани устройства.':'No registered devices.'}</p>}
-   <ul>{data.devices.map(d=><li key={d.id}>{d.label} <button type="button" disabled={busy} onClick={()=>void remove(d)}>{bg?'Отпиши устройство':'Unsubscribe device'}</button></li>)}</ul>
+   <ul>{data.devices.map(d=><li key={d.id}>{d.label} <button type="button" disabled={busy} onClick={()=>void check(d)}>{bg?'Провери регистрацията':'Check registration'}</button> {checks[d.id]&&<p role="status">{pushRegistrationMessages[lang][checks[d.id]]}</p>} <button type="button" disabled={busy} onClick={()=>void remove(d)}>{bg?'Отпиши устройство':'Unsubscribe device'}</button></li>)}</ul>
    <label>{bg?'Име на това устройство':'Name of this device'}<input value={label} maxLength={80} disabled={busy} onChange={e=>setLabel(e.target.value)}/></label>
    {!data.registrationEnabled&&<p>{bg?'Регистрацията на устройства е неактивна до ръчно конфигуриране и одобрение.':'Device registration is inactive pending manual configuration and approval.'}</p>}
    <button type="button" disabled={busy||dirty||!worker||support!=='supported'||!data.registrationEnabled||!data.preferences.enabled||!label.trim()||!data.preferences.cities.length||!data.preferences.categories.length||Notification.permission==='denied'} onClick={subscribe}>{bg?'Разреши и регистрирай това устройство':'Allow and register this device'}</button>
