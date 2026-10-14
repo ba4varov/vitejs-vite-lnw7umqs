@@ -246,3 +246,60 @@ test('Google denial preserves an existing shared session and scrubs callback err
   assert.deepEqual(f.active(), existing)
   assert.equal(f.location.href, 'https://meteo.example/')
 })
+
+test('places preflight refreshes expired session and shares concurrent refresh', async t => {
+  const f = await setup(t)
+  f.auth.saveSession(session(-1))
+  f.fetch.mock.mockImplementation(async () => f.response(session(3600, 'new')))
+  const [a,b] = await Promise.all([f.auth.accountSession('account'),f.auth.accountSession('account')])
+  assert.equal(a.access_token, 'new'); assert.equal(b.access_token, 'new')
+  assert.equal(f.fetch.mock.callCount(), 1)
+})
+test('places cannot use another account or expired token after network refresh failure', async t => {
+  const f = await setup(t)
+  f.auth.saveSession(session(-1))
+  assert.equal(await f.auth.accountSession('other'), null)
+  assert.equal(await f.auth.accountSession('account'), null)
+  assert.equal(f.active().access_token, 'old')
+})
+test('401 forces shared refresh once; a rotated token avoids another refresh', async t => {
+  const f = await setup(t)
+  f.auth.saveSession(session())
+  f.fetch.mock.mockImplementation(async () => f.response(session(3600,'new')))
+  assert.equal((await f.auth.accountSession('account','old')).access_token,'new')
+  assert.equal((await f.auth.accountSession('account','old')).access_token,'new')
+  assert.equal(f.fetch.mock.callCount(),1)
+})
+
+test('401 does not share a no-op restore instead of refreshing', async t => {
+  const f = await setup(t)
+  f.auth.saveSession(session())
+  let release
+  const waiting = new Promise(resolve => { release = resolve })
+  navigator.locks.request = async (_name, callback) => { await waiting; return callback() }
+  f.fetch.mock.mockImplementation(async () => f.response(session(3600,'new')))
+  const restoring = f.auth.restoreSession()
+  const places = f.auth.accountSession('account','old')
+  release()
+  await restoring
+  assert.equal((await places).access_token, 'new')
+  assert.equal(f.fetch.mock.callCount(),1)
+})
+
+test('concurrent 401 recovery shares one forced refresh', async t => {
+  const f = await setup(t)
+  f.auth.saveSession(session())
+  let release
+  f.fetch.mock.mockImplementation(() => new Promise(resolve => { release = () => resolve(f.response(session(3600,'new'))) }))
+  const a = f.auth.accountSession('account','old'), b = f.auth.accountSession('account','old')
+  await f.flush(); release()
+  assert.equal((await a).access_token,'new'); assert.equal((await b).access_token,'new')
+  assert.equal(f.fetch.mock.callCount(),1)
+})
+test('a token rotated in another tab while waiting for lock is reused', async t => {
+  const f = await setup(t)
+  f.auth.saveSession(session())
+  f.values.set('meteo-pulse-auth',JSON.stringify(session(3600,'new')))
+  assert.equal((await f.auth.accountSession('account','old')).access_token,'new')
+  assert.equal(f.fetch.mock.callCount(),0)
+})
