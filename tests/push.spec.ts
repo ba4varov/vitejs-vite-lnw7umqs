@@ -7,9 +7,10 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}))
   const scope:any=window;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
   let permissionValue='default',subscription:any=null
+  scope.setTestPushPermission=(value:string)=>{permissionValue=value}
   scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
   scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},getKey:(name:string)=>name==='p256dh'?Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer:new Uint8Array(16).fill(1).buffer,unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
-  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>subscription}})})
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>subscription}}))})
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
   Object.defineProperty(navigator.serviceWorker,'register',{value:async()=>({pushManager:{
@@ -272,4 +273,46 @@ for(const lang of ['bg','en'])test(`safe p256dh/auth diagnostics ${lang}`,async(
  expect(requests).toHaveLength(4);expect(new Set(requests.map(r=>r.nonce)).size).toBe(4)
  expect(state.calls.every(c=>c.method==='GET')).toBe(true)
  expect(await page.evaluate(()=>[(window as any).pushPrompts,(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0,0])
+})
+
+for(const scenario of ['success','cancel','mismatch','lost-response','subscribe-failed','disabled'])test(`manual Push renewal ${scenario} uses only simulated operations`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,registrationEnabled:scenario!=='disabled'})
+ const panel=await choose(page)
+ await page.evaluate(({publicKey,scenario})=>{
+  const w:any=window
+  w.setTestPushPermission('granted')
+  const old={endpoint:'https://fcm.googleapis.com/wp/'+(scenario==='mismatch'?'other':'isolated'),options:{applicationServerKey:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},unsubscribe:async()=>{w.pushUnsubscribes++;return true}}
+  w.renewalRegistration={scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>old,subscribe:async()=>{
+   w.pushSubscribes++;if(scenario==='subscribe-failed')throw Error('synthetic failure')
+   return {toJSON:()=>({endpoint:'https://fcm.googleapis.com/wp/renewed',keys:{p256dh:publicKey,auth:'AQEBAQEBAQEBAQEBAQEBAQ'}}),unsubscribe:()=>{throw Error('Unexpected cleanup')}}
+  }}}
+ },{publicKey,scenario})
+ const hash=await import('node:crypto').then(c=>c.createHash('sha256').update('https://fcm.googleapis.com/wp/isolated').digest('hex'))
+ const oldDevice={id:'00000000-0000-0000-0000-000000000003',label:'Note 13 Pro',fingerprint:hash,createdAt:'2026-10-14T00:00:00Z'}
+ const calls:any[]=[]
+ await page.route('**/api/push',async r=>{
+  const method=r.request().method();calls.push({method,body:r.request().postDataJSON()})
+  if(method==='POST'&&scenario==='lost-response')return r.abort('failed')
+  return r.fulfill({json:{contractVersion:1,pro:false,preferences:state.preferences(),devices:method==='POST'?[oldDevice,{...oldDevice,id:'00000000-0000-0000-0000-000000000004',label:'Renewed device'}]:[oldDevice],registrationEnabled:scenario!=='disabled',publicKey,deliveryEnabled:false}})
+ })
+ // Trigger a React render after setting the synthetic permission.
+ await panel.getByLabel('Име на това устройство').fill('Test phone')
+ const button=panel.getByRole('button',{name:'Поднови Push регистрацията',exact:true})
+ if(scenario==='disabled'){
+  await expect(button).toBeDisabled()
+ }else{
+  let dialogs=0
+  page.on('dialog',async dialog=>{dialogs++;expect(dialog.message()).toContain('не може надеждно да се възстанови');if(scenario==='cancel')await dialog.dismiss();else await dialog.accept()})
+  await button.click()
+  const messages:any={success:'Push регистрацията е подновена',cancel:'Подновяването е отказано',mismatch:'не съвпада с избраното устройство','lost-response':'Резултатът от записването е неясен','subscribe-failed':'новото абониране не успя'}
+  await expect(panel.getByRole('status').first()).toContainText(messages[scenario])
+  expect(dialogs).toBe(scenario==='mismatch'?0:1)
+ }
+ const mutated=['success','lost-response','subscribe-failed'].includes(scenario)
+ expect(await page.evaluate(()=>(window as any).pushUnsubscribes)).toBe(mutated?1:0)
+ expect(await page.evaluate(()=>(window as any).pushSubscribes)).toBe(mutated?1:0)
+ expect(calls.filter(c=>c.method==='DELETE')).toHaveLength(0)
+ expect(calls.filter(c=>c.method==='POST')).toHaveLength(['success','lost-response'].includes(scenario)?1:0)
+ expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
+ if(scenario==='success'){await expect(panel).toContainText('Note 13 Pro');await expect(panel).toContainText('Renewed device')}
 })
