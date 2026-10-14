@@ -90,6 +90,20 @@ jobs:
             supabase/functions/push-test/index.ts
           git diff --exit-code -- supabase
 
+      - name: Set up pinned Node.js for the local TLS fixture
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.14.0'
+          check-latest: false
+
+      - name: Check FCM wire equivalence with native Deno against local TLS only
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          DENO_DIR=work/deno-cache DENO_TLS_CA_STORE=system deno cache --frozen \
+            --config supabase/functions/push-test/deno.json tests/edge-push/wire-client.mjs
+          DENO_BINARY="$(command -v deno)" node --test tests/unit/push-wire.test.mjs
+
   push-unit-tests:
     name: Locked npm install and isolated push unit tests
     runs-on: ubuntu-24.04
@@ -113,7 +127,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Run existing mocked push delivery and transport tests
-        run: node --test tests/unit/push-delivery.test.mjs tests/unit/push-transport.test.mjs tests/unit/push-diagnostics.test.mjs tests/unit/push-operator.test.mjs tests/unit/push-operator-edge.test.mjs tests/unit/push-operator-cli.test.mjs
+        run: node --test tests/unit/push-delivery.test.mjs tests/unit/push-transport.test.mjs tests/unit/push-diagnostics.test.mjs tests/unit/push-operator.test.mjs tests/unit/push-operator-edge.test.mjs tests/unit/push-operator-cli.test.mjs tests/unit/push-provider.test.mjs tests/unit/push-wire.test.mjs
 
       - name: Confirm dependency and function files remain unchanged
         run: git diff --exit-code -- package.json package-lock.json supabase

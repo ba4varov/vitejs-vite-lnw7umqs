@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import {pathToFileURL} from 'node:url'
+import {safeProviderReason} from '../supabase/functions/_shared/push-provider.mjs'
 const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(v)
 export function options(args) {
  if(![3,4].includes(args.length)||!/^[a-z]{20}$/.test(args[0])||!args.slice(1,3).every(uuid)||!['rain','storm','wind','cold','heat','walk','garden','sport'].includes(args[3]||'wind'))throw Error('INVALID_SELECTION')
@@ -21,7 +22,8 @@ export async function runOperator(o,{edge,confirm,output,requestId=randomUUID()}
   if(await confirm('SEND ONE')!=='SEND ONE')return output('Отказано. Няма опит за изпращане.')
   const sent=await edge({operation:'send',permitId:permit,confirmation:phrase})
   const categories=['accepted','subscription_expired','provider_auth_rejected','rate_limited','provider_unavailable','redirect_refused','request_rejected','provider_rejected','tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed','transport_uncertain','dns_failed','preparation_failed','database_uncertain']
-  output(JSON.stringify({category:categories.includes(sent.diagnostic?.category)?sent.diagnostic.category:'unknown',providerStatus:Number.isInteger(sent.diagnostic?.providerStatus)&&sent.diagnostic.providerStatus>=200&&sent.diagnostic.providerStatus<=599?sent.diagnostic.providerStatus:null}))
+  const providerReason=safeProviderReason(sent.diagnostic?.providerReason)
+  output(JSON.stringify({...(providerReason?{providerReason}:{}),category:categories.includes(sent.diagnostic?.category)?sent.diagnostic.category:'unknown',providerStatus:Number.isInteger(sent.diagnostic?.providerStatus)&&sent.diagnostic.providerStatus>=200&&sent.diagnostic.providerStatus<=599?sent.diagnostic.providerStatus:null}))
  }finally{await cleanup()}
 }
 function prompt(text,hidden=false) {

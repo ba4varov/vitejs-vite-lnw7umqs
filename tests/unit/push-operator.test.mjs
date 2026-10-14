@@ -46,3 +46,13 @@ test('only the exact short confirmation sends; cancellation always closes the pe
  await assert.rejects(runOperator(o,f.deps),/CANCELLED/)
  assert.deepEqual(f.calls.map(b=>b.operation),['prepare','cancel'])
 })
+
+test('operator prints only allowlisted provider reasons',async()=>{
+ for(const reason of ['fcm_invalid_argument','private provider response']){
+  const f=fixture({diagnostic:{category:'request_rejected',providerStatus:400,providerReason:reason}})
+  await runOperator(o,f.deps)
+  const output=f.output.join()
+  assert.equal(output.includes(reason),reason==='fcm_invalid_argument')
+  assert.ok(output.includes('400'))
+ }
+})

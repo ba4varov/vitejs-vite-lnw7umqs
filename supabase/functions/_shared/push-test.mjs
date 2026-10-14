@@ -4,6 +4,7 @@ import {createECDH, timingSafeEqual} from 'node:crypto'
 import {lookup} from 'node:dns/promises'
 import {connect as tlsConnect} from 'node:tls'
 import {Buffer} from 'node:buffer'
+import {readProviderReason,safeProviderReason} from './push-provider.mjs'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const invalidHeaderText=value=>['\r','\n','\0'].some(char=>String(value).includes(char))
@@ -97,7 +98,7 @@ export async function sendPinned(details, resolver=lookup, connector=connectNode
  const endpoint=new URL(details.endpoint),host=endpoint.hostname
  const dns=await pinnedLookup(host,resolver)
  const target=await new Promise((resolve,reject)=>dns(host,{},(error,address,family)=>error?reject(error):resolve({address,family})))
- const controller=new AbortController();let timer,connection
+ const controller=new AbortController();let timer,connection,finalResult
  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('PROVIDER_UNCERTAIN'))},8000)})
  const deliver=async()=>{
   connection=await connector({...target,hostname:host},controller.signal)
@@ -134,11 +135,17 @@ export async function sendPinned(details, resolver=lookup, connector=connectNode
     const colon=line.indexOf(':');if(colon<1 || invalidHeaderText(line))throw Error('INVALID_RESPONSE')
     if(line.slice(0,colon).toLowerCase()==='retry-after'){retryAfter=retryAfter===undefined?line.slice(colon+1).trim():'INVALID_RETRY_AFTER'}
    }
-   return {status:Number(match[1]),retryAfter}
+   finalResult={status:Number(match[1]),retryAfter}
+   if(host==='fcm.googleapis.com'&&finalResult.status>=400){
+    const reason=await readProviderReason(connection,response.subarray(end+4,used),lines)
+    if(reason)finalResult.providerReason=reason
+   }
+   return finalResult
   }
   throw Error('RESPONSE_LIMIT')
  }
  try {return await Promise.race([deliver(),timeout])}catch(error){
+  if(finalResult)return finalResult // A diagnostic read timeout cannot erase a final HTTP status.
   const safe=['TLS_FAILED','CONNECT_FAILED','WRITE_FAILED','RESPONSE_FAILED','RESPONSE_LIMIT','INVALID_RESPONSE','INVALID_HEADERS','REQUEST_LIMIT']
   const uncertain=Error('PROVIDER_UNCERTAIN')
   uncertain.diagnosticCode=controller.signal.aborted?'timeout':safe.includes(error?.message)?error.message.toLowerCase():'transport_failed'
@@ -175,7 +182,7 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
   }catch{return reply(400,'INVALID_REQUEST')}
   const config={publicKey:env.PUSH_VAPID_PUBLIC_KEY,privateKey:env.PUSH_VAPID_PRIVATE_KEY,subject:env.PUSH_VAPID_SUBJECT}
   if(!validVapid(config.publicKey,config.privateKey,config.subject))return reply(503,'PUSH_TEST_UNCONFIGURED')
-  let claim,phase='claim',providerStatus
+  let claim,phase='claim',providerStatus,providerReason
   const report=diagnostic=>{try{diagnose(diagnostic)}catch{/* Diagnostics must not affect authorization or delivery. */}}
   try {
    claim=await rpc('claim_push_test',{permit_id:body.permitId,key_public:config.publicKey})
@@ -196,7 +203,8 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
    const result=await send(details,async()=>new Promise((resolve,reject)=>dns('',{all:true},(e,a)=>e?reject(e):resolve(a))))
    if(!Number.isInteger(result.status) || result.status<200 || result.status>599)throw Error('INVALID_RESPONSE')
    providerStatus=result.status
-   const diagnostic={category:providerDiagnostic(result.status),providerStatus:result.status}
+   providerReason=safeProviderReason(result.providerReason)
+   const diagnostic={category:providerDiagnostic(result.status),providerStatus:result.status,...(providerReason?{providerReason}:{})}
    report(diagnostic)
    const outcome=result.status>=200 && result.status<300?'sent':[404,410].includes(result.status)?'expired':result.status===429?'throttled':'failed'
    phase='finish'
@@ -204,7 +212,7 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
    return reply(outcome==='sent'?200:502,outcome==='sent'?'PUSH_TEST_ACCEPTED':'PUSH_TEST_NOT_CONFIRMED',diagnostic)
   }catch(error){
    // Reservations are never replayed. Unknown provider/DB outcomes stay uncertain.
-   const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus})}
+   const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus}),...(providerReason?{providerReason}:{})}
    report(diagnostic)
    return reply(503,'PUSH_TEST_UNCERTAIN',diagnostic)
   }finally{

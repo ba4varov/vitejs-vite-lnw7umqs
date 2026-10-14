@@ -60,3 +60,14 @@ test('diagnostic sink failure cannot change delivery; disabled gate never touche
  assert.deepEqual(await (await createTestHandler({...deps,env:{...env,PUSH_TEST_DELIVERY_ENABLED:'false'},rpc:()=>{throw Error('must not call')}})(request())).json(),{error:'PUSH_TEST_DISABLED',deliveryEnabled:false})
  assert.equal(sends,1)
 })
+
+test('only allowlisted provider reasons reach replies/logs, including after failed finish',async()=>{
+ for(const [providerReason,fail] of [['fcm_invalid_argument',false],['fcm_invalid_argument',true],[device.endpoint,false]]){
+  let sends=0;const logs=[]
+  const handler=createTestHandler({env,resolver,diagnose:d=>logs.push(d),rpc:async name=>{if(fail&&name==='finish_push_test')throw Error('private');return name==='claim_push_test'?device:true},send:async()=>{sends++;return {status:400,providerReason,body:device.endpoint}}})
+  const body=await (await handler(request())).json()
+  assert.equal(body.diagnostic.providerStatus,400);assert.equal(sends,1)
+  assert.equal(body.diagnostic.providerReason,providerReason==='fcm_invalid_argument'?providerReason:undefined)
+  assert.ok(!JSON.stringify([body,logs]).includes(device.endpoint))
+ }
+})

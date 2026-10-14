@@ -1,5 +1,7 @@
 # Push диагностика без реално изпращане
 
+Актуална проверка на HTTP 400, wire сравнение със стандартния sender и граници на новия `providerReason`: [push-http400-bg.md](push-http400-bg.md).
+
 ## Какво означава отчетеният 502
 
 В проверения main (90f2542) `PUSH_TEST_NOT_CONFIRMED` с HTTP 502 се връща само след получен валиден финален HTTP отговор извън 2xx и успешно `finish_push_test`. Възможни са всички 300–599: пренасочване, невалидна заявка/удостоверяване, липсващ абонамент, ограничение на заявките и грешка при доставчика. 404/410 маркират expired и премахват съответната стара регистрация; 429 прилага Retry-After към глобалния cooldown, а необработимо дълъг срок изключва DB gate. Останалите статуси маркират failed. Няма автоматичен retry.
@@ -16,7 +18,7 @@ SSRF allowlist и проверката на всички DNS адреси ост
 
 ## Безопасна диагностика
 
-След операторско удостоверяване отговорът съдържа `diagnostic.category`, числов `providerStatus`, когато е получен, и `phase` при грешка. Edge логът `push_test_result` съдържа само тези полета. Няма endpoint, IP, permit/device/user/claim ID, VAPID ключ, JWT, Authorization, auth/p256dh, response body, произволни headers или exception текст. Отказите преди claim не добавят диагностика. Неуспешно логване не влияе на изпращането. Резултатът от доставчика се отчита преди finish RPC, така че грешка при записването не скрива известния HTTP статус.
+След операторско удостоверяване отговорът съдържа `diagnostic.category`, числов `providerStatus`, когато е получен, опционален allowlisted `providerReason` при разпознат FCM отказ и `phase` при грешка. Edge логът `push_test_result` съдържа само тези полета. Няма endpoint, IP, permit/device/user/claim ID, VAPID ключ, JWT, Authorization, auth/p256dh, response body, произволни headers или exception текст. Отказите преди claim не добавят диагностика. Неуспешно логване не влияе на изпращането. Резултатът от доставчика се отчита преди finish RPC, така че грешка при записването не скрива известния HTTP статус.
 
 Категории: accepted; provider_auth_rejected (401/403); subscription_expired (404/410); rate_limited (429); redirect_refused (3xx); request_rejected (400/413); provider_unavailable (5xx); provider_rejected (други). Отказ на удостоверяване не доказва сам по себе си грешен VAPID ключ. Транспортът различава connect_failed, tls_failed, write_failed, response_failed, invalid_response, response_limit, timeout и transport_failed; DNS и DB имат отделни категории. TLS категорията не излага конкретна сертификатна/системна грешка.
 
