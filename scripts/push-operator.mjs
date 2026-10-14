@@ -16,9 +16,9 @@ export async function runOperator(o,{edge,confirm,output,requestId=randomUUID()}
   const result=await edge({operation:'prepare',userId:o.user,deviceId:o.device,category:o.category,requestId})
   if(result.error!=='PUSH_TEST_READY'||!uuid(result.permitId)||result.userId!==o.user||result.deviceId!==o.device||result.category!==o.category)throw Error('NOT_READY')
   permit=result.permitId
-  output(`Production проект ${o.project}; акаунт ${o.user}; устройство ${o.device}; категория ${o.category}.`)
+  output(`Production проект: ${o.project}\nИзбран акаунт (USER_UUID): ${o.user}\nИзбрано устройство (DEVICE_UUID): ${o.device}\nКатегория: ${o.category}`)
   const phrase=`SEND ONE ${o.user} ${o.device}`
-  if(!await confirm(phrase))return output('Отказано. Няма опит за изпращане.')
+  if(await confirm('SEND ONE')!=='SEND ONE')return output('Отказано. Няма опит за изпращане.')
   const sent=await edge({operation:'send',permitId:permit,confirmation:phrase})
   const categories=['accepted','subscription_expired','provider_auth_rejected','rate_limited','provider_unavailable','redirect_refused','request_rejected','provider_rejected','tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed','transport_uncertain','dns_failed','preparation_failed','database_uncertain']
   output(JSON.stringify({category:categories.includes(sent.diagnostic?.category)?sent.diagnostic.category:'unknown',providerStatus:Number.isInteger(sent.diagnostic?.providerStatus)&&sent.diagnostic.providerStatus>=200&&sent.diagnostic.providerStatus<=599?sent.diagnostic.providerStatus:null}))
@@ -27,16 +27,52 @@ export async function runOperator(o,{edge,confirm,output,requestId=randomUUID()}
 function prompt(text,hidden=false) {
  if(!process.stdin.isTTY || !process.stdout.isTTY)throw Error('TTY_REQUIRED')
  return new Promise((resolve,reject)=>{
-  let value='';process.stdin.setRawMode(true);process.stdin.resume()
-  process.stdout.write(text+'\n> ')
-  const done=()=>{process.stdin.off('data',read);process.stdin.setRawMode(false);process.stdin.pause();process.stdout.write('\n')}
-  const read=chunk=>{for(const c of chunk.toString()){
-   if(c==='\u0003'){done();reject(Error('CANCELLED'));return}
-   if(c==='\r'||c==='\n'){done();resolve(value);return}
-   if(c==='\u007f'){value=value.slice(0,-1);continue}
-   if(c>=' '&&c<='~'&&value.length<8192){value+=c;if(!hidden)process.stdout.write(c)}
-  }}
-  process.stdin.on('data',read)
+  const input=process.stdin,output=process.stdout,wasRaw=input.isRaw
+  let value='',escape='',pasting=false,invalid=false,finished=false
+  input.setRawMode(true);input.resume()
+  // Bracketed paste keeps pasted newlines from acting as Enter.
+  output.write('\u001b[?2004h'+text+'\n> ')
+  const done=(error)=>{
+   if(finished)return
+   finished=true
+   input.off('data',read);input.off('end',closed);input.off('error',failed)
+   input.setRawMode(Boolean(wasRaw));input.pause()
+   output.write('\u001b[?2004l\n')
+   if(error)reject(error);else resolve(invalid?'':value)
+  }
+  const closed=()=>done(Error('CANCELLED'))
+  const failed=()=>done(Error('INPUT_FAILED'))
+  const append=c=>{
+   if(c<' '||c>'~'||value.length>=8192){invalid=true;return}
+   value+=c;if(!hidden)output.write(c)
+  }
+  const read=chunk=>{
+   const chars=chunk.toString()
+   for(let i=0;i<chars.length;i++){
+    const c=chars[i]
+    if(c==='\u0003'){done(Error('CANCELLED'));return}
+    if(escape||c==='\u001b'){
+     escape+=c
+     if(escape==='\u001b[200~'){pasting=true;escape='';continue}
+     if(escape==='\u001b[201~'){pasting=false;escape='';continue}
+     if(['\u001b[200~','\u001b[201~'].some(marker=>marker.startsWith(escape)))continue
+     invalid=true;escape='';continue
+    }
+    if(pasting){append(c);continue}
+    if(c==='\r'||c==='\n'){
+     // A pasted Enter must not confirm, even without bracketed paste support.
+     if(!hidden&&i>0)invalid=true
+     if(chars.slice(i+1).replace(/^\n$/,'')!=='')invalid=true
+     done();return
+    }
+    if(c==='\u007f'||c==='\b'){
+     if(value.length){value=value.slice(0,-1);if(!hidden)output.write('\b \b')}
+     continue
+    }
+    append(c)
+   }
+  }
+  input.on('data',read);input.once('end',closed);input.once('error',failed)
  })
 }
 async function main() {
@@ -51,7 +87,7 @@ async function main() {
   try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2048)throw Error('EDGE_FAILED');text+=new TextDecoder().decode(value)}}finally{await reader.cancel()}
   return JSON.parse(text)
  }
- try{await runOperator(o,{edge,confirm:async phrase=>(await prompt('За един-единствен опит въведете точно: '+phrase))===phrase,output:console.log})}finally{token='';session=''}
+ try{await runOperator(o,{edge,confirm:phrase=>prompt('За един-единствен опит въведете точно: '+phrase),output:console.log})}finally{token='';session=''}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{
  const messages={INVALID_SELECTION:'Употреба: node scripts/push-operator.mjs PROJECT_REF USER_UUID DEVICE_UUID [wind]',TTY_REQUIRED:'Нужен е интерактивен terminal.',INVALID_TOKEN:'Невалиден формат на операторския token.',INVALID_SESSION:'Невалиден формат на access token.',NOT_READY:'Production preflight отказа: проверете избрания администратор, устройството, съгласието, cooldown и server конфигурацията.'}
