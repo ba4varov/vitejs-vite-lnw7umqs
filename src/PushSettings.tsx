@@ -1,6 +1,7 @@
+import {checkPushKeys,pushKeyMessages} from './push-key-diagnostics.js'
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
-import {pushRequest,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
+import {pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
@@ -10,6 +11,9 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const [data,setData]=useState<PushSnapshot|null>(null),[draft,setDraft]=useState<PushPreferences>({enabled:false,cities:[],categories:[]}),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[worker,setWorker]=useState<ServiceWorkerRegistration|null>(null)
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
  const [checks,setChecks]=useState<Record<string,string>>({})
+ const [keyChecks,setKeyChecks]=useState<Record<string,{p256dh:string;auth:string}>>({})
+ const diagnosticEpoch=useRef(0)
+ useEffect(()=>{diagnosticEpoch.current++;setChecks({});setKeyChecks({});return()=>{diagnosticEpoch.current++}},[session.user.id,session.access_token])
  const live=useRef(true)
  const apply=(d:PushSnapshot)=>{if(live.current){setData(d);setDraft(d.preferences)}}
  useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{live.current=false}},[session.user.id,session.access_token])
@@ -25,7 +29,15 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(fail).finally(()=>{if(live.current)setBusy(false)})
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
- const check=async(device:PushDevice)=>{setBusy(true);setChecks({});try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}
+ const check=async(device:PushDevice)=>{setBusy(true);setChecks({});setKeyChecks({});try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}
+ const checkKeys=async(device:PushDevice)=>{
+  const epoch=diagnosticEpoch.current
+  setBusy(true);setChecks({});setKeyChecks({})
+  try {
+   const result=await checkPushKeys({device,key:data?.publicKey,authorize:()=>pushKeySessionMatches(session),verify:(body:object)=>pushKeyRequest(session,body)})
+   if(live.current&&epoch===diagnosticEpoch.current)setKeyChecks({[device.id]:result})
+  }finally{if(live.current)setBusy(false)}
+ }
  const dirty=!!data&&JSON.stringify(draft)!==JSON.stringify(data.preferences)
  const unsavedInputs=Boolean(city.name.trim() || (label.trim() && !data?.devices.some(device=>device.label===label.trim())))
  useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
@@ -64,7 +76,16 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
    <h4>{bg?'Моите устройства':'My devices'}</h4>
    {!!data.devices.length&&<p>{bg?'Проверката сравнява този браузър с избраното устройство. За Note 13 Pro отвори Meteo Pulse в Chrome на този телефон.':'The check compares this browser with the selected device. For Note 13 Pro, open Meteo Pulse in Chrome on that phone.'}</p>}
    {!data.devices.length&&<p>{bg?'Няма регистрирани устройства.':'No registered devices.'}</p>}
-   <ul>{data.devices.map(d=><li key={d.id}>{d.label} <button type="button" disabled={busy} onClick={()=>void check(d)}>{bg?'Провери регистрацията':'Check registration'}</button> {checks[d.id]&&<p role="status">{pushRegistrationMessages[lang][checks[d.id]]}</p>} <button type="button" disabled={busy} onClick={()=>void remove(d)}>{bg?'Отпиши устройство':'Unsubscribe device'}</button></li>)}</ul>
+   <ul>{data.devices.map(d=><li key={d.id}>
+    {d.label} <button type="button" disabled={busy} onClick={()=>void check(d)}>{bg?'Провери регистрацията':'Check registration'}</button>
+    {' '}<button type="button" disabled={busy} onClick={()=>void checkKeys(d)}>{bg?'Провери p256dh/auth':'Check p256dh/auth'}</button>
+    {keyChecks[d.id]&&<p role="status">
+     p256dh: {pushKeyMessages[lang][keyChecks[d.id].p256dh]}; auth: {pushKeyMessages[lang][keyChecks[d.id].auth]}.
+     {' '}{bg?'Съвпадението не доказва, че FCM ще приеме известие.':'A match does not prove that FCM will accept a notification.'}
+    </p>}
+    {checks[d.id]&&<p role="status">{pushRegistrationMessages[lang][checks[d.id]]}</p>}
+    {' '}<button type="button" disabled={busy} onClick={()=>void remove(d)}>{bg?'Отпиши устройство':'Unsubscribe device'}</button>
+   </li>)}</ul>
    <label>{bg?'Име на това устройство':'Name of this device'}<input value={label} maxLength={80} disabled={busy} onChange={e=>setLabel(e.target.value)}/></label>
    {!data.registrationEnabled&&<p>{bg?'Регистрацията на устройства е неактивна до ръчно конфигуриране и одобрение.':'Device registration is inactive pending manual configuration and approval.'}</p>}
    <button type="button" disabled={busy||dirty||!worker||support!=='supported'||!data.registrationEnabled||!data.preferences.enabled||!label.trim()||!data.preferences.cities.length||!data.preferences.categories.length||Notification.permission==='denied'} onClick={subscribe}>{bg?'Разреши и регистрирай това устройство':'Allow and register this device'}</button>

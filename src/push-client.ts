@@ -1,3 +1,4 @@
+import {requestPushKeyCheck} from './push-key-request.js'
 import {restoreSession,type AuthSession} from './auth-client'
 export type PushCity={name:string;latitude:number;longitude:number;zone:string}
 export type PushPreferences={enabled:boolean;cities:PushCity[];categories:string[]}
@@ -11,4 +12,12 @@ export async function pushRequest(session:AuthSession,method='GET',body?:object)
  const data=await response.json()
  if(data.contractVersion!==1||data.deliveryEnabled!==false||!Array.isArray(data.devices)||!Array.isArray(data.preferences?.cities)||!Array.isArray(data.preferences?.categories)||typeof data.pro!=='boolean')throw Error('INVALID_RESPONSE')
  return data
+}
+
+export async function pushKeySessionMatches(session:AuthSession) {
+ const active=await restoreSession()
+ return !!active&&active.user.id===session.user.id
+}
+export async function pushKeyRequest(session:AuthSession,body:object) {
+ return requestPushKeyCheck(session,body,{getSession:restoreSession})
 }
