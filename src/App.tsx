@@ -2,6 +2,7 @@ import { trackActivity } from './activity-client'
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { WeatherAdvice } from './WeatherAdvice'
+import { WindyMap } from './WindyMap'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
 import { Chart, SingleChart } from './WeatherCharts'
 import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
@@ -1157,16 +1158,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
           <section className="card map-section">
             <h3>🌍 {t.interactiveMap}</h3>
-            <div style={{ borderRadius: '12px', overflow: 'hidden', marginTop: '16px', background: darkMode ? '#1e293b' : '#f1f5f9' }}>
-              <iframe
-                width="100%"
-                height="450"
-                src={`https://embed.windy.com/embed2.html?lat=${coords.lat}&lon=${coords.lon}&detailLat=${coords.lat}&detailLon=${coords.lon}&width=650&height=450&zoom=6&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&city=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&metricRain=mm&radarRange=-1`}
-                frameBorder="0"
-                title="Windy Map"
-                style={{ display: 'block' }}
-              ></iframe>
-            </div>
+            <WindyMap coords={coords} lang={lang} darkMode={darkMode} title={t.interactiveMap} />
           </section>
 
           {weather.aqi !== null && weather.aqi !== undefined && (

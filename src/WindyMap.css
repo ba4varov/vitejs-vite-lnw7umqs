@@ -1,0 +1,23 @@
+.windy-view { position: static; width: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; }
+.windy-controls, .windy-hint, .windy-scroll-shield { display: none; }
+.windy-canvas { position: relative; }
+.windy-view.is-expanded { position: fixed; inset: 0; box-sizing: border-box; width: 100%; height: 100vh; height: 100dvh; max-width: none; max-height: none; display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: var(--weather-surface, #fff); color: var(--weather-ink, #0f172a); overflow: hidden; }
+.windy-view::backdrop { background: #0f172a; }
+.windy-view.is-expanded .windy-controls { display: flex; flex-shrink: 0; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; }
+.windy-view.is-expanded .windy-controls span { min-width: 0; font-weight: 600; }
+.windy-view.is-expanded .windy-canvas { flex: 1; min-height: 0; }
+.map-section .windy-view.is-expanded iframe { height: 100%; pointer-events: auto; }
+.windy-controls button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--weather-line, #64748b); border-radius: 10px; background: var(--weather-surface, #fff); color: var(--weather-ink, #0f172a); font: inherit; font-weight: 600; cursor: pointer; }
+.windy-controls button:focus-visible { outline: 3px solid #0284c7; outline-offset: 2px; }
+.windy-controls button[aria-pressed=true] { box-shadow: inset 0 0 0 2px currentColor; }
+@media (max-width: 640px) {
+  .windy-controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; }
+  .windy-controls button { flex: 1; }
+  .windy-hint { display: block; margin: 0; padding: 0 12px 12px; font-size: 14px; line-height: 1.5; }
+  .map-section .windy-view iframe { height: 320px; pointer-events: none; }
+  .windy-scroll-shield { display: block; position: absolute; inset: 0; touch-action: pan-y; }
+  .windy-view.is-interacting iframe { pointer-events: auto; }
+  .windy-view.is-interacting .windy-scroll-shield, .windy-view.is-expanded .windy-scroll-shield, .windy-view.is-expanded .windy-hint { display: none; }
+  .windy-view.is-expanded .windy-controls { flex-wrap: nowrap; }
+  .windy-view.is-expanded .windy-controls button { flex: none; }
+}
