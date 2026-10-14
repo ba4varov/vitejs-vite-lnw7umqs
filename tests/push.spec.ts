@@ -8,7 +8,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   const scope:any=window;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
   let permissionValue='default',subscription:any=null
   scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
-  scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
+  scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},getKey:(name:string)=>name==='p256dh'?Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer:new Uint8Array(16).fill(1).buffer,unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
   Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>subscription}})})
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
@@ -197,6 +197,42 @@ for(const lang of ['bg','en'])test(`missing diagnostic public key ${lang}`,async
  const row=page.locator('.push-settings li').filter({hasText:'Note 13 Pro'})
  await row.getByRole('button',{name:lang==='bg'?'Провери регистрацията':'Check registration',exact:true}).click()
  await expect(row.getByRole('status')).toHaveText(lang==='bg'?'Публичният VAPID ключ за проверката липсва или е невалиден.':'The public VAPID key for the check is missing or invalid.')
+ expect(state.calls.every(c=>c.method==='GET')).toBe(true)
+ expect(await page.evaluate(()=>[(window as any).pushPrompts,(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0,0])
+})
+
+for(const lang of ['bg','en'])test(`safe p256dh/auth diagnostics ${lang}`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,registrationEnabled:false})
+ if(lang==='en'){
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+ }
+ const requests:any[]=[];let statuses={p256dh:'match',auth:'match'}
+ await page.route('**/api/push-key-diagnostics',async r=>{
+  const body=r.request().postDataJSON();requests.push(body)
+  expect(Object.keys(body).sort()).toEqual(['auth','deviceId','fingerprint','nonce','p256dh'])
+  for(const field of ['p256dh','auth','nonce'])expect(body[field]).toMatch(/^[a-f0-9]{64}$/)
+  expect(JSON.stringify(body)).not.toContain(publicKey)
+  expect(JSON.stringify(body)).not.toContain('AQEBAQEBAQEBAQEBAQEBAQ')
+  expect(JSON.stringify(body)).not.toContain('https://fcm.googleapis.com')
+  return r.fulfill({json:{keys:statuses}})
+ })
+ const row=page.locator('.push-settings li').filter({hasText:'Note 13 Pro'})
+ const button=row.getByRole('button',{name:lang==='bg'?'Провери p256dh/auth':'Check p256dh/auth',exact:true})
+ await page.evaluate(()=>(window as any).diagnosticSubscription('device'))
+ await button.click();await expect(row.getByRole('status')).toContainText(lang==='bg'?'не може да бъде проверен':'cannot be checked')
+ expect(requests).toHaveLength(0)
+ await page.evaluate(()=>(window as any).diagnosticSubscription('match'))
+ for(const status of ['match','mismatch','missing','unavailable']){
+  statuses={p256dh:status,auth:status}
+  await button.click()
+  const text=lang==='bg'?{match:'p256dh: съвпада',mismatch:'p256dh: не съвпада',missing:'липсва в браузъра или в записа',unavailable:'не може да бъде проверен'}:{match:'p256dh: matches',mismatch:'p256dh: does not match',missing:'missing in the browser or stored record',unavailable:'cannot be checked'}
+  await expect(row.getByRole('status')).toContainText(text[status])
+  await expect(row.getByRole('status')).toContainText(lang==='bg'?'не доказва, че FCM ще приеме':'does not prove that FCM will accept')
+ }
+ expect(requests).toHaveLength(4);expect(new Set(requests.map(r=>r.nonce)).size).toBe(4)
  expect(state.calls.every(c=>c.method==='GET')).toBe(true)
  expect(await page.evaluate(()=>[(window as any).pushPrompts,(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0,0])
 })

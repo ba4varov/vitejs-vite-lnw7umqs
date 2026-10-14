@@ -59,6 +59,8 @@ try {
   // One psql session preserves temporary before/after snapshots of an existing device.
   console.log(sql(['tests/sql/push-operator-before.sql','supabase/migrations/20261013050000_push_operator.sql','tests/sql/push-operator.sql']
     .map(path=>readFileSync(new URL(path,root),'utf8')).join('\n')))
+  sql(readFileSync(new URL('supabase/migrations/20261014060000_push_key_diagnostics.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/push-key-diagnostics.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.
   docker(['run','-d','--name',rest,'--network',`container:${pg}`,'-e','PGRST_DB_URI=postgres://authenticator@127.0.0.1:5432/postgres','-e','PGRST_DB_SCHEMAS=public','-e','PGRST_DB_ANON_ROLE=anon','-e',`PGRST_JWT_SECRET=${secret}`,'postgrest/postgrest:v13.0.7'])
   ready=false
@@ -73,6 +75,13 @@ try {
     await delay(500)
   }
   assert.ok(ready,'PostgREST schema cache readiness timed out')
+
+  const keyCheckBody=JSON.stringify({device_id:'f0000000-0000-0000-0000-000000000003',endpoint_fingerprint:'0'.repeat(64),nonce_hex:'1'.repeat(64),p256dh_proof:'2'.repeat(64),auth_proof:'3'.repeat(64)})
+  for(const token of [null,'invalid',jwt(ordinary,Math.floor(Date.now()/1000)-60),jwt(ordinary,undefined,'wrong-signature')])assert.ok([401,403].includes(request('/rpc/check_my_push_keys',token,keyCheckBody).status))
+  const ownKeyCheck=request('/rpc/check_my_push_keys',jwt(ordinary),keyCheckBody)
+  assert.equal(ownKeyCheck.status,200);assert.deepEqual(ownKeyCheck.body,{p256dh:'unavailable',auth:'unavailable'})
+  console.log('PASS: key diagnostics real local JWT rejects missing/expired/forged sessions; unavailable devices expose only statuses')
+
   for(const endpoint of ['/rpc/admin_statistics','/rpc/admin_users','/rpc/admin_advanced_statistics','/rpc/admin_audit_entries','/rpc/admin_management_users','/rpc/admin_management_summary','/rpc/admin_user_activity']) {
     assert.equal(request(endpoint,jwt(ordinary)).status,403,'Ordinary direct RPC must fail')
     assert.equal(request(endpoint,null).status,401,'Anonymous direct RPC must fail')
