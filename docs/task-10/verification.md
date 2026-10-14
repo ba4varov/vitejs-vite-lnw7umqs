@@ -1,3 +1,5 @@
+> Latest follow-up after `5a7167d`: [startup timing diagnosis and non-blocking reverse lookup](timing/verification.md). The measurements below describe the original progressive-loading change.
+
 # Task 10 — primary forecast without supplementary blocking
 
 This records the original PR #90 revision `b952c59`. The subsequent GPS startup update and its fresh validation are documented in [the GPS follow-up](gps/verification.md).

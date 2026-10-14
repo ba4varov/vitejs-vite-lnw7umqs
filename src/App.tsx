@@ -1,8 +1,9 @@
+import { startupTiming } from './startup-timing.js'
 import { createInitialLocation } from './initial-location.js'
 import { createForecastRequests, enrichForecast } from './forecast-sources.js'
 import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import './App.css'
 import { WeatherAdvice } from './WeatherAdvice'
 import { WindyMap } from './WindyMap'
@@ -252,13 +253,8 @@ const WeatherApp = () => {
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
-  const initialLocationRef = useRef(createInitialLocation({ navigator, resolveGps: async (coords, options) => {
-    while (true) {
-      const language = langRef.current
-      const data = await reverseGeocodeLocation(coords, language, options)
-      if (language === langRef.current) return locationFromReverseGeocode(data, translations[language].myLocation)
-    }
-  } }))
+  startupTiming.mark('react')
+  const initialLocationRef = useRef(createInitialLocation({ navigator }))
   const [initialLocationReady, setInitialLocationReady] = useState(false)
   const initialGpsLabelRef = useRef<any>(null)
   const initialDefaultTicketRef = useRef<any>(null)
@@ -826,6 +822,10 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           description: code.desc
         })
       }
+      startupTiming.mark('weather:processed')
+      // Freeze automatic startup labels with the first primary snapshot. A slow
+      // neighborhood lookup must neither delay weather nor rename its card later.
+      if (initialGpsLabelRef.current?.key === key) initialGpsLabelRef.current.pending = false
       setWeather(nextWeather)
       setHourly(hr)
       setPlannerLocation({lat,lon})
@@ -864,6 +864,15 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     }
   }
 
+  useLayoutEffect(() => {
+    if (!hasCurrentForecast || !startupTiming.enabled) return
+    startupTiming.mark('card:commit')
+    // Two animation frames provide an after-paint opportunity for this DOM commit;
+    // this is a visible-card proxy, not a GPU/pixel presentation timestamp.
+    let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => startupTiming.mark('card:paint')) })
+    return () => cancelAnimationFrame(frame)
+  }, [hasCurrentForecast])
+
   useEffect(() => {
     if (!initialLocationReady) return
     // Defer setup by one microtask. StrictMode cleanup cancels its rehearsal
@@ -890,7 +899,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       }
       else if (selection.source === 'geolocation') {
         setLocationSource('geolocation')
-        initialGpsLabelRef.current = { key: `${selection.lat},${selection.lon}`, lang: langRef.current }
+        initialGpsLabelRef.current = { key: `${selection.lat},${selection.lon}`, lang: langRef.current, pending: true }
         setCity(selection.name || translations[langRef.current].myLocation)
         setExactLocation(selection.exactLocation || null)
         setPlaceDetails({ region: selection.region, country: selection.country })
@@ -945,16 +954,20 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
   useEffect(() => {
     if (locationSource !== 'geolocation') return
-    if (initialGpsLabelRef.current?.key === locationKey && initialGpsLabelRef.current.lang === lang) return
-    initialGpsLabelRef.current = null
+    if (initialGpsLabelRef.current?.key === locationKey && initialGpsLabelRef.current.lang === lang && !initialGpsLabelRef.current.pending) return
+    if (initialGpsLabelRef.current?.lang !== lang) initialGpsLabelRef.current = null
     const controller = new AbortController()
+    startupTiming.mark('reverse:start')
+    const startupLabel = initialGpsLabelRef.current
+    const labelCurrent = () => !controller.signal.aborted && !locationChoiceRef.current && (!startupLabel || startupLabel.pending)
     void reverseGeocodeLocation(coords, lang, { signal: controller.signal }).then(data => {
-      if (controller.signal.aborted || locationChoiceRef.current) return
+      startupTiming.mark('reverse:end')
+      if (!labelCurrent()) return
       const localized = locationFromReverseGeocode(data, t.myLocation)
       setCity(localized.name)
       setPlaceDetails({ region: localized.region, country: localized.country })
       setExactLocation(localized.exactLocation)
-    }).catch(() => { if (!controller.signal.aborted && !locationChoiceRef.current) setCity(t.myLocation) })
+    }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) setCity(t.myLocation) })
     return () => controller.abort()
   }, [lang, coords.lat, coords.lon, locationSource])
 

@@ -24,8 +24,8 @@ test('permission query never resolves: independent deadline wins',async()=>{
 test('GPS error falls back and success after deadline is ignored',async()=>{
  const s=setup();const result=s.chooser.start();await flush();s.callbacks[0].error();assert.deepEqual(await result,{source:'fallback'});s.gps();assert.deepEqual(await result,{source:'fallback'})
 })
-test('slow GPS falls back at deadline, ignores later coordinates and reverse lookup',async()=>{
- let reverse=0;const s=setup('granted',{resolveGps:async()=>{reverse++;return {name:'Varna'}}});const result=s.chooser.start();await flush();s.timers[0]();assert.deepEqual(await result,{source:'fallback'});s.gps();await flush();assert.equal(reverse,0)
+test('slow GPS falls back at deadline and ignores later coordinates',async()=>{
+ const s=setup();const result=s.chooser.start();await flush();s.timers[0]();assert.deepEqual(await result,{source:'fallback'});s.gps();await flush();assert.deepEqual(await result,{source:'fallback'})
 })
 test('default wins while GPS is pending, or after a faster GPS result',async()=>{
  for(const gpsFirst of [false,true]){const s=setup();s.chooser.waitForDefault();const result=s.chooser.start();await flush();if(gpsFirst){s.gps();await flush();assert.equal(s.chooser.settled,false)}const place={name:'Sofia',lat:42.7,lon:23.3};s.chooser.defaultResolved(place);assert.deepEqual(await result,{source:'place',place});if(!gpsFirst)s.gps();assert.deepEqual(await result,{source:'place',place})}
@@ -39,8 +39,8 @@ test('manual selection wins pending GPS/default and cannot be replaced',async()=
 test('default lookup has the same bounded budget; late default cannot reorder fallback',async()=>{
  const s=setup('denied');s.chooser.waitForDefault();const result=s.chooser.start();await flush();s.timers[0]();assert.deepEqual(await result,{source:'fallback'});assert.equal(s.chooser.defaultResolved({name:'Sofia'}),false)
 })
-test('GPS labels are resolved before election; slow labels are bounded and aborted',async()=>{
- for(const slow of [false,true]){const d=deferred();let signal;const s=setup('granted',{resolveGps:async(_,options)=>{signal=options.signal;return d.promise}});const result=s.chooser.start();await flush();s.gps();await flush();assert.equal(s.chooser.settled,false);if(slow)s.timers[0]();d.resolve({name:'Varna',exactLocation:'Troshevo'});const chosen=await result;assert.equal(chosen.source,'geolocation');assert.equal(chosen.name,slow?undefined:'Varna');assert.equal(signal.aborted,true)}
+test('GPS coordinates release election immediately without reverse geocoding',async()=>{
+ const s=setup();const result=s.chooser.start();await flush();s.gps();assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89});assert.equal(s.chooser.settled,true)
 })
 test('invalid GPS coordinates never become a forecast location',async()=>{
  const s=setup();const result=s.chooser.start();await flush();s.callbacks[0].success({coords:{latitude:NaN,longitude:27}});assert.deepEqual(await result,{source:'fallback'})

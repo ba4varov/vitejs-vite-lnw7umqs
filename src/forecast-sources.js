@@ -1,3 +1,4 @@
+import { startupTiming } from './startup-timing.js'
 import { hourlyNumber, meanObservation, valuesByTime } from './weather-utils.js'
 
 // A request generation owns all three sources. Abort reduces wasted work; the
@@ -11,22 +12,26 @@ export function createForecastRequests(fetcher = (...args) => fetch(...args)) {
       const ownController = controller = new AbortController()
       const ticket = ++generation
       const current = () => ticket === generation && isLocationCurrent()
-      const read = async url => {
+      const read = async (url, source) => {
+        if (source === 'weather') startupTiming.mark('weather:start')
         const response = await fetcher(url, { signal: ownController.signal })
+        if (source === 'weather') startupTiming.mark('weather:response')
         if (!response.ok) throw new Error('Forecast source unavailable')
-        return response.json()
+        const data = await response.json()
+        startupTiming.mark(source === 'weather' ? 'weather:parsed' : `${source}:end`)
+        return data
       }
       // Launch every source before awaiting any one of them. Each supplementary
       // branch consumes its rejection independently, even if the main fails.
-      const main = read(urls.weather)
+      const main = read(urls.weather, 'weather').catch(error => { startupTiming.mark('weather:error'); throw error })
       for (const source of ['marine', 'aqi']) {
-        void read(urls[source]).then(data => {
+        void read(urls[source], source).then(data => {
           const fields = source === 'marine' ? ['sea_surface_temperature'] : ['european_aqi', 'pm10', 'pm2_5']
           const hasCurrent = fields.some(field => Object.hasOwn(data?.current || {}, field))
           const hasHourly = Array.isArray(data?.hourly?.time) && fields.some(field => Array.isArray(data?.hourly?.[field]))
           if (!hasCurrent && !hasHourly) throw new Error('Incomplete forecast source')
           if (current()) onSupplement(source, data)
-        }).catch(() => { if (current()) onSupplement(source, null) })
+        }).catch(() => { startupTiming.mark(`${source}:end`); if (current()) onSupplement(source, null) })
       }
       return { main, current }
     },

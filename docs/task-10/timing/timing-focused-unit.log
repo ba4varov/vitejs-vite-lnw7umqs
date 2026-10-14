@@ -1,0 +1,33 @@
+✔ starts all sources together and main resolves without supplementary completion (50.152169ms)
+✔ supplementary data can arrive before main (1.906208ms)
+✔ supplementary http failure is handled without blocking main (1.33249ms)
+✔ supplementary network failure is handled without blocking main (2.637533ms)
+✔ supplementary json failure is handled without blocking main (8.604756ms)
+✔ supplementary incomplete failure is handled without blocking main (0.778691ms)
+✔ new generation discards old supplemental JSON and main even when fetch ignores abort (6.577811ms)
+✔ location changes invalidate responses before another request starts; cancel invalidates everything (3.292272ms)
+✔ main failure rejects independently; retry succeeds (4.427008ms)
+✔ enrichment uses timestamp joins and original day hours, preserves zero/null and precision (2.139559ms)
+✔ granted GPS elects final coordinates, starts once across StrictMode setup and settles once (65.97428ms)
+✔ permission denied falls back without prompting (3.331619ms)
+✔ permission prompt falls back without prompting (3.744724ms)
+✔ permission undefined falls back without prompting (0.28424ms)
+✔ missing geolocation falls back (7.371643ms)
+✔ permission query never resolves: independent deadline wins (24.416932ms)
+✔ GPS error falls back and success after deadline is ignored (0.814669ms)
+✔ slow GPS falls back at deadline and ignores later coordinates (4.509468ms)
+✔ default wins while GPS is pending, or after a faster GPS result (10.856583ms)
+✔ no default releases GPS; failing default and denied GPS release fallback (42.986763ms)
+✔ manual selection wins pending GPS/default and cannot be replaced (0.998768ms)
+✔ default lookup has the same bounded budget; late default cannot reorder fallback (0.686037ms)
+✔ GPS coordinates release election immediately without reverse geocoding (0.881083ms)
+✔ invalid GPS coordinates never become a forecast location (0.89238ms)
+✔ startup diagnostics are off by default and allow only fixed phases without payloads (16.058195ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1677.343068

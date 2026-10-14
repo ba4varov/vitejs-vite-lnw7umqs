@@ -1,0 +1,5107 @@
+{
+  "baselineCommit": "5a7167d1ff2d681551a68999ac968b98025bedc5",
+  "environment": "Local production previews, Chromium, synthetic network/GPS, real timers, one worker",
+  "supplementDelayMs": 6000,
+  "units": "milliseconds since navigation; missing phases/durations are null or absent, never zero substitutes",
+  "summary": [
+    {
+      "scenario": "denied-gps",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 474.9,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 122.8,
+        "gpsToWeather": null,
+        "weatherHeaders": 170.1,
+        "weatherBodyParse": 8.6,
+        "parseToPaint": 256.6,
+        "navigationToPaint": 1044.7,
+        "module": 250.2,
+        "react": 272.1,
+        "processing": 27.7,
+        "processingToCommit": 58.4,
+        "commitToPaint": 175.2
+      }
+    },
+    {
+      "scenario": "denied-gps",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 514.9,
+        "permission": 0,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 60.6,
+        "gpsToWeather": null,
+        "weatherHeaders": 141.0,
+        "weatherBodyParse": 2.0,
+        "parseToPaint": 281.4,
+        "navigationToPaint": 961.7,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 352.7,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 163.4,
+        "gpsToWeather": null,
+        "weatherHeaders": 178.4,
+        "weatherBodyParse": 2.3,
+        "parseToPaint": 426.2,
+        "navigationToPaint": 1097.4,
+        "module": 269.9,
+        "react": 292.2,
+        "processing": 45.0,
+        "processingToCommit": 84.5,
+        "commitToPaint": 296.7
+      }
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 316.8,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 188.5,
+        "gpsToWeather": null,
+        "weatherHeaders": 168.5,
+        "weatherBodyParse": 5.8,
+        "parseToPaint": 414.1,
+        "navigationToPaint": 1067.4,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 432.5,
+        "permission": 0.0,
+        "gps": 150.7,
+        "preferredPlace": null,
+        "reverseResponse": 57.3,
+        "permissionToWeather": 194.5,
+        "gpsToWeather": 53.0,
+        "weatherHeaders": 128.2,
+        "weatherBodyParse": 1.7,
+        "parseToPaint": 201.5,
+        "navigationToPaint": 942.1,
+        "module": 255.9,
+        "react": 386.1,
+        "processing": 24.5,
+        "processingToCommit": 27.2,
+        "commitToPaint": 152.5
+      }
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 398.6,
+        "permission": 0.0,
+        "gps": 125.4,
+        "preferredPlace": null,
+        "reverseResponse": 49.5,
+        "permissionToWeather": 178.5,
+        "gpsToWeather": 54.6,
+        "weatherHeaders": 129.4,
+        "weatherBodyParse": 1.6,
+        "parseToPaint": 238.1,
+        "navigationToPaint": 969.3,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 280.6,
+        "permission": 0.1,
+        "gps": 3800.5,
+        "preferredPlace": null,
+        "reverseResponse": 55.4,
+        "permissionToWeather": 3812.8,
+        "gpsToWeather": 12.2,
+        "weatherHeaders": 134.4,
+        "weatherBodyParse": 0.8,
+        "parseToPaint": 255.4,
+        "navigationToPaint": 4484,
+        "module": 208.9,
+        "react": 225.1,
+        "processing": 19.4,
+        "processingToCommit": 23.5,
+        "commitToPaint": 205.1
+      }
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 393.4,
+        "permission": 0.0,
+        "gps": 3800.3,
+        "preferredPlace": null,
+        "reverseResponse": 48.6,
+        "permissionToWeather": 3854.5,
+        "gpsToWeather": 54.1,
+        "weatherHeaders": 127.6,
+        "weatherBodyParse": 1.6,
+        "parseToPaint": 218.3,
+        "navigationToPaint": 4578.9,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 346.9,
+        "permission": 0.0,
+        "gps": 134.7,
+        "preferredPlace": 2028.4,
+        "reverseResponse": null,
+        "permissionToWeather": 2199.6,
+        "gpsToWeather": 2064.7,
+        "weatherHeaders": 127.8,
+        "weatherBodyParse": 1.3,
+        "parseToPaint": 190.0,
+        "navigationToPaint": 2867.9,
+        "module": 219.2,
+        "react": 269.2,
+        "processing": 22.8,
+        "processingToCommit": 25.2,
+        "commitToPaint": 140.4
+      }
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 340.7,
+        "permission": 0.0,
+        "gps": 128.6,
+        "preferredPlace": 2029.0,
+        "reverseResponse": 51.6,
+        "permissionToWeather": 2176.3,
+        "gpsToWeather": 2005.0,
+        "weatherHeaders": 126.5,
+        "weatherBodyParse": 1.0,
+        "parseToPaint": 175.3,
+        "navigationToPaint": 2830.2,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 367.2,
+        "permission": 0.1,
+        "gps": 253.7,
+        "preferredPlace": null,
+        "reverseResponse": 5022.2,
+        "permissionToWeather": 275.4,
+        "gpsToWeather": 21.6,
+        "weatherHeaders": 132.4,
+        "weatherBodyParse": 1.6,
+        "parseToPaint": 287.3,
+        "navigationToPaint": 1104.7,
+        "module": 234.6,
+        "react": 309.8,
+        "processing": 34.5,
+        "processingToCommit": 36.1,
+        "commitToPaint": 200.9
+      }
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 407,
+        "permission": 0.2,
+        "gps": 116.9,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 4506.2,
+        "gpsToWeather": 4386.1,
+        "weatherHeaders": 135.2,
+        "weatherBodyParse": 0.9,
+        "parseToPaint": 229.9,
+        "navigationToPaint": 5268.1,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "after",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 316.1,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 173,
+        "gpsToWeather": null,
+        "weatherHeaders": 4015.2,
+        "weatherBodyParse": 4.2,
+        "parseToPaint": 252.5,
+        "navigationToPaint": 4791.1,
+        "module": 246.1,
+        "react": 273.4,
+        "processing": 27.7,
+        "processingToCommit": 52.6,
+        "commitToPaint": 180.7
+      }
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "before",
+      "repetitions": 3,
+      "medianMs": {
+        "navigationToPermission": 343.8,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 113.0,
+        "gpsToWeather": null,
+        "weatherHeaders": 4016.8,
+        "weatherBodyParse": 1.4,
+        "parseToPaint": 244.4,
+        "navigationToPaint": 4708,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      }
+    }
+  ],
+  "records": [
+    {
+      "scenario": "denied-gps",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 241.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 342.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 534.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 534.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 657
+        },
+        {
+          "phase": "marine:start",
+          "ms": 659.7
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 660
+        },
+        {
+          "phase": "weather:response",
+          "ms": 953.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 969.2
+        },
+        {
+          "phase": "card:commit",
+          "ms": 1066.9
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1368.4
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 231.3
+        },
+        {
+          "phase": "react",
+          "ms": 266.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 531.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 534.4
+        },
+        {
+          "phase": "location:ready",
+          "ms": 534.4
+        },
+        {
+          "phase": "weather:start",
+          "ms": 656.8
+        },
+        {
+          "phase": "weather:response",
+          "ms": 953.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 969.2
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 1008.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 1066.7
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1368.3
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 534.2,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 122.8,
+        "gpsToWeather": null,
+        "weatherHeaders": 296.4,
+        "weatherBodyParse": 15.8,
+        "parseToPaint": 399.2,
+        "navigationToPaint": 1368.4,
+        "module": 231.3,
+        "react": 266.9,
+        "processing": 39.1,
+        "processingToCommit": 58.4,
+        "commitToPaint": 301.6
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "denied-gps",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 394.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 431.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 474.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 474.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 609.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 615.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 617.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 779.5
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 788.1
+        },
+        {
+          "phase": "card:commit",
+          "ms": 874.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1044.7
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 382.9
+        },
+        {
+          "phase": "react",
+          "ms": 408.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 469.7
+        },
+        {
+          "phase": "permission:end",
+          "ms": 475
+        },
+        {
+          "phase": "location:ready",
+          "ms": 475.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 609.2
+        },
+        {
+          "phase": "weather:response",
+          "ms": 779.6
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 788.1
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 815.8
+        },
+        {
+          "phase": "card:commit",
+          "ms": 874.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1044.7
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 474.9,
+        "permission": 0.0,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 134.5,
+        "gpsToWeather": null,
+        "weatherHeaders": 170.1,
+        "weatherBodyParse": 8.6,
+        "parseToPaint": 256.6,
+        "navigationToPaint": 1044.7,
+        "module": 382.9,
+        "react": 408.5,
+        "processing": 27.7,
+        "processingToCommit": 58.7,
+        "commitToPaint": 170.2
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "denied-gps",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 258.4
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 293.7
+        },
+        {
+          "phase": "permission:start",
+          "ms": 452.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 453
+        },
+        {
+          "phase": "weather:start",
+          "ms": 517.1
+        },
+        {
+          "phase": "marine:start",
+          "ms": 520.2
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 521.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 647.5
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 648.2
+        },
+        {
+          "phase": "card:commit",
+          "ms": 693.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 868.3
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 250.2
+        },
+        {
+          "phase": "react",
+          "ms": 272.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 450.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 453
+        },
+        {
+          "phase": "location:ready",
+          "ms": 453.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 516.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 647.5
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 648.3
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 669.7
+        },
+        {
+          "phase": "card:commit",
+          "ms": 693.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 868.3
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 452.9,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 64.2,
+        "gpsToWeather": null,
+        "weatherHeaders": 130.4,
+        "weatherBodyParse": 0.7,
+        "parseToPaint": 220.1,
+        "navigationToPaint": 868.3,
+        "module": 250.2,
+        "react": 272.1,
+        "processing": 21.4,
+        "processingToCommit": 23.4,
+        "commitToPaint": 175.2
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "denied-gps",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 719.2
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 739
+        },
+        {
+          "phase": "permission:start",
+          "ms": 806
+        },
+        {
+          "phase": "permission:end",
+          "ms": 806
+        },
+        {
+          "phase": "weather:start",
+          "ms": 855.2
+        },
+        {
+          "phase": "marine:start",
+          "ms": 857.8
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 858.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 983.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 984.7
+        },
+        {
+          "phase": "card:commit",
+          "ms": 1038.2
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1266.1
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 806,
+        "permission": 0,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 49.2,
+        "gpsToWeather": null,
+        "weatherHeaders": 128.6,
+        "weatherBodyParse": 0.9,
+        "parseToPaint": 281.4,
+        "navigationToPaint": 1266.1,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "denied-gps",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 206.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 266.7
+        },
+        {
+          "phase": "permission:start",
+          "ms": 419.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 419.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 479.7
+        },
+        {
+          "phase": "marine:start",
+          "ms": 482.7
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 483.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 621.6
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 626.9
+        },
+        {
+          "phase": "card:commit",
+          "ms": 781.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 959.6
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 419.1,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 60.6,
+        "gpsToWeather": null,
+        "weatherHeaders": 141.9,
+        "weatherBodyParse": 5.3,
+        "parseToPaint": 332.7,
+        "navigationToPaint": 959.6,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "denied-gps",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 284.7
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 381.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 514.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 514.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 582.3
+        },
+        {
+          "phase": "marine:start",
+          "ms": 592
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 592.8
+        },
+        {
+          "phase": "weather:response",
+          "ms": 723.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 725.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 770.3
+        },
+        {
+          "phase": "card:paint",
+          "ms": 961.7
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 514.9,
+        "permission": 0.0,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 67.4,
+        "gpsToWeather": null,
+        "weatherHeaders": 141.0,
+        "weatherBodyParse": 2.0,
+        "parseToPaint": 236.4,
+        "navigationToPaint": 961.7,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 403.5
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 456.4
+        },
+        {
+          "phase": "permission:start",
+          "ms": 482.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 483
+        },
+        {
+          "phase": "weather:start",
+          "ms": 646.3
+        },
+        {
+          "phase": "marine:start",
+          "ms": 649.7
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 650.1
+        },
+        {
+          "phase": "weather:response",
+          "ms": 907
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 909.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 1073.3
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1383.4
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 397.9
+        },
+        {
+          "phase": "react",
+          "ms": 437.7
+        },
+        {
+          "phase": "permission:start",
+          "ms": 481.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 483
+        },
+        {
+          "phase": "location:ready",
+          "ms": 483.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 646.1
+        },
+        {
+          "phase": "weather:response",
+          "ms": 907
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 909.3
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 988
+        },
+        {
+          "phase": "card:commit",
+          "ms": 1073.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1383.4
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 482.9,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 163.4,
+        "gpsToWeather": null,
+        "weatherHeaders": 260.7,
+        "weatherBodyParse": 2.3,
+        "parseToPaint": 474.1,
+        "navigationToPaint": 1383.4,
+        "module": 397.9,
+        "react": 437.7,
+        "processing": 78.7,
+        "processingToCommit": 85.1,
+        "commitToPaint": 310.3
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 276.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 319.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 352.7
+        },
+        {
+          "phase": "permission:end",
+          "ms": 352.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 484.9
+        },
+        {
+          "phase": "marine:start",
+          "ms": 487.8
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 488.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 656
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 661.5
+        },
+        {
+          "phase": "card:commit",
+          "ms": 791.9
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1087.7
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 269.9
+        },
+        {
+          "phase": "react",
+          "ms": 292.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 349.3
+        },
+        {
+          "phase": "permission:end",
+          "ms": 352.9
+        },
+        {
+          "phase": "location:ready",
+          "ms": 353
+        },
+        {
+          "phase": "weather:start",
+          "ms": 484.8
+        },
+        {
+          "phase": "weather:response",
+          "ms": 656
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 661.5
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 706.5
+        },
+        {
+          "phase": "card:commit",
+          "ms": 791
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1087.7
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 352.7,
+        "permission": 0.2,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 132.2,
+        "gpsToWeather": null,
+        "weatherHeaders": 171.1,
+        "weatherBodyParse": 5.5,
+        "parseToPaint": 426.2,
+        "navigationToPaint": 1087.7,
+        "module": 269.9,
+        "react": 292.2,
+        "processing": 45.0,
+        "processingToCommit": 84.5,
+        "commitToPaint": 296.7
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 257.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 308.3
+        },
+        {
+          "phase": "permission:start",
+          "ms": 323.3
+        },
+        {
+          "phase": "permission:end",
+          "ms": 323.4
+        },
+        {
+          "phase": "weather:start",
+          "ms": 523
+        },
+        {
+          "phase": "marine:start",
+          "ms": 529.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 533.3
+        },
+        {
+          "phase": "weather:response",
+          "ms": 701.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 702.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 815.7
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1097.4
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 243.2
+        },
+        {
+          "phase": "react",
+          "ms": 271
+        },
+        {
+          "phase": "permission:start",
+          "ms": 316.7
+        },
+        {
+          "phase": "permission:end",
+          "ms": 323.5
+        },
+        {
+          "phase": "location:ready",
+          "ms": 323.5
+        },
+        {
+          "phase": "weather:start",
+          "ms": 521.6
+        },
+        {
+          "phase": "weather:response",
+          "ms": 701.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 702.4
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 731.9
+        },
+        {
+          "phase": "card:commit",
+          "ms": 815.3
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1097.4
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 323.3,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 199.7,
+        "gpsToWeather": null,
+        "weatherHeaders": 178.4,
+        "weatherBodyParse": 1.0,
+        "parseToPaint": 395.0,
+        "navigationToPaint": 1097.4,
+        "module": 243.2,
+        "react": 271,
+        "processing": 29.5,
+        "processingToCommit": 83.4,
+        "commitToPaint": 282.1
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 269
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 312.3
+        },
+        {
+          "phase": "permission:start",
+          "ms": 316.8
+        },
+        {
+          "phase": "permission:end",
+          "ms": 316.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 505.3
+        },
+        {
+          "phase": "marine:start",
+          "ms": 507.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 507.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 641.6
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 647.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 760.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1058.4
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 316.8,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 188.5,
+        "gpsToWeather": null,
+        "weatherHeaders": 136.3,
+        "weatherBodyParse": 5.8,
+        "parseToPaint": 411.0,
+        "navigationToPaint": 1058.4,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 380.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 447.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 456.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 456.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 466.3
+        },
+        {
+          "phase": "marine:start",
+          "ms": 468.7
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 468.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 634.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 653.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 860.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1067.4
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 456.2,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 10.1,
+        "gpsToWeather": null,
+        "weatherHeaders": 168.5,
+        "weatherBodyParse": 18.5,
+        "parseToPaint": 414.1,
+        "navigationToPaint": 1067.4,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "desktop-no-gps",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 208.2
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 277.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 287.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 287.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 486.2
+        },
+        {
+          "phase": "marine:start",
+          "ms": 489.2
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 489.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 667.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 669.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 801.9
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1087.3
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 287.1,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 199.1,
+        "gpsToWeather": null,
+        "weatherHeaders": 181.2,
+        "weatherBodyParse": 2.2,
+        "parseToPaint": 417.7,
+        "navigationToPaint": 1087.3,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 368
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 424.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 432.5
+        },
+        {
+          "phase": "permission:end",
+          "ms": 432.5
+        },
+        {
+          "phase": "gps:start",
+          "ms": 432.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 591.8
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 603.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 611
+        },
+        {
+          "phase": "marine:start",
+          "ms": 612.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 612.9
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 660.6
+        },
+        {
+          "phase": "weather:response",
+          "ms": 738.7
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 740.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 789.7
+        },
+        {
+          "phase": "card:paint",
+          "ms": 942.1
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 356.2
+        },
+        {
+          "phase": "react",
+          "ms": 386.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 429.4
+        },
+        {
+          "phase": "permission:end",
+          "ms": 432.6
+        },
+        {
+          "phase": "gps:start",
+          "ms": 432.6
+        },
+        {
+          "phase": "gps:end",
+          "ms": 591.8
+        },
+        {
+          "phase": "location:ready",
+          "ms": 591.9
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 602.6
+        },
+        {
+          "phase": "weather:start",
+          "ms": 610.9
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 661.2
+        },
+        {
+          "phase": "weather:response",
+          "ms": 738.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 740.6
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 765.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 789.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 942.1
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 432.5,
+        "permission": 0.0,
+        "gps": 159.1,
+        "preferredPlace": null,
+        "reverseResponse": 57.3,
+        "permissionToWeather": 178.5,
+        "gpsToWeather": 19.2,
+        "weatherHeaders": 127.7,
+        "weatherBodyParse": 1.9,
+        "parseToPaint": 201.5,
+        "navigationToPaint": 942.1,
+        "module": 356.2,
+        "react": 386.1,
+        "processing": 24.8,
+        "processingToCommit": 24.2,
+        "commitToPaint": 152.5
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 330.7
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 433.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 439.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 439.2
+        },
+        {
+          "phase": "gps:start",
+          "ms": 439.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 560.1
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 629.5
+        },
+        {
+          "phase": "weather:start",
+          "ms": 633.7
+        },
+        {
+          "phase": "marine:start",
+          "ms": 634.4
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 634.5
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 679.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 761.9
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 762.8
+        },
+        {
+          "phase": "card:commit",
+          "ms": 814.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1005.2
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 255.9
+        },
+        {
+          "phase": "react",
+          "ms": 423.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 438.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 439.3
+        },
+        {
+          "phase": "gps:start",
+          "ms": 439.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 560.1
+        },
+        {
+          "phase": "location:ready",
+          "ms": 560.1
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 629.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 633.7
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 680.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 762
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 762.8
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 787.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 814.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1005.2
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 439.2,
+        "permission": 0.0,
+        "gps": 120.8,
+        "preferredPlace": null,
+        "reverseResponse": 50.2,
+        "permissionToWeather": 194.5,
+        "gpsToWeather": 73.6,
+        "weatherHeaders": 128.2,
+        "weatherBodyParse": 0.9,
+        "parseToPaint": 242.4,
+        "navigationToPaint": 1005.2,
+        "module": 255.9,
+        "react": 423.9,
+        "processing": 24.5,
+        "processingToCommit": 27.2,
+        "commitToPaint": 190.7
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 230.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 285.7
+        },
+        {
+          "phase": "permission:start",
+          "ms": 292.7
+        },
+        {
+          "phase": "permission:end",
+          "ms": 292.8
+        },
+        {
+          "phase": "gps:start",
+          "ms": 292.8
+        },
+        {
+          "phase": "gps:end",
+          "ms": 443.5
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 485.8
+        },
+        {
+          "phase": "weather:start",
+          "ms": 496.5
+        },
+        {
+          "phase": "marine:start",
+          "ms": 498.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 498.8
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 546.6
+        },
+        {
+          "phase": "weather:response",
+          "ms": 628
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 629.7
+        },
+        {
+          "phase": "card:commit",
+          "ms": 682.7
+        },
+        {
+          "phase": "card:paint",
+          "ms": 824
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 216.5
+        },
+        {
+          "phase": "react",
+          "ms": 240.4
+        },
+        {
+          "phase": "permission:start",
+          "ms": 291.5
+        },
+        {
+          "phase": "permission:end",
+          "ms": 292.8
+        },
+        {
+          "phase": "gps:start",
+          "ms": 292.8
+        },
+        {
+          "phase": "gps:end",
+          "ms": 443.6
+        },
+        {
+          "phase": "location:ready",
+          "ms": 443.7
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 484
+        },
+        {
+          "phase": "weather:start",
+          "ms": 496.4
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 548.6
+        },
+        {
+          "phase": "weather:response",
+          "ms": 628
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 629.7
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 654
+        },
+        {
+          "phase": "card:commit",
+          "ms": 682.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 823.9
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 292.7,
+        "permission": 0.1,
+        "gps": 150.7,
+        "preferredPlace": null,
+        "reverseResponse": 60.8,
+        "permissionToWeather": 203.8,
+        "gpsToWeather": 53.0,
+        "weatherHeaders": 131.5,
+        "weatherBodyParse": 1.7,
+        "parseToPaint": 194.3,
+        "navigationToPaint": 824,
+        "module": 216.5,
+        "react": 240.4,
+        "processing": 24.3,
+        "processingToCommit": 28.6,
+        "commitToPaint": 141.3
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 252.8
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 275.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 398.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 398.6
+        },
+        {
+          "phase": "gps:start",
+          "ms": 398.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 538.7
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 539
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 591.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 602.5
+        },
+        {
+          "phase": "marine:start",
+          "ms": 603.5
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 603.8
+        },
+        {
+          "phase": "weather:response",
+          "ms": 729.6
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 731.2
+        },
+        {
+          "phase": "card:commit",
+          "ms": 777.8
+        },
+        {
+          "phase": "card:paint",
+          "ms": 969.3
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 398.6,
+        "permission": 0.0,
+        "gps": 140.0,
+        "preferredPlace": null,
+        "reverseResponse": 52.1,
+        "permissionToWeather": 203.9,
+        "gpsToWeather": 63.8,
+        "weatherHeaders": 127.1,
+        "weatherBodyParse": 1.6,
+        "parseToPaint": 238.1,
+        "navigationToPaint": 969.3,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 214.4
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 231.6
+        },
+        {
+          "phase": "permission:start",
+          "ms": 383.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 383.6
+        },
+        {
+          "phase": "gps:start",
+          "ms": 383.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 501.2
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 501.7
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 551.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 555.8
+        },
+        {
+          "phase": "marine:start",
+          "ms": 556.5
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 556.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 691
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 691.7
+        },
+        {
+          "phase": "card:commit",
+          "ms": 741
+        },
+        {
+          "phase": "card:paint",
+          "ms": 922.5
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 383.6,
+        "permission": 0.0,
+        "gps": 117.5,
+        "preferredPlace": null,
+        "reverseResponse": 49.5,
+        "permissionToWeather": 172.2,
+        "gpsToWeather": 54.6,
+        "weatherHeaders": 135.2,
+        "weatherBodyParse": 0.7,
+        "parseToPaint": 230.8,
+        "navigationToPaint": 922.5,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-fast-gps",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 269.5
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 299.3
+        },
+        {
+          "phase": "permission:start",
+          "ms": 401.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 401.9
+        },
+        {
+          "phase": "gps:start",
+          "ms": 402
+        },
+        {
+          "phase": "gps:end",
+          "ms": 527.4
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 527.8
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 574.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 580.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 581.1
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 582.8
+        },
+        {
+          "phase": "weather:response",
+          "ms": 709.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 719.1
+        },
+        {
+          "phase": "card:commit",
+          "ms": 796.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1011.9
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 401.9,
+        "permission": 0.0,
+        "gps": 125.4,
+        "preferredPlace": null,
+        "reverseResponse": 46.3,
+        "permissionToWeather": 178.5,
+        "gpsToWeather": 53.0,
+        "weatherHeaders": 129.4,
+        "weatherBodyParse": 9.3,
+        "parseToPaint": 292.8,
+        "navigationToPaint": 1011.9,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 214.9
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 272.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 280.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 280.6
+        },
+        {
+          "phase": "gps:start",
+          "ms": 280.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4081.2
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4088.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4093.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4094.1
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4094.2
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4144.3
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4227.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4228.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4278.9
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4484
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 208.9
+        },
+        {
+          "phase": "react",
+          "ms": 225.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 277
+        },
+        {
+          "phase": "permission:end",
+          "ms": 280.7
+        },
+        {
+          "phase": "gps:start",
+          "ms": 280.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4081.4
+        },
+        {
+          "phase": "location:ready",
+          "ms": 4081.5
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4088.7
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4093.3
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4144.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4227.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4228.6
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 4255.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4278.9
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4484
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 280.6,
+        "permission": 0.0,
+        "gps": 3800.5,
+        "preferredPlace": null,
+        "reverseResponse": 55.4,
+        "permissionToWeather": 3812.8,
+        "gpsToWeather": 12.2,
+        "weatherHeaders": 134.4,
+        "weatherBodyParse": 0.8,
+        "parseToPaint": 255.4,
+        "navigationToPaint": 4484,
+        "module": 208.9,
+        "react": 225.1,
+        "processing": 26.8,
+        "processingToCommit": 23.5,
+        "commitToPaint": 205.1
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 203.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 237.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 242.7
+        },
+        {
+          "phase": "permission:end",
+          "ms": 242.8
+        },
+        {
+          "phase": "gps:start",
+          "ms": 242.8
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4043.2
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4046.7
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4051.6
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4052.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4053.1
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4098.8
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4184.9
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4185.8
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4231.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4467.4
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 199.2
+        },
+        {
+          "phase": "react",
+          "ms": 216.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 241.8
+        },
+        {
+          "phase": "permission:end",
+          "ms": 242.8
+        },
+        {
+          "phase": "gps:start",
+          "ms": 242.8
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4043.3
+        },
+        {
+          "phase": "location:ready",
+          "ms": 4043.3
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4046.4
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4051.5
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4100.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4184.9
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4185.8
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 4205.1
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4230
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4467.3
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 242.7,
+        "permission": 0.1,
+        "gps": 3800.4,
+        "preferredPlace": null,
+        "reverseResponse": 52.1,
+        "permissionToWeather": 3808.9,
+        "gpsToWeather": 8.4,
+        "weatherHeaders": 133.3,
+        "weatherBodyParse": 0.9,
+        "parseToPaint": 281.6,
+        "navigationToPaint": 4467.4,
+        "module": 199.2,
+        "react": 216.2,
+        "processing": 19.3,
+        "processingToCommit": 24.9,
+        "commitToPaint": 237.3
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 350.7
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 382.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 389.4
+        },
+        {
+          "phase": "permission:end",
+          "ms": 389.6
+        },
+        {
+          "phase": "gps:start",
+          "ms": 389.9
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4192
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4206.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4213.8
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4215.2
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4216.1
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4269.2
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4349.7
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4350.5
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4389.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4549.4
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 344.5
+        },
+        {
+          "phase": "react",
+          "ms": 366.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 387.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 389.7
+        },
+        {
+          "phase": "gps:start",
+          "ms": 389.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4192.7
+        },
+        {
+          "phase": "location:ready",
+          "ms": 4192.9
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4205.8
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4213.7
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4270.1
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4349.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4350.5
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 4369.9
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4389.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4549.4
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 389.4,
+        "permission": 0.2,
+        "gps": 3802.1,
+        "preferredPlace": null,
+        "reverseResponse": 63.0,
+        "permissionToWeather": 3824.4,
+        "gpsToWeather": 21.8,
+        "weatherHeaders": 135.9,
+        "weatherBodyParse": 0.8,
+        "parseToPaint": 198.9,
+        "navigationToPaint": 4549.4,
+        "module": 344.5,
+        "react": 366.5,
+        "processing": 19.4,
+        "processingToCommit": 19.5,
+        "commitToPaint": 160.0
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 276.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 295.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 393.4
+        },
+        {
+          "phase": "permission:end",
+          "ms": 393.4
+        },
+        {
+          "phase": "gps:start",
+          "ms": 393.4
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4193.8
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4194.3
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4242.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4247.9
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4248.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4249.1
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4378.1
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4382.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4429.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4578.9
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 393.4,
+        "permission": 0.0,
+        "gps": 3800.4,
+        "preferredPlace": null,
+        "reverseResponse": 48.6,
+        "permissionToWeather": 3854.5,
+        "gpsToWeather": 54.1,
+        "weatherHeaders": 130.2,
+        "weatherBodyParse": 4.5,
+        "parseToPaint": 196.3,
+        "navigationToPaint": 4578.9,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 292.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 318.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 323.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 323.3
+        },
+        {
+          "phase": "gps:start",
+          "ms": 323.4
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4123.7
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4124.2
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4170.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4175.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4177.8
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4178.3
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4303
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4304.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4346.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4522.9
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 323.2,
+        "permission": 0.1,
+        "gps": 3800.3,
+        "preferredPlace": null,
+        "reverseResponse": 46.7,
+        "permissionToWeather": 3852.2,
+        "gpsToWeather": 51.7,
+        "weatherHeaders": 127.6,
+        "weatherBodyParse": 1.6,
+        "parseToPaint": 218.3,
+        "navigationToPaint": 4522.9,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "phone-gps-3800",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 223
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 246
+        },
+        {
+          "phase": "permission:start",
+          "ms": 405.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 405.9
+        },
+        {
+          "phase": "gps:start",
+          "ms": 406.1
+        },
+        {
+          "phase": "gps:end",
+          "ms": 4206.4
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 4206.8
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 4256.6
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4261.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4262.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4262.6
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4387.7
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4389
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4483.8
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4632.6
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 405.9,
+        "permission": 0.0,
+        "gps": 3800.3,
+        "preferredPlace": null,
+        "reverseResponse": 49.8,
+        "permissionToWeather": 3855.5,
+        "gpsToWeather": 55.0,
+        "weatherHeaders": 126.3,
+        "weatherBodyParse": 1.3,
+        "parseToPaint": 243.6,
+        "navigationToPaint": 4632.6,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 215.1
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 285.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 406.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 406.3
+        },
+        {
+          "phase": "gps:start",
+          "ms": 406.4
+        },
+        {
+          "phase": "default:start",
+          "ms": 504.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 533.3
+        },
+        {
+          "phase": "default:end",
+          "ms": 2532.7
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2540.5
+        },
+        {
+          "phase": "marine:start",
+          "ms": 2541.2
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 2541.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2671.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2672.2
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2719.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2848.5
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 206.1
+        },
+        {
+          "phase": "react",
+          "ms": 232.7
+        },
+        {
+          "phase": "default:start",
+          "ms": 401.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 404.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 406.3
+        },
+        {
+          "phase": "gps:start",
+          "ms": 406.4
+        },
+        {
+          "phase": "gps:end",
+          "ms": 533.3
+        },
+        {
+          "phase": "default:end",
+          "ms": 2534.1
+        },
+        {
+          "phase": "location:ready",
+          "ms": 2534.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2540.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2671.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2672.2
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 2695
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2719.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2848.5
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 406.2,
+        "permission": 0.1,
+        "gps": 126.9,
+        "preferredPlace": 2028.4,
+        "reverseResponse": null,
+        "permissionToWeather": 2134.3,
+        "gpsToWeather": 2007.2,
+        "weatherHeaders": 130.8,
+        "weatherBodyParse": 0.9,
+        "parseToPaint": 176.3,
+        "navigationToPaint": 2848.5,
+        "module": 206.1,
+        "react": 232.7,
+        "processing": 22.8,
+        "processingToCommit": 24.4,
+        "commitToPaint": 129.1
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 283.7
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 320
+        },
+        {
+          "phase": "permission:start",
+          "ms": 346.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 346.9
+        },
+        {
+          "phase": "gps:start",
+          "ms": 347.1
+        },
+        {
+          "phase": "gps:end",
+          "ms": 481.8
+        },
+        {
+          "phase": "default:start",
+          "ms": 522.8
+        },
+        {
+          "phase": "default:end",
+          "ms": 2539.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2546.5
+        },
+        {
+          "phase": "marine:start",
+          "ms": 2547.4
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 2547.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2674.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2677.9
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2725.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2867.9
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 259.6
+        },
+        {
+          "phase": "react",
+          "ms": 301.7
+        },
+        {
+          "phase": "default:start",
+          "ms": 344.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 346.5
+        },
+        {
+          "phase": "permission:end",
+          "ms": 347.1
+        },
+        {
+          "phase": "gps:start",
+          "ms": 347.1
+        },
+        {
+          "phase": "gps:end",
+          "ms": 481.9
+        },
+        {
+          "phase": "default:end",
+          "ms": 2540.5
+        },
+        {
+          "phase": "location:ready",
+          "ms": 2540.5
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2546.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2674.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2677.9
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 2700
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2725.2
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2867.9
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 346.9,
+        "permission": 0.0,
+        "gps": 134.7,
+        "preferredPlace": 2016.4,
+        "reverseResponse": null,
+        "permissionToWeather": 2199.6,
+        "gpsToWeather": 2064.7,
+        "weatherHeaders": 127.8,
+        "weatherBodyParse": 3.6,
+        "parseToPaint": 190.0,
+        "navigationToPaint": 2867.9,
+        "module": 259.6,
+        "react": 301.7,
+        "processing": 22.1,
+        "processingToCommit": 25.2,
+        "commitToPaint": 142.7
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 254
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 284.6
+        },
+        {
+          "phase": "permission:start",
+          "ms": 306.8
+        },
+        {
+          "phase": "permission:end",
+          "ms": 306.8
+        },
+        {
+          "phase": "gps:start",
+          "ms": 307
+        },
+        {
+          "phase": "gps:end",
+          "ms": 488.2
+        },
+        {
+          "phase": "default:start",
+          "ms": 505.1
+        },
+        {
+          "phase": "default:end",
+          "ms": 2553.6
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2563.1
+        },
+        {
+          "phase": "marine:start",
+          "ms": 2563.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 2564.3
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2688.6
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2689.9
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2742.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2882.6
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 219.2
+        },
+        {
+          "phase": "react",
+          "ms": 269.2
+        },
+        {
+          "phase": "default:start",
+          "ms": 305.3
+        },
+        {
+          "phase": "permission:start",
+          "ms": 306.3
+        },
+        {
+          "phase": "permission:end",
+          "ms": 306.9
+        },
+        {
+          "phase": "gps:start",
+          "ms": 306.9
+        },
+        {
+          "phase": "gps:end",
+          "ms": 488.3
+        },
+        {
+          "phase": "default:end",
+          "ms": 2555.8
+        },
+        {
+          "phase": "location:ready",
+          "ms": 2555.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2562.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2688.6
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2689.9
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 2714
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2742.2
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2882.6
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 306.8,
+        "permission": 0.0,
+        "gps": 181.2,
+        "preferredPlace": 2048.5,
+        "reverseResponse": null,
+        "permissionToWeather": 2256.3,
+        "gpsToWeather": 2074.9,
+        "weatherHeaders": 125.5,
+        "weatherBodyParse": 1.3,
+        "parseToPaint": 192.7,
+        "navigationToPaint": 2882.6,
+        "module": 219.2,
+        "react": 269.2,
+        "processing": 24.1,
+        "processingToCommit": 28.2,
+        "commitToPaint": 140.4
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 262.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 343.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 451.5
+        },
+        {
+          "phase": "permission:end",
+          "ms": 451.5
+        },
+        {
+          "phase": "gps:start",
+          "ms": 451.7
+        },
+        {
+          "phase": "default:start",
+          "ms": 550.5
+        },
+        {
+          "phase": "gps:end",
+          "ms": 580.3
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 580.7
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 626.3
+        },
+        {
+          "phase": "default:end",
+          "ms": 2575.4
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2582.2
+        },
+        {
+          "phase": "marine:start",
+          "ms": 2583.1
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 2583.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2708.7
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2710
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2756.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2885.3
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 451.5,
+        "permission": 0.0,
+        "gps": 128.6,
+        "preferredPlace": 2024.9,
+        "reverseResponse": 45.6,
+        "permissionToWeather": 2130.7,
+        "gpsToWeather": 2001.9,
+        "weatherHeaders": 126.5,
+        "weatherBodyParse": 1.3,
+        "parseToPaint": 175.3,
+        "navigationToPaint": 2885.3,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 280.1
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 308.4
+        },
+        {
+          "phase": "permission:start",
+          "ms": 317.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 317.1
+        },
+        {
+          "phase": "gps:start",
+          "ms": 317.2
+        },
+        {
+          "phase": "default:start",
+          "ms": 482.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 512.6
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 513
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 564.6
+        },
+        {
+          "phase": "default:end",
+          "ms": 2511.7
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2517.6
+        },
+        {
+          "phase": "marine:start",
+          "ms": 2518.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 2518.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2647.2
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2647.9
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2694.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2830.2
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 317.1,
+        "permission": 0.0,
+        "gps": 195.4,
+        "preferredPlace": 2029.0,
+        "reverseResponse": 51.6,
+        "permissionToWeather": 2200.5,
+        "gpsToWeather": 2005.0,
+        "weatherHeaders": 129.6,
+        "weatherBodyParse": 0.7,
+        "parseToPaint": 182.3,
+        "navigationToPaint": 2830.2,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-default",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 290.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 313.6
+        },
+        {
+          "phase": "permission:start",
+          "ms": 340.7
+        },
+        {
+          "phase": "permission:end",
+          "ms": 340.7
+        },
+        {
+          "phase": "gps:start",
+          "ms": 340.9
+        },
+        {
+          "phase": "gps:end",
+          "ms": 467
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 467.7
+        },
+        {
+          "phase": "default:start",
+          "ms": 474.4
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 563.5
+        },
+        {
+          "phase": "default:end",
+          "ms": 2506.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 2517
+        },
+        {
+          "phase": "marine:start",
+          "ms": 2517.6
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 2517.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 2642.7
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 2643.7
+        },
+        {
+          "phase": "card:commit",
+          "ms": 2687.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 2818.3
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 340.7,
+        "permission": 0.0,
+        "gps": 126.1,
+        "preferredPlace": 2031.7,
+        "reverseResponse": 95.8,
+        "permissionToWeather": 2176.3,
+        "gpsToWeather": 2050,
+        "weatherHeaders": 125.7,
+        "weatherBodyParse": 1.0,
+        "parseToPaint": 174.6,
+        "navigationToPaint": 2818.3,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 278.7
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 327.1
+        },
+        {
+          "phase": "permission:start",
+          "ms": 367.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 367.2
+        },
+        {
+          "phase": "gps:start",
+          "ms": 367.4
+        },
+        {
+          "phase": "gps:end",
+          "ms": 644.6
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 680.5
+        },
+        {
+          "phase": "weather:start",
+          "ms": 687.8
+        },
+        {
+          "phase": "marine:start",
+          "ms": 689.2
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 689.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 816.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 817.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 905.8
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1104.7
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 5702.7
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 234.6
+        },
+        {
+          "phase": "react",
+          "ms": 309.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 332.9
+        },
+        {
+          "phase": "permission:end",
+          "ms": 367.4
+        },
+        {
+          "phase": "gps:start",
+          "ms": 367.4
+        },
+        {
+          "phase": "gps:end",
+          "ms": 644.6
+        },
+        {
+          "phase": "location:ready",
+          "ms": 644.8
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 680.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 687.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 816.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 817.4
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 865.1
+        },
+        {
+          "phase": "card:commit",
+          "ms": 905.7
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1104.6
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 5704.2
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 367.2,
+        "permission": 0.0,
+        "gps": 277.2,
+        "preferredPlace": null,
+        "reverseResponse": 5022.2,
+        "permissionToWeather": 320.6,
+        "gpsToWeather": 43.2,
+        "weatherHeaders": 128.5,
+        "weatherBodyParse": 1.1,
+        "parseToPaint": 287.3,
+        "navigationToPaint": 1104.7,
+        "module": 234.6,
+        "react": 309.8,
+        "processing": 47.7,
+        "processingToCommit": 40.6,
+        "commitToPaint": 198.9
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 399.5
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 428.7
+        },
+        {
+          "phase": "permission:start",
+          "ms": 433.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 433.7
+        },
+        {
+          "phase": "gps:start",
+          "ms": 433.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 687.4
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 702
+        },
+        {
+          "phase": "weather:start",
+          "ms": 709
+        },
+        {
+          "phase": "marine:start",
+          "ms": 724.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 725.2
+        },
+        {
+          "phase": "weather:response",
+          "ms": 853.8
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 856.5
+        },
+        {
+          "phase": "card:commit",
+          "ms": 911.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1112.2
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 5735.1
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 390.8
+        },
+        {
+          "phase": "react",
+          "ms": 411.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 432.8
+        },
+        {
+          "phase": "permission:end",
+          "ms": 433.7
+        },
+        {
+          "phase": "gps:start",
+          "ms": 433.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 687.5
+        },
+        {
+          "phase": "location:ready",
+          "ms": 687.5
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 701.8
+        },
+        {
+          "phase": "weather:start",
+          "ms": 708.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 853.9
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 856.5
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 881.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 911.3
+        },
+        {
+          "phase": "card:paint",
+          "ms": 1112.2
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 5736.5
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 433.6,
+        "permission": 0.1,
+        "gps": 253.7,
+        "preferredPlace": null,
+        "reverseResponse": 5033.1,
+        "permissionToWeather": 275.4,
+        "gpsToWeather": 21.6,
+        "weatherHeaders": 144.8,
+        "weatherBodyParse": 2.7,
+        "parseToPaint": 255.7,
+        "navigationToPaint": 1112.2,
+        "module": 390.8,
+        "react": 411.8,
+        "processing": 24.9,
+        "processingToCommit": 29.9,
+        "commitToPaint": 200.9
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 185.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 215.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 225.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 225.3
+        },
+        {
+          "phase": "gps:start",
+          "ms": 225.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 427.5
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 435.6
+        },
+        {
+          "phase": "weather:start",
+          "ms": 438
+        },
+        {
+          "phase": "marine:start",
+          "ms": 439.6
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 439.9
+        },
+        {
+          "phase": "weather:response",
+          "ms": 570.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 572
+        },
+        {
+          "phase": "card:commit",
+          "ms": 642.8
+        },
+        {
+          "phase": "card:paint",
+          "ms": 906.9
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 5449.3
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 163.9
+        },
+        {
+          "phase": "react",
+          "ms": 191.3
+        },
+        {
+          "phase": "permission:start",
+          "ms": 223.4
+        },
+        {
+          "phase": "permission:end",
+          "ms": 225.3
+        },
+        {
+          "phase": "gps:start",
+          "ms": 225.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 427.7
+        },
+        {
+          "phase": "location:ready",
+          "ms": 427.7
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 435.4
+        },
+        {
+          "phase": "weather:start",
+          "ms": 438
+        },
+        {
+          "phase": "weather:response",
+          "ms": 570.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 572
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 606.5
+        },
+        {
+          "phase": "card:commit",
+          "ms": 642.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 906.9
+        },
+        {
+          "phase": "reverse:end",
+          "ms": 5450.4
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 225.2,
+        "permission": 0.1,
+        "gps": 202.2,
+        "preferredPlace": null,
+        "reverseResponse": 5013.7,
+        "permissionToWeather": 212.8,
+        "gpsToWeather": 10.5,
+        "weatherHeaders": 132.4,
+        "weatherBodyParse": 1.6,
+        "parseToPaint": 334.9,
+        "navigationToPaint": 906.9,
+        "module": 163.9,
+        "react": 191.3,
+        "processing": 34.5,
+        "processingToCommit": 36.1,
+        "commitToPaint": 264.3
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 210.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 281.2
+        },
+        {
+          "phase": "permission:start",
+          "ms": 407
+        },
+        {
+          "phase": "permission:end",
+          "ms": 407.2
+        },
+        {
+          "phase": "gps:start",
+          "ms": 407.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 511.8
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 512.5
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4913.2
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4915
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4915.3
+        },
+        {
+          "phase": "weather:response",
+          "ms": 5048.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 5049.2
+        },
+        {
+          "phase": "card:commit",
+          "ms": 5170.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 5371.1
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 407,
+        "permission": 0.2,
+        "gps": 104.5,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 4506.2,
+        "gpsToWeather": 4401.4,
+        "weatherHeaders": 135.2,
+        "weatherBodyParse": 0.8,
+        "parseToPaint": 321.9,
+        "navigationToPaint": 5371.1,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 235.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 266.4
+        },
+        {
+          "phase": "permission:start",
+          "ms": 270.6
+        },
+        {
+          "phase": "permission:end",
+          "ms": 270.6
+        },
+        {
+          "phase": "gps:start",
+          "ms": 270.7
+        },
+        {
+          "phase": "gps:end",
+          "ms": 461
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 462
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4778.6
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4780.2
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4780.5
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4923.9
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4928
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4988.3
+        },
+        {
+          "phase": "card:paint",
+          "ms": 5157.9
+        },
+        {
+          "phase": "marine:end",
+          "ms": 10799.9
+        },
+        {
+          "phase": "aqi:end",
+          "ms": 10800.4
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 270.6,
+        "permission": 0.0,
+        "gps": 190.3,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 4508.0,
+        "gpsToWeather": 4317.6,
+        "weatherHeaders": 145.3,
+        "weatherBodyParse": 4.1,
+        "parseToPaint": 229.9,
+        "navigationToPaint": 5157.9,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-reverse",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 291.4
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 316.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 416.5
+        },
+        {
+          "phase": "permission:end",
+          "ms": 417.2
+        },
+        {
+          "phase": "gps:start",
+          "ms": 417.3
+        },
+        {
+          "phase": "gps:end",
+          "ms": 534.2
+        },
+        {
+          "phase": "reverse:start",
+          "ms": 534.6
+        },
+        {
+          "phase": "weather:start",
+          "ms": 4920.3
+        },
+        {
+          "phase": "marine:start",
+          "ms": 4921.3
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 4921.4
+        },
+        {
+          "phase": "weather:response",
+          "ms": 5052.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 5053.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 5101.5
+        },
+        {
+          "phase": "card:paint",
+          "ms": 5268.1
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 416.5,
+        "permission": 0.7,
+        "gps": 116.9,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 4503.8,
+        "gpsToWeather": 4386.1,
+        "weatherHeaders": 132.1,
+        "weatherBodyParse": 0.9,
+        "parseToPaint": 214.8,
+        "navigationToPaint": 5268.1,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "after",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 253.6
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 307.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 316.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 316.2
+        },
+        {
+          "phase": "weather:start",
+          "ms": 497.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 504.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 505.3
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4518
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4519.1
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4604.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4837.4
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 246.1
+        },
+        {
+          "phase": "react",
+          "ms": 288.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 313.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 316.2
+        },
+        {
+          "phase": "location:ready",
+          "ms": 316.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 497.2
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4518
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4519.1
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 4549.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4604.2
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4837.4
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 316.1,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 181.3,
+        "gpsToWeather": null,
+        "weatherHeaders": 4020.6,
+        "weatherBodyParse": 1.1,
+        "parseToPaint": 318.3,
+        "navigationToPaint": 4837.4,
+        "module": 246.1,
+        "react": 288.8,
+        "processing": 30.5,
+        "processingToCommit": 54.6,
+        "commitToPaint": 233.2
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "after",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 235.5
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 290.9
+        },
+        {
+          "phase": "permission:start",
+          "ms": 431.4
+        },
+        {
+          "phase": "permission:end",
+          "ms": 431.4
+        },
+        {
+          "phase": "weather:start",
+          "ms": 520.9
+        },
+        {
+          "phase": "marine:start",
+          "ms": 526.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 527.6
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4534.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4538.6
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4610.6
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4791.1
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 229.7
+        },
+        {
+          "phase": "react",
+          "ms": 244.6
+        },
+        {
+          "phase": "permission:start",
+          "ms": 428.2
+        },
+        {
+          "phase": "permission:end",
+          "ms": 431.5
+        },
+        {
+          "phase": "location:ready",
+          "ms": 431.6
+        },
+        {
+          "phase": "weather:start",
+          "ms": 520.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4534.4
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4538.6
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 4566.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4610.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4791.1
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 431.4,
+        "permission": 0.0,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 89.5,
+        "gpsToWeather": null,
+        "weatherHeaders": 4013.5,
+        "weatherBodyParse": 4.2,
+        "parseToPaint": 252.5,
+        "navigationToPaint": 4791.1,
+        "module": 229.7,
+        "react": 244.6,
+        "processing": 27.7,
+        "processingToCommit": 44.1,
+        "commitToPaint": 180.7
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "after",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 261.5
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 290.7
+        },
+        {
+          "phase": "permission:start",
+          "ms": 298
+        },
+        {
+          "phase": "permission:end",
+          "ms": 298.1
+        },
+        {
+          "phase": "weather:start",
+          "ms": 471
+        },
+        {
+          "phase": "marine:start",
+          "ms": 473.4
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 473.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4486.2
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4490.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4565.4
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4721.8
+        }
+      ],
+      "integrated": [
+        {
+          "phase": "module",
+          "ms": 255.7
+        },
+        {
+          "phase": "react",
+          "ms": 273.4
+        },
+        {
+          "phase": "permission:start",
+          "ms": 296.1
+        },
+        {
+          "phase": "permission:end",
+          "ms": 298.3
+        },
+        {
+          "phase": "location:ready",
+          "ms": 298.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 470.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4486.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4490.4
+        },
+        {
+          "phase": "weather:processed",
+          "ms": 4512.5
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4565.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4721.8
+        }
+      ],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 298,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 173,
+        "gpsToWeather": null,
+        "weatherHeaders": 4015.2,
+        "weatherBodyParse": 4.2,
+        "parseToPaint": 231.4,
+        "navigationToPaint": 4721.8,
+        "module": 255.7,
+        "react": 273.4,
+        "processing": 22.1,
+        "processingToCommit": 52.6,
+        "commitToPaint": 156.7
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "before",
+      "repeat": 1,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 253.3
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 332.5
+        },
+        {
+          "phase": "permission:start",
+          "ms": 343.8
+        },
+        {
+          "phase": "permission:end",
+          "ms": 343.9
+        },
+        {
+          "phase": "weather:start",
+          "ms": 485.2
+        },
+        {
+          "phase": "marine:start",
+          "ms": 486.9
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 487.1
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4502
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4503.4
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4587.8
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4840.4
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 343.8,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 141.4,
+        "gpsToWeather": null,
+        "weatherHeaders": 4016.8,
+        "weatherBodyParse": 1.4,
+        "parseToPaint": 337.0,
+        "navigationToPaint": 4840.4,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "before",
+      "repeat": 2,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 214.7
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 236
+        },
+        {
+          "phase": "permission:start",
+          "ms": 251.3
+        },
+        {
+          "phase": "permission:end",
+          "ms": 251.3
+        },
+        {
+          "phase": "weather:start",
+          "ms": 267.2
+        },
+        {
+          "phase": "marine:start",
+          "ms": 269.1
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 269.7
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4279.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4281.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4345.2
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4525.7
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 251.3,
+        "permission": 0.0,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 15.9,
+        "gpsToWeather": null,
+        "weatherHeaders": 4012.1,
+        "weatherBodyParse": 2.0,
+        "parseToPaint": 244.4,
+        "navigationToPaint": 4525.7,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    },
+    {
+      "scenario": "slow-weather",
+      "revision": "before",
+      "repeat": 3,
+      "events": [
+        {
+          "phase": "dom:ready",
+          "ms": 233.4
+        },
+        {
+          "phase": "skeleton:commit",
+          "ms": 252.8
+        },
+        {
+          "phase": "permission:start",
+          "ms": 345.4
+        },
+        {
+          "phase": "permission:end",
+          "ms": 345.5
+        },
+        {
+          "phase": "weather:start",
+          "ms": 458.4
+        },
+        {
+          "phase": "marine:start",
+          "ms": 460.1
+        },
+        {
+          "phase": "aqi:start",
+          "ms": 460.2
+        },
+        {
+          "phase": "weather:response",
+          "ms": 4478.3
+        },
+        {
+          "phase": "weather:parsed",
+          "ms": 4479.3
+        },
+        {
+          "phase": "card:commit",
+          "ms": 4548.1
+        },
+        {
+          "phase": "card:paint",
+          "ms": 4708
+        }
+      ],
+      "integrated": [],
+      "requests": {
+        "weather": 1,
+        "marine": 1,
+        "aqi": 1,
+        "images": 1
+      },
+      "durationsMs": {
+        "navigationToPermission": 345.4,
+        "permission": 0.1,
+        "gps": null,
+        "preferredPlace": null,
+        "reverseResponse": null,
+        "permissionToWeather": 113.0,
+        "gpsToWeather": null,
+        "weatherHeaders": 4019.9,
+        "weatherBodyParse": 1.0,
+        "parseToPaint": 228.7,
+        "navigationToPaint": 4708,
+        "module": null,
+        "react": null,
+        "processing": null,
+        "processingToCommit": null,
+        "commitToPaint": null
+      },
+      "mainBeforeSupplements": true
+    }
+  ]
+}

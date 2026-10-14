@@ -80,7 +80,8 @@ for(const mode of ['no-permissions','stalled-permission','denied-callback','slow
  const s=await setup(page,mode)
  if(mode==='denied-callback'){await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1);await page.evaluate(()=>(window as any).gpsCalls[0].error({code:1}))}
  if(mode==='slow-label')await s.locate()
- if(mode==='stalled-permission'||mode==='slow-label')await page.clock.fastForward(5000)
+ if(mode==='slow-label')await expect(page.locator('.big-temp')).toHaveText('13°C')
+ if(mode==='stalled-permission')await page.clock.fastForward(5000)
  await expect(page.locator('.big-temp')).toHaveText(mode==='slow-label'?'13°C':'12°C')
  const first=await s.stable();s.releaseLabel();await page.clock.fastForward(10000);expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
 })
@@ -103,8 +104,8 @@ test('explicit GPS timeout does not block startup, and a later explicit result i
  const s=await setup(page,'slow');await page.getByRole('button',{name:'Use my location',exact:true}).click();await page.clock.fastForward(5000);await expect(page.locator('.big-temp')).toHaveText('12°C');await s.locate(1);await page.clock.fastForward(1000);await expect(page.locator('.big-temp')).toHaveText('12°C');expect(s.weatherCalls()).toHaveLength(1)
 })
 
-test('language change during initial reverse lookup settles labels before the first forecast',async({page})=>{
- const s=await setup(page,'slow-label','en');await s.locate();await clickHeaderControl(page,page.locator('.lang-btn'));s.releaseLabel()
+test('language change can localize GPS after first forecast without another weather request',async({page})=>{
+ const s=await setup(page,'slow-label','en');await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C');await clickHeaderControl(page,page.locator('.lang-btn'));s.releaseLabel()
  await expect(page.locator('.big-temp')).toHaveText('13°C');await expect(page.locator('.main-card h2')).toContainText('Варна');await expect(page.locator('.main-card h2')).toContainText('Трошево')
  const first=await s.stable();await page.clock.fastForward(10000);expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
 })

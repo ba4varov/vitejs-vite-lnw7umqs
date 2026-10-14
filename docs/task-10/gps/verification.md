@@ -1,3 +1,5 @@
+> Historical verification at `5a7167d`. See [the subsequent startup timing follow-up](../timing/verification.md) for non-blocking reverse geocoding and new measurements.
+
 # GPS startup follow-up — draft PR #90
 
 Amends `b952c5978135a734b1848f18782c7bbef7e9056f` on the existing PR branch. The primary/marine/AQI request pipeline from task 10 remains parallel and primary-driven.

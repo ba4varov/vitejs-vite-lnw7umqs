@@ -1,0 +1,100 @@
+[WebServer] (node:90237) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 46 tests using 3 workers
+
+(node:90256) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90258) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90257) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 3:10:15 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"permission","status":403,"code":"42501"}
+[WebServer] 3:10:17 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"schema","status":404,"code":"PGRST205"}
+  ✓   2 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"favorite_places","status":403,"code":"42501"} (13.1s)
+  ✓   3 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"place_settings","status":404,"code":"PGRST205"} (14.2s)
+  ✓   1 tests/places-sync.spec.ts:30:3 › successful defaults, remove/add, language, logout/login 390 bg (14.8s)
+[WebServer] 3:10:29 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"schema","status":400,"code":"42703"}
+[WebServer] 3:10:29 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"network","status":null,"code":null}
+[WebServer] 3:10:30 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"server","status":503,"code":null}
+  ✓   4 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"favorite_places","status":400,"code":"42703"} (12.7s)
+  ✓   5 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"place_settings","status":503} (11.9s)
+  ✓   6 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"favorite_places","network":true} (11.6s)
+[WebServer] 3:10:41 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"response","status":null,"code":null}
+[WebServer] 3:10:41 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"response","status":null,"code":null}
+  ✓   8 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"place_settings","body":[{}]} (11.6s)
+  ✓   7 tests/places-sync.spec.ts:48:5 › failure and retry 390 bg {"source":"favorite_places","body":null} (12.5s)
+[WebServer] 3:10:45 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":401,"code":"PGRST301"}
+  ✓   9 tests/places-sync.spec.ts:57:3 › expired token refresh and single 401 recovery 390 bg (15.2s)
+  ✓  10 tests/places-sync.spec.ts:67:3 › empty list is successful 390 bg (10.1s)
+[WebServer] 3:10:56 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"permission","status":403,"code":"42501"}
+  ✓  12 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"favorite_places","status":403,"code":"42501"} (10.5s)
+  ✓  11 tests/places-sync.spec.ts:30:3 › successful defaults, remove/add, language, logout/login 390 en (16.3s)
+[WebServer] 3:11:03 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"schema","status":404,"code":"PGRST205"}
+  ✓  13 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"place_settings","status":404,"code":"PGRST205"} (12.2s)
+[WebServer] 3:11:07 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"schema","status":400,"code":"42703"}
+  ✓  14 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"favorite_places","status":400,"code":"42703"} (11.5s)
+[WebServer] 3:11:09 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"server","status":503,"code":null}
+  ✓  15 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"place_settings","status":503} (11.7s)
+[WebServer] 3:11:17 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"network","status":null,"code":null}
+  ✓  16 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"favorite_places","network":true} (12.8s)
+[WebServer] 3:11:20 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"response","status":null,"code":null}
+  ✓  17 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"favorite_places","body":null} (12.9s)
+[WebServer] 3:11:23 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"response","status":null,"code":null}
+  ✓  18 tests/places-sync.spec.ts:48:5 › failure and retry 390 en {"source":"place_settings","body":[{}]} (13.6s)
+[WebServer] 3:11:33 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":401,"code":"PGRST301"}
+  ✓  20 tests/places-sync.spec.ts:67:3 › empty list is successful 390 en (10.5s)
+  ✓  19 tests/places-sync.spec.ts:57:3 › expired token refresh and single 401 recovery 390 en (15.7s)
+  ✓  21 tests/places-sync.spec.ts:30:3 › successful defaults, remove/add, language, logout/login 1440 bg (17.4s)
+[WebServer] 3:11:43 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"permission","status":403,"code":"42501"}
+[WebServer] 3:11:45 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"schema","status":404,"code":"PGRST205"}
+  ✓  22 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"favorite_places","status":403,"code":"42501"} (13.2s)
+  ✓  23 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"place_settings","status":404,"code":"PGRST205"} (12.6s)
+[WebServer] 3:11:55 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"schema","status":400,"code":"42703"}
+[WebServer] 3:11:56 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"server","status":503,"code":null}
+  ✓  24 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"favorite_places","status":400,"code":"42703"} (15.1s)
+  ✓  25 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"place_settings","status":503} (11.4s)
+[WebServer] 3:11:58 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"network","status":null,"code":null}
+  ✓  26 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"favorite_places","network":true} (13.0s)
+[WebServer] 3:12:09 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"response","status":null,"code":null}
+[WebServer] 3:12:10 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"response","status":null,"code":null}
+  ✓  27 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"favorite_places","body":null} (13.4s)
+  ✓  28 tests/places-sync.spec.ts:48:5 › failure and retry 1440 bg {"source":"place_settings","body":[{}]} (14.1s)
+[WebServer] 3:12:14 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":401,"code":"PGRST301"}
+  ✓  29 tests/places-sync.spec.ts:57:3 › expired token refresh and single 401 recovery 1440 bg (16.1s)
+  ✓  30 tests/places-sync.spec.ts:67:3 › empty list is successful 1440 bg (12.0s)
+  ✓  31 tests/places-sync.spec.ts:30:3 › successful defaults, remove/add, language, logout/login 1440 en (15.1s)
+[WebServer] 3:12:28 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"permission","status":403,"code":"42501"}
+  ✓  32 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"favorite_places","status":403,"code":"42501"} (13.6s)
+[WebServer] 3:12:35 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"schema","status":404,"code":"PGRST205"}
+[WebServer] 3:12:38 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"schema","status":400,"code":"42703"}
+  ✓  33 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"place_settings","status":404,"code":"PGRST205"} (16.0s)
+  ✓  34 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"favorite_places","status":400,"code":"42703"} (13.2s)
+[WebServer] 3:12:43 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"server","status":503,"code":null}
+  ✓  35 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"place_settings","status":503} (14.6s)
+[WebServer] 3:12:53 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"network","status":null,"code":null}
+[WebServer] 3:12:55 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"response","status":null,"code":null}
+  ✓  36 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"favorite_places","network":true} (16.7s)
+  ✓  37 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"favorite_places","body":null} (17.5s)
+[WebServer] 3:13:01 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"response","status":null,"code":null}
+  ✓  38 tests/places-sync.spec.ts:48:5 › failure and retry 1440 en {"source":"place_settings","body":[{}]} (20.4s)
+[WebServer] 3:13:19 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":401,"code":"PGRST301"}
+  ✓  40 tests/places-sync.spec.ts:67:3 › empty list is successful 1440 en (20.7s)
+  ✓  39 tests/places-sync.spec.ts:57:3 › expired token refresh and single 401 recovery 1440 en (25.5s)
+[WebServer] 3:13:28 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":null,"code":null}
+[WebServer] 3:13:28 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"session","status":null,"code":null}
+  ✓  41 tests/places-sync.spec.ts:73:1 › late account response cannot replace new account; manual selection wins pending default (22.5s)
+[WebServer] 3:13:34 PM [vite] (client) [console.warn] places_sync {"source":"default_place","category":"server","status":503,"code":null}
+[WebServer] 3:13:36 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"permission","status":403,"code":"42501"}
+[WebServer] 3:13:40 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":null,"code":null}
+[WebServer] 3:13:40 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"session","status":null,"code":null}
+  ✓  42 tests/places-sync.spec.ts:91:1 › failed reload keeps last valid favorites and default; retry is disabled while pending (22.2s)
+  ✓  44 tests/places-sync.spec.ts:129:1 › 401 refresh recovers automatically without losing default (16.2s)
+[WebServer] 3:13:49 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"session","status":null,"code":null}
+[WebServer] 3:13:49 PM [vite] (client) [console.warn] places_sync {"source":"place_settings","category":"session","status":null,"code":null}
+  ✓  43 tests/places-sync.spec.ts:114:1 › expired refresh failure retains session and exposes retry; revoked session returns to guest (27.5s)
+[WebServer] 3:13:56 PM [vite] (client) [console.warn] places_sync {"source":"favorite_places","category":"response","status":null,"code":null}
+  ✓  46 tests/places-sync.spec.ts:151:1 › incomplete add response cannot insert an invalid favorite into client state (12.3s)
+  ✓  45 tests/places-sync.spec.ts:141:1 › expired initial load waits for slow refresh and recovers for same account (15.9s)
+
+  46 passed (3.9m)

@@ -1,0 +1,304 @@
+{
+  "baseline": "5a7167d1ff2d681551a68999ac968b98025bedc5",
+  "build": "passed",
+  "lint": "passed",
+  "unit": {
+    "passed": 400,
+    "skipped": 1,
+    "failed": 0
+  },
+  "focused_unit_after_final_instrumentation": {
+    "passed": 25,
+    "failed": 0
+  },
+  "browser": {
+    "gps": {
+      "passed": 65,
+      "failed": 0,
+      "duration": "3.6m"
+    },
+    "production_timing_comparison": {
+      "passed": 42,
+      "failed": 0,
+      "duration": "2.8m"
+    },
+    "pr90_loading": {
+      "passed": 37,
+      "failed": 0,
+      "duration": "2.4m"
+    },
+    "pr90_app": {
+      "passed": 163,
+      "failed": 0,
+      "duration": "8.6m"
+    },
+    "places_sync": {
+      "passed": 46,
+      "failed": 0,
+      "duration": "3.9m"
+    },
+    "pr90_charts": {
+      "passed": 71,
+      "failed": 0,
+      "duration": "3.1m"
+    },
+    "pr90_forecast_cards": {
+      "passed": 72,
+      "failed": 0,
+      "duration": "5.6m"
+    }
+  },
+  "successful_browser_executions": 496,
+  "distinct_scenarios": 468,
+  "visual": {
+    "baseline": "c9a384aecf82104d50b1a2802baeae9e0010c9aa",
+    "cases": 24,
+    "section_comparisons": 120,
+    "dimensions": "exact",
+    "threshold": 0.2,
+    "maxDiffPixelRatio": 0.005,
+    "byte_identical_pairs": 96,
+    "matrix": [
+      {
+        "case": "390-en-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "360-bg-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "390-en-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "320-bg-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "1440-bg-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "320-en-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "768-en-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "360-en-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "1440-en-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "430-en-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "320-en-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "360-bg-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "768-bg-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "768-en-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "1440-en-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "430-bg-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "430-en-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "360-en-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "430-bg-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "320-bg-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "390-bg-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "390-bg-light",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "1440-bg-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      },
+      {
+        "case": "768-bg-dark",
+        "byte_identical": {
+          "main-card": false,
+          "hourly-section": true,
+          "forecast-section": true,
+          "charts-section": true,
+          "aqi-section": true
+        }
+      }
+    ]
+  }
+}
