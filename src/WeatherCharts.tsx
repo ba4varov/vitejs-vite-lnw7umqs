@@ -7,7 +7,7 @@ type ChartType = 'temp' | 'rain' | 'wind' | 'pressure' | 'aqi'
 const formatChartValue = (value: number, type: ChartType) =>
   type === 'rain' ? value.toLocaleString('bg-BG', { maximumFractionDigits: 2 }) : Math.round(value).toString()
 
-export const SingleChart = ({ hourly, darkMode, type, label, unit, color, height, lang = 'bg' }: any) => {
+export const SingleChart = ({ hourly, darkMode, type, label, unit, color, height, loading = false, lang = 'bg' }: any) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
@@ -129,7 +129,7 @@ export const SingleChart = ({ hourly, darkMode, type, label, unit, color, height
     setActiveIndex(Math.max(0, Math.min(values.length - 1, Math.round((clientX - rect.left - left) / Math.max(1, rect.width - left - (compact ? 28 : 22)) * (values.length - 1)))))
   }
   const currentValue = activeIndex === null ? null : values[activeIndex]
-  const summaryText = !summary ? copy.noData : type === 'wind'
+  const summaryText = !summary ? (loading ? (lang === 'bg' ? 'Зареждане…' : 'Loading…') : copy.noData) : type === 'wind'
     ? `${copy.now} ${formatChartValue(summary.current, type)} ${unit} · ${copy.max} ${formatChartValue(summary.max, type)} ${unit}`
     : type === 'rain' ? `${copy.total} ${formatChartValue(values.reduce((sum: number, value) => sum + (value || 0), 0), type)} ${unit} · ${copy.max} ${formatChartValue(summary.max, type)} ${unit}`
     : `${copy.now} ${formatChartValue(summary.current, type)}${type === 'temp' ? '°' : ` ${unit}`} · ${copy.min} ${formatChartValue(summary.min, type)}${type === 'temp' ? '°' : ` ${unit}`} · ${copy.max} ${formatChartValue(summary.max, type)}${type === 'temp' ? '°' : ` ${unit}`}`

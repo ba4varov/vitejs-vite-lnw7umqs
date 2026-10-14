@@ -1,0 +1,1205 @@
+{
+  "base": "c9a384aecf82104d50b1a2802baeae9e0010c9aa",
+  "matrix": [
+    {
+      "case": "390-en-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "cca9e74c3110b23d529da6bb228b6954f41033a2e20f3461068ddb72de61c674"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "6c7b3d3bb7d38fa1f05b36f4f13cb8dd27dc35dd2b1b714125223b7f789d5a0c"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "c1ed48f398e96e290414c0b01ddaa2d0c590517f1afaca99adb9bc9a2ecca97d"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "781658c7bcd1f0789e853a978296cf1468a7dc1a5b6c231997880e2b134fee9e"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "9732734d72910aff8e34730b4f90f676f09d1d78b9e6479380fdcc8694873afd"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "cca9e74c3110b23d529da6bb228b6954f41033a2e20f3461068ddb72de61c674"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "6c7b3d3bb7d38fa1f05b36f4f13cb8dd27dc35dd2b1b714125223b7f789d5a0c"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "c1ed48f398e96e290414c0b01ddaa2d0c590517f1afaca99adb9bc9a2ecca97d"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "781658c7bcd1f0789e853a978296cf1468a7dc1a5b6c231997880e2b134fee9e"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "67d455243f6e340c1e45c607011299741874396094d6fcb4926c0d06f3e0b534"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "94c1e91a6d5dc0cbbfc39516d60995a1123d42681d6eac8f8e5ffd894459361b"
+        }
+      ]
+    },
+    {
+      "case": "360-bg-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "510c991ba093e166d17a63d02c2597540c7101ffabbb827bec1aa00c28b23bb1"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "6b04b628fb643b1f5f8f4b33509b7d4fbd2e58c58cf4ef88e13801a2fe2f3ef4"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "fe746c47cee93ae043f1cb8a3586c82dae3bb656f381265aaf2e5eabb4829489"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "9bf2270bdd10053fbae46c9fbd047c8fe54745b20043e4bcab3c921c96a62f5b"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "590963a6b5cdc8d5cbe57abd041aa04504dd96179e65b5ed13d68ba169e759e2"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "510c991ba093e166d17a63d02c2597540c7101ffabbb827bec1aa00c28b23bb1"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "6b04b628fb643b1f5f8f4b33509b7d4fbd2e58c58cf4ef88e13801a2fe2f3ef4"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "fe746c47cee93ae043f1cb8a3586c82dae3bb656f381265aaf2e5eabb4829489"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "9bf2270bdd10053fbae46c9fbd047c8fe54745b20043e4bcab3c921c96a62f5b"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "4a4cdd3858a49e2068567937399b0d04fa1ad76232f5681551b36d477f741f78"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "44d8d3fcb99ceae1eb90e6f83c3c51aef294254fd56f8393ea86b03cfc036d29"
+        }
+      ]
+    },
+    {
+      "case": "390-en-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "703850cd674b514ea4e4e3f20aa1e46f6d9633341b98776614d7b0ee4a35f984"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "43f0b512cb6a305def1f89c749f3f34fe48a2e88fa3896b4e74d68126fffb492"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "b8ef965a82659c83eb114e6f69ca4dd3733168d418fa10e700d10fd5ff7624fb"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "b6542e0f4d21fbbf56a161d3f605468753cf2309ec853519417b6a96d610e9f7"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "4102be142273090efcd3d0f1aea6ccc1fec57ae15806096ba96406cec67ab73c"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "703850cd674b514ea4e4e3f20aa1e46f6d9633341b98776614d7b0ee4a35f984"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "43f0b512cb6a305def1f89c749f3f34fe48a2e88fa3896b4e74d68126fffb492"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "b8ef965a82659c83eb114e6f69ca4dd3733168d418fa10e700d10fd5ff7624fb"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "b6542e0f4d21fbbf56a161d3f605468753cf2309ec853519417b6a96d610e9f7"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "a2953e5a38f1d755f075c9f7066c45d017ecc3c041995cfceeca2e1da5cc8731"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "ae1eb1ea333e4abd7c4ccbe3c6789e5f8b26691a7d9e9d3aff25755f5bdc53a1"
+        }
+      ]
+    },
+    {
+      "case": "320-bg-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "8b31c43b43cf948f60b1469350d264f937ff516baebfa2ce2667b6d1745b369c"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "c5eafd84518adcf68a3984738fa3adb81f427970a5192672b0b54c0645fd571e"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "41ec466b8351da3155a875a6cbbc3a544280cbca29c27c2c0284ce3fb541b026"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "29100ace6223ba9d0c0afe47d984459740cc806a112984160c3a119498420707"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "b63a3f845582d24ab2a43e51fc108ee4ad687dc7b38d1ba7e7ee0f5e589ed456"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "8b31c43b43cf948f60b1469350d264f937ff516baebfa2ce2667b6d1745b369c"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "c5eafd84518adcf68a3984738fa3adb81f427970a5192672b0b54c0645fd571e"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "41ec466b8351da3155a875a6cbbc3a544280cbca29c27c2c0284ce3fb541b026"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "29100ace6223ba9d0c0afe47d984459740cc806a112984160c3a119498420707"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "0741eeba12883f99f9b841c044763d40cbb463c41eeeb5d5518b7b81d876161c"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "99d6ef6f1ccc1c675847300d4e647ee102d0e11118791ea1696bcac125533c30"
+        }
+      ]
+    },
+    {
+      "case": "1440-bg-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "3fa0ef4dc432c35c15c4236d7c47b5284038c57293e319960af39593b4d2f355"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "0de6b52dc8300521d9a386a4fc056aa3a7d7964cdecb1fea82dae6988895d920"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "9dbb158eebff109fc15a5d5e9b9602b4188db0bfb7c001a4cd7ff12cf1fbb852"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "31e5c4392a4fbd4f253cac5ea78ed2026a836dbd9a73a66ee780f085120d62a6"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "f38799d6f21a9a62d79eb0a25887ad47fb825b957c0d5bb642c723f010378177"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "3fa0ef4dc432c35c15c4236d7c47b5284038c57293e319960af39593b4d2f355"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "0de6b52dc8300521d9a386a4fc056aa3a7d7964cdecb1fea82dae6988895d920"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "9dbb158eebff109fc15a5d5e9b9602b4188db0bfb7c001a4cd7ff12cf1fbb852"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "31e5c4392a4fbd4f253cac5ea78ed2026a836dbd9a73a66ee780f085120d62a6"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "48a90243875aed2c2bb06a1c23189299d77ba51321d363d52e90ecab65e6f84e"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "d463a5b7a04493a43a6ed2aa435712c3197953bd186cf1d1fe7829a972d412e3"
+        }
+      ]
+    },
+    {
+      "case": "320-en-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "b4871dc23b12856a12b8f1cd5fd311b90311294555903d7e129585985cc1ef4d"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "57191ff9baed5968274d704046e0d2483507bd1d1e2a7b631a6eb52f2ec6247b"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "eef8a6f26882fcf39e5baefa6a687d0f4e4a48f20c7e94ae7cde65cf46c0f119"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "1b5c4dc7887af90fe1800bdabe6f7df16e672951d8c0aa82512a45dfd72c204d"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "68afce5b6e78297e6bacdfad78de8db915e90bc1dc18c84995cf4131098fb207"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "b4871dc23b12856a12b8f1cd5fd311b90311294555903d7e129585985cc1ef4d"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "57191ff9baed5968274d704046e0d2483507bd1d1e2a7b631a6eb52f2ec6247b"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "eef8a6f26882fcf39e5baefa6a687d0f4e4a48f20c7e94ae7cde65cf46c0f119"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "1b5c4dc7887af90fe1800bdabe6f7df16e672951d8c0aa82512a45dfd72c204d"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "8ac4d0bf32e9c03e953118051f989a9ca3995a2608b5faa8d734e9d510271114"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "cbcc110a9d225ab09b4cccf8ccba970321eb83199f4c0df9d67ff930be0bd267"
+        }
+      ]
+    },
+    {
+      "case": "768-en-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "7d6e2cd346523c9548b0577e559fab59b1b3ca827807edd7a5862bc03b150289"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "8185878593260fdc742bc53bfb911f27d4199baf8b5c7759c354a9c32c145b36"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "56a556e1be7f6169d8b12d6f6efc55e63dcc6d511855cac1bc7e10769059b5f6"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "639f09dd30dcffad079353ef3e2e7471042ec6d116f6ed60ec5536c576cf71bc"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "1f0b72f6b9dd548d8c769e584fdaad307f5a1020a66d70bcc878d96247d83f6c"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "7d6e2cd346523c9548b0577e559fab59b1b3ca827807edd7a5862bc03b150289"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "8185878593260fdc742bc53bfb911f27d4199baf8b5c7759c354a9c32c145b36"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "56a556e1be7f6169d8b12d6f6efc55e63dcc6d511855cac1bc7e10769059b5f6"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "639f09dd30dcffad079353ef3e2e7471042ec6d116f6ed60ec5536c576cf71bc"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "f3fe9799806624eabc767c6daeaef90f64ab52c83bb6af68b52a61b9077cd8bc"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "0fd97053f511bd0ff0b488536ad34635dff9eb1cdfff7e27a75b2488f6d15dec"
+        }
+      ]
+    },
+    {
+      "case": "360-en-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "3b2dfb3a4845777a4b3f6e9d8dbf999770e223b38ba781be5fb7535e5cec3d95"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "e4f65ad0b5d9f24307459f80a5ecbcfadb6b57cacf688b405159954b68a10808"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "c6e9307b9d3e5777c8a6cee081d39c1fd829bbd8097fa784928966e02eafdb78"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "faf41defce4e92c4b55f3392ec20ea22588e262919250a68f1c51316afbd7674"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "3f7658a234931264cd9033720327fa300ddd112726c8debca8d043f9e3b5c0f7"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "3b2dfb3a4845777a4b3f6e9d8dbf999770e223b38ba781be5fb7535e5cec3d95"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "e4f65ad0b5d9f24307459f80a5ecbcfadb6b57cacf688b405159954b68a10808"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "c6e9307b9d3e5777c8a6cee081d39c1fd829bbd8097fa784928966e02eafdb78"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "faf41defce4e92c4b55f3392ec20ea22588e262919250a68f1c51316afbd7674"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "f65ab0991786db2db54a94bcc0bce1597e6ffcf000b443d3deb8cf0ddb4225e2"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "1fc3d57ecd74ddb0f55b307d6f3800ccae9c15045d225d2b6c649e44aafc54d1"
+        }
+      ]
+    },
+    {
+      "case": "1440-en-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "6a0814734302c8ef5440408f64f153fe9605ccf6f6d20ed600e4887cfd404576"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "dc8104e0a7732d22c334fb16a50b4ba95ca3743b38f9b4fd0bcd1fdd166fb153"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "11b3e497cef42df791c16008d9ce4ae51fd2832110047d15e7483b7af06925d2"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "50f7bb2a4b89f0286901c267e7c0c3cd6bad2f98217f29de005b9691b6d6220a"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "f913d44e5b0e20d94cf9743be22c9d159bc21bc75eeb388d297ca3a7bd102a34"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "6a0814734302c8ef5440408f64f153fe9605ccf6f6d20ed600e4887cfd404576"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "dc8104e0a7732d22c334fb16a50b4ba95ca3743b38f9b4fd0bcd1fdd166fb153"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "11b3e497cef42df791c16008d9ce4ae51fd2832110047d15e7483b7af06925d2"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "50f7bb2a4b89f0286901c267e7c0c3cd6bad2f98217f29de005b9691b6d6220a"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "19e3d2b0ce6a4713733150af824c18dd2df88f70019b3335ba99ae4df2a3900a"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "c3ad29dd1148f0e25e1d1d81edab9d5f606a960f5e61767d88dcefa14b38f95a"
+        }
+      ]
+    },
+    {
+      "case": "430-en-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "219364ff69e4a88612987352dd79e4dd2ed8dfdf799a0db211ff5a0a437aa587"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "4e2611fe095f4fdf0c31428aac2334deb8a9ffebe3c838a0ec0fc4b28ce98d98"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "479b457b5ef36d8413ab16c6211dd8b6038702b15ffbf3a437605c2bdbdb6f77"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "df0d9e4006a01c4b705bc81c7406aa398068ff3d77fbff519bd7bbcbf08fb2ad"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "a8096dca05001e23d3033c1afbc4535f2e74507debf6341f72a9eeb389e11b16"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "219364ff69e4a88612987352dd79e4dd2ed8dfdf799a0db211ff5a0a437aa587"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "4e2611fe095f4fdf0c31428aac2334deb8a9ffebe3c838a0ec0fc4b28ce98d98"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "479b457b5ef36d8413ab16c6211dd8b6038702b15ffbf3a437605c2bdbdb6f77"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "df0d9e4006a01c4b705bc81c7406aa398068ff3d77fbff519bd7bbcbf08fb2ad"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "020fd6f740d94c8adb724ddf134255c5675e4ec77f43ccd8e06e3647ab615476"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "028f308e7ee734ec51b8fbd0cada09e51c8f6853f8fd3c5d064da0c8c481f9ae"
+        }
+      ]
+    },
+    {
+      "case": "320-en-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "b0b2ac97966a897041361c8f9b64fca1bce5dbbd347dcda3659935f2ef1019bb"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "fe982c5c4e904973b3e55839f5da8d8005a51c6499efba422a38f5ecd67c1de5"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "c2c9ecd50c902771525983533da3277b85120c4113ace0afea566b87d051b736"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "c7593c5ea41fefdb704ca754cbb7b34b58d90c06ef9b11351a9b9588baa970fc"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "7f18b6c28420b567b3b3f62797c0a17440f981c16f75bb56c3d7cce6348071de"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "b0b2ac97966a897041361c8f9b64fca1bce5dbbd347dcda3659935f2ef1019bb"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "fe982c5c4e904973b3e55839f5da8d8005a51c6499efba422a38f5ecd67c1de5"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "c2c9ecd50c902771525983533da3277b85120c4113ace0afea566b87d051b736"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "c7593c5ea41fefdb704ca754cbb7b34b58d90c06ef9b11351a9b9588baa970fc"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "d75c6c2a4f7375767f7c47e939af491845244dc6f16aaf7bdd40eb92818e71b7"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "1cf95ca661d0f8ef2ac6cb2d0a06f05d3b52e5ec1ba6a7e38725dffe4c00f8a3"
+        }
+      ]
+    },
+    {
+      "case": "360-bg-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "9dbe3d0f73b2a660b9b2bb17adde98e284d0d97328f538ec04f282352f156288"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "c6af966d7a2bce4a8decab4c65bfae2a4594b9baf928f5832e1165ee80f96e5b"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "801a18f9af2565cc0f484c18b6424f64619d41ab76f26e92914e11e19ad3d933"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "22a0e6bcb37676617e94a3aa828fcbddda34c4c52ceb6f7aeb6c88c7321473d9"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "12bfd8b6a5989478a2c68e26d3670a7d640c31b1b468e97dfb08f2970f7f2f3e"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "9dbe3d0f73b2a660b9b2bb17adde98e284d0d97328f538ec04f282352f156288"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "c6af966d7a2bce4a8decab4c65bfae2a4594b9baf928f5832e1165ee80f96e5b"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "801a18f9af2565cc0f484c18b6424f64619d41ab76f26e92914e11e19ad3d933"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "22a0e6bcb37676617e94a3aa828fcbddda34c4c52ceb6f7aeb6c88c7321473d9"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "75171b19829cea0b4d849fa1de6216a29cf4cbd360a59a3da68a7d260d7dd3e1"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "8b419ddc73946daa40f5484fb4325058ab4aee5fba38bcbd234a69a625b8c9d1"
+        }
+      ]
+    },
+    {
+      "case": "768-bg-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "b97e3cd1e00738cdcdf51af78ae7ff24fb4cf46fe6fdc7437544d4488a19c41a"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "836f7b6c305b0e253359a8e9cf06d0d3a9f02ef23a13b8c8d3ab0b46144253bc"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "ee0019b58cc07e2b682f674bd6bc96d3f24f509b2132f4c692f4b89ee27dde5c"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "fc0c2bd227e9c00e04d0f57139ca8b598576d663ee565d6a68087bb17d3f068d"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "c9434e3e0cd5146194930f109af8a6c3cee43ec14d6521504e5cdc50363963c8"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "b97e3cd1e00738cdcdf51af78ae7ff24fb4cf46fe6fdc7437544d4488a19c41a"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "836f7b6c305b0e253359a8e9cf06d0d3a9f02ef23a13b8c8d3ab0b46144253bc"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "ee0019b58cc07e2b682f674bd6bc96d3f24f509b2132f4c692f4b89ee27dde5c"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "fc0c2bd227e9c00e04d0f57139ca8b598576d663ee565d6a68087bb17d3f068d"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "7d48ec709d83ec8c66154e8ea018d19fa2d685f36dce9d3e1c4d0a69ffe28408"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "c35a3c28fec5dac3d1b8094d94f9df2808ea276160b9fd30ebf917a725ae14b4"
+        }
+      ]
+    },
+    {
+      "case": "768-en-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "69f1b708feb2d9e2fd12cb2addbe323383a796147bb56e0c4835cdb2ec3b8d47"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "3c47760b35df9b0b42d72027d783252148479fdd3d75afbcb2cc96922712e995"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "8b45e19b70dcf5294a3c4eaf7435d960a0f63308226ef8714af9c34244584521"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "1f08c9bd220f605b926bbb2c0502fb9f1a3e01aa41ddd051d4aae71e9fd4da12"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "0890c2bc31fa23bc2c3555ebe80752a35126001ba2931684e0bd97bd5e9d9b8e"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "69f1b708feb2d9e2fd12cb2addbe323383a796147bb56e0c4835cdb2ec3b8d47"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "3c47760b35df9b0b42d72027d783252148479fdd3d75afbcb2cc96922712e995"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "8b45e19b70dcf5294a3c4eaf7435d960a0f63308226ef8714af9c34244584521"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "1f08c9bd220f605b926bbb2c0502fb9f1a3e01aa41ddd051d4aae71e9fd4da12"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "4659679bad1ef0c83196ad8a75ae8b4d767feb4f6139381f83b12837f8dac13e"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "810c09f4b3d1b3ee2e8f5dd9c0dd44c895141ce1a0e6ee1c1f87f2691605fb0b"
+        }
+      ]
+    },
+    {
+      "case": "1440-en-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "f9998534daa88cbb67a34a660e8b19bd6cd15a2aadd6214e5f393a4435d6a8c3"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "ebd104234d46e33192c1b58259590ec9b06e37a2773e7e601cb3ca4fd05e255a"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "4313be84ddf568a3fcf16a4bec3bef7bbe2ad33acaa3d740f2e403becc67e128"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "f70c20ba7fe195a5573298d9d60f8462587d1edf3210b95869283ce1b4cd6bfa"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "f8c4e3e706c5fe7e848094db2022f989fb7c1072265d89e1eea4e71fe363316a"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "f9998534daa88cbb67a34a660e8b19bd6cd15a2aadd6214e5f393a4435d6a8c3"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "ebd104234d46e33192c1b58259590ec9b06e37a2773e7e601cb3ca4fd05e255a"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "4313be84ddf568a3fcf16a4bec3bef7bbe2ad33acaa3d740f2e403becc67e128"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "f70c20ba7fe195a5573298d9d60f8462587d1edf3210b95869283ce1b4cd6bfa"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "98d3b835cf9fb33a6d23c5e6750675a7b57639ec0cbc02e7a9cf7f0300ff94e9"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "c091963b3e1477822cff162ccac88e900770076600d93174587f2d687cad1fbb"
+        }
+      ]
+    },
+    {
+      "case": "430-bg-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "f7a34f760a47e7d26f620a6d3af2c072ff5ebc559d7e0ed4e58b7780dfd938dc"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "1825472c327d54c2aa99659c2e3bb88190ba7d07787918ae6280f4bd8c2d643e"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "02f08524b6a130d1e7da85943fb885c4842af01c5f20277fa5ed2942a1d2302c"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "1e2c3a7b69d6dac14851fe4bc50b5b53a0df72747d4b5e46aa629860cf40bccd"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "f3ba9d426ad6e88d086a22adc8c864a4610c612ca021aebdbc6dab83aba9cfa9"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "f7a34f760a47e7d26f620a6d3af2c072ff5ebc559d7e0ed4e58b7780dfd938dc"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "1825472c327d54c2aa99659c2e3bb88190ba7d07787918ae6280f4bd8c2d643e"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "02f08524b6a130d1e7da85943fb885c4842af01c5f20277fa5ed2942a1d2302c"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "1e2c3a7b69d6dac14851fe4bc50b5b53a0df72747d4b5e46aa629860cf40bccd"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "bb8cbcd857b6b47a4d27f9e1cfb616691308842b26572f0676fe39dd4765468a"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "f98940c8931bccd96b4d620f5ae42da94ec976534318e008666636ea76164086"
+        }
+      ]
+    },
+    {
+      "case": "430-en-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "ba3f61dbd20b93dd2ff314e38e0be656754fde274473bbc0451ef7fb4e65bc94"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "353eeb062a90f4e0019b0ff513b86a6eb9c92110dde70f177849df7317b00a9f"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "f38fbc1e20e00ecde4c70054490c9d3abc64e7b2fc1af51f0c32cc39544cf571"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "3cb2daa5bcd90c5afe56f6d55a6851b2df5efba8802fd738c96c8b2cbf94136e"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "eef1b880e55a67997fd6b0bc2692259a4fbbb5f288e40049933cfb51f75a3e99"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "ba3f61dbd20b93dd2ff314e38e0be656754fde274473bbc0451ef7fb4e65bc94"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "353eeb062a90f4e0019b0ff513b86a6eb9c92110dde70f177849df7317b00a9f"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "f38fbc1e20e00ecde4c70054490c9d3abc64e7b2fc1af51f0c32cc39544cf571"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "3cb2daa5bcd90c5afe56f6d55a6851b2df5efba8802fd738c96c8b2cbf94136e"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "cb79bffc23a0105c2e481d6fd8acaadb3633a4cdba0b42d60bef398a71d886f8"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "51a93b7aa5190369e27df02a2f0389163c9c336b926e9c8e2b519a1d89859efd"
+        }
+      ]
+    },
+    {
+      "case": "360-en-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "8a28020d9a5ba6c9ce83cbb55257acb828e2c3ab62e9a72114db9c9222d155d2"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "f327cd24fdbf62b6b59b9514432bcd5db9426a68b7215c7fe2b87436124e6b14"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "59f09639947478cbdb4c3db19beaae24874f063f0c2d70424b2bb859b5977e06"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "c65876b27038c76e815cb88823f4d7bb953feae9606aa9873eefbf0e73adb1b9"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "7402eb52de700b296b3919cf0c384806241e0f1c83228bcffafb987a219bacc8"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "8a28020d9a5ba6c9ce83cbb55257acb828e2c3ab62e9a72114db9c9222d155d2"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "f327cd24fdbf62b6b59b9514432bcd5db9426a68b7215c7fe2b87436124e6b14"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "59f09639947478cbdb4c3db19beaae24874f063f0c2d70424b2bb859b5977e06"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "c65876b27038c76e815cb88823f4d7bb953feae9606aa9873eefbf0e73adb1b9"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "a809a5a9f5d9613e8cd76aa5cd11aef04f8c95992435eaafad732ca654146f0c"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "7faa9c05a16776787815d2399a424c48919fec0ab8a76b30fc9ad647dc045923"
+        }
+      ]
+    },
+    {
+      "case": "430-bg-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "6441ff97f9f683818ddbb876e0936f27ff01e53defb121dfd75b9da40ffee22e"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "3d67a0c2e7e807a39758581416daf1decd1f85897c618e06eb5a3992074168f4"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "a22cad09ba50dfc9be1eefc94050cd626e367c393e0e6e34b47e6f3a1e44b67c"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "461de03d989d0c00c7a0d62f0b73f5bda962c3b86bf9187936d0137397d330f9"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "f6dcf445b65a381d1a1ac906e3ef32271f488cca71c7b3db5d7ef55030cb0f8a"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "6441ff97f9f683818ddbb876e0936f27ff01e53defb121dfd75b9da40ffee22e"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "3d67a0c2e7e807a39758581416daf1decd1f85897c618e06eb5a3992074168f4"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "a22cad09ba50dfc9be1eefc94050cd626e367c393e0e6e34b47e6f3a1e44b67c"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "461de03d989d0c00c7a0d62f0b73f5bda962c3b86bf9187936d0137397d330f9"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "f263b3edc635093670880016bdd948471148edb7a018382d84c38b76aca2edb3"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "59c1e5edef7b118a810835af802d4acc52b9f3ef639431031b784421a09bec93"
+        }
+      ]
+    },
+    {
+      "case": "320-bg-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "f2622962e12f2c0985c1b6ec7bdd76cb429bfe0648f03b61453d37d8aaa0a277"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "3671860352ddc37c9fd1f3261696d00437c002793067b3a30b2ec6106ef15c38"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "2183468239c70aa8a3ecd3d277da78670affdfc9d18152bdba969f2c0c82d1ba"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "b2c7d240ae3dca1a44ef3f81ffb7600c05dcfc872d4b3f24a4e5ec719d9579e6"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "c058227ee03032514a8795a89de36b66e16fd34e62ec74c264eaf892420d3e00"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "f2622962e12f2c0985c1b6ec7bdd76cb429bfe0648f03b61453d37d8aaa0a277"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "3671860352ddc37c9fd1f3261696d00437c002793067b3a30b2ec6106ef15c38"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "2183468239c70aa8a3ecd3d277da78670affdfc9d18152bdba969f2c0c82d1ba"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "b2c7d240ae3dca1a44ef3f81ffb7600c05dcfc872d4b3f24a4e5ec719d9579e6"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "d1b3313b0e7ab3748edcaefe9ab80feb64f4e628049d02d224b20c64d96dc8ce"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "32bb5f82528a446361daf84ddafa220252c6e968be613cde56d2102f5b07bb5f"
+        }
+      ]
+    },
+    {
+      "case": "390-bg-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "ebe2d3e968ceca0d84a9e725760c86e7505538fc419248b1c3b9306c94b10408"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "b16bedfef9f0f180327111f218c7a98ffdd4a3d7562604c045e2ff83e1ce330c"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "44970a858bf575815e7349948845e294f18335f3607c4f4ed3b887c7f102d80f"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "7e263da54323ba2c5bb47f6ca7f4cb5dd36536fef47bb598d51588f9087b1500"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "965084557fe4778263ce8ce59a45d337be0c1bd8a9e5739b63e20d99e566fecc"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "ebe2d3e968ceca0d84a9e725760c86e7505538fc419248b1c3b9306c94b10408"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "b16bedfef9f0f180327111f218c7a98ffdd4a3d7562604c045e2ff83e1ce330c"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "44970a858bf575815e7349948845e294f18335f3607c4f4ed3b887c7f102d80f"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "7e263da54323ba2c5bb47f6ca7f4cb5dd36536fef47bb598d51588f9087b1500"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "68bf2467833126bab50fe56865316b91b7a71431500fef774aa5cc615c4e1e37"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "3e512de533630e1ea0c303b968b9a93d4322e936a10b601d1270b9a261f6cdbb"
+        }
+      ]
+    },
+    {
+      "case": "390-bg-light",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "c3a53a25e8ba0fc37db0fa1168a360976ec6f08862ea6cfed9014b8cfd9c7b63"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "4790f1425717b1758ab486be3e88102a6524ece25b2e13d6ee85964160911a9f"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "3666959a516f03f47ae56f295be04a623645e6086ddb00bf27bdbe1b823972ae"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "5949aa80f8c72b0edacfe034b91b488b9914f88c49d51cff6b4dd5b9bda6aa27"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "a64620723b00d8a053dcf68df8427ece187d39a20fabc07c9b01c45faa4167a3"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "c3a53a25e8ba0fc37db0fa1168a360976ec6f08862ea6cfed9014b8cfd9c7b63"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "4790f1425717b1758ab486be3e88102a6524ece25b2e13d6ee85964160911a9f"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "3666959a516f03f47ae56f295be04a623645e6086ddb00bf27bdbe1b823972ae"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "5949aa80f8c72b0edacfe034b91b488b9914f88c49d51cff6b4dd5b9bda6aa27"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "d67c9700463992edc77a40ff8ceb403cd22bcab4dbab84570b56b32e5e0c8edd"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "d665cb9983fb9e85e9915181247d7c3b31787e94096dc1e51162a87c50bd7771"
+        }
+      ]
+    },
+    {
+      "case": "1440-bg-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "3a4a866e862d6a6cbb2da8560cefc76ead65c84972d9bccc889d1ea96fb9e76d"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "c3283348ae54831775fb75b3bd8389d00362ee1958b2d2cd3e5caa9710a49946"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "e63e6e0bff9f229b2ae44e3649e2fef600a6e75129e8eae4b27a1eaddece93cc"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "02b3a6c76125995365674ee8caea66621f789285b3287e9c3d95205fe5a04c5a"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "cd2e5a993c50063035483373864fc153bdc4f3984348afd81c9e7871e008f065"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "3a4a866e862d6a6cbb2da8560cefc76ead65c84972d9bccc889d1ea96fb9e76d"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "c3283348ae54831775fb75b3bd8389d00362ee1958b2d2cd3e5caa9710a49946"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "e63e6e0bff9f229b2ae44e3649e2fef600a6e75129e8eae4b27a1eaddece93cc"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "02b3a6c76125995365674ee8caea66621f789285b3287e9c3d95205fe5a04c5a"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "6e83e9db3a41a725580f95d0696b5d45380adc6df7644e9903e7117e68d533b9"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "b21c48177b5ef885be83b61ffc5892f9824a8d86249a3a3c8341d13b7ff09159"
+        }
+      ]
+    },
+    {
+      "case": "768-bg-dark",
+      "complete": true,
+      "screenshots": [
+        {
+          "name": "after-aqi-section.png",
+          "sha256": "8897fd3678b6fa7faa416a4d12df7d3b3667b22841390b26a9033d828fcce342"
+        },
+        {
+          "name": "after-charts-section.png",
+          "sha256": "c6fc1ac749649a6c8d8ad83e2ac3b25c50c13459e3dfa96e59f2c3184c331db1"
+        },
+        {
+          "name": "after-forecast-section.png",
+          "sha256": "1a53dbb22d0952fcddd46a2358b89d6d8e4fe2eb909c9b9c07774bf9f1824d9d"
+        },
+        {
+          "name": "after-hourly-section.png",
+          "sha256": "248d25eb9dd7f58de233814a5a4ab35d5bd21e5f91eea8806b26de745be717ab"
+        },
+        {
+          "name": "after-main-card.png",
+          "sha256": "d899ae7fdac516dbf97b013109e17eebb7fa9a86c08073d17d0d1862d69a3c54"
+        },
+        {
+          "name": "before-aqi-section.png",
+          "sha256": "8897fd3678b6fa7faa416a4d12df7d3b3667b22841390b26a9033d828fcce342"
+        },
+        {
+          "name": "before-charts-section.png",
+          "sha256": "c6fc1ac749649a6c8d8ad83e2ac3b25c50c13459e3dfa96e59f2c3184c331db1"
+        },
+        {
+          "name": "before-forecast-section.png",
+          "sha256": "1a53dbb22d0952fcddd46a2358b89d6d8e4fe2eb909c9b9c07774bf9f1824d9d"
+        },
+        {
+          "name": "before-hourly-section.png",
+          "sha256": "248d25eb9dd7f58de233814a5a4ab35d5bd21e5f91eea8806b26de745be717ab"
+        },
+        {
+          "name": "before-main-card.png",
+          "sha256": "61b3460adf6b824bd92e1dda1d23d7ef9865a5d84d9ce7734cdfd8be92496776"
+        },
+        {
+          "name": "skeleton.png",
+          "sha256": "096155d22b5772b318ab7cbcc63e0112c5803dfbd1489dc83c483869cbda94e6"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+[WebServer] (node:77899) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:77930) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 37 tests using 3 workers
+
+(node:77952) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:77953) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:77954) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 tests/progressive-forecast.spec.ts:66:1 › supplements finish before main, remain available when main renders (7.8s)
+  ✓   3 tests/progressive-forecast.spec.ts:71:73 › optional failures marine (8.4s)
+  ✓   1 tests/progressive-forecast.spec.ts:53:1 › main renders while BOTH supplemental HTTP requests remain pending; timing evidence (11.1s)
+[WebServer] 2:59:15 PM [vite] (client) [console.error] Error: Forecast source unavailable
+[WebServer]     at read (http://127.0.0.1:4173/src/forecast-sources.js:21:29)
+[WebServer]     at async fetchWeather (http://127.0.0.1:4173/src/App.tsx:1023:17)
+  ✓   4 tests/progressive-forecast.spec.ts:71:73 › optional failures aqi (6.3s)
+  ✓   5 tests/progressive-forecast.spec.ts:71:73 › optional failures marine,aqi (6.7s)
+  ✓   6 tests/progressive-forecast.spec.ts:77:1 › main fails initially and retry works (6.4s)
+  ✓   7 tests/progressive-forecast.spec.ts:82:1 › switch cities with all older requests pending; no mixed location content (7.4s)
+  ✓   8 tests/progressive-forecast.spec.ts:93:66 › 15 minute refresh retains last valid data: pending (7.0s)
+  ✓   9 tests/progressive-forecast.spec.ts:93:66 › 15 minute refresh retains last valid data: failed (8.8s)
+[WebServer] 2:59:29 PM [vite] (client) [console.error] Error: Incomplete main forecast
+[WebServer]     at fetchWeather (http://127.0.0.1:4173/src/App.tsx:1046:64)
+[WebServer] 2:59:30 PM [vite] (client) [console.error] Error: Forecast source unavailable
+[WebServer]     at read (http://127.0.0.1:4173/src/forecast-sources.js:21:29)
+[WebServer]     at async fetchWeather (http://127.0.0.1:4173/src/App.tsx:1023:17)
+  ✓  11 tests/progressive-forecast.spec.ts:93:66 › 15 minute refresh retains last valid data: malformed (5.6s)
+  ✓  10 tests/progressive-forecast.spec.ts:93:66 › 15 minute refresh retains last valid data: main-failed (7.3s)
+  ✓  12 tests/progressive-forecast.spec.ts:102:1 › zero and missing observations, timestamp joins, daily means and live open detail enrichment (9.1s)
+  ✓  13 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 320 bg false (13.2s)
+  ✓  14 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 320 bg true (13.7s)
+  ✓  15 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 320 en false (15.1s)
+  ✓  17 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 360 bg false (10.7s)
+  ✓  16 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 320 en true (12.8s)
+  ✓  18 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 360 bg true (12.5s)
+  ✓  19 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 360 en false (11.7s)
+  ✓  20 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 360 en true (12.9s)
+  ✓  21 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 390 bg false (11.3s)
+  ✓  22 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 390 bg true (12.7s)
+  ✓  23 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 390 en false (12.5s)
+  ✓  24 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 390 en true (13.7s)
+  ✓  25 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 430 bg false (11.5s)
+  ✓  26 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 430 bg true (13.0s)
+  ✓  27 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 430 en false (12.7s)
+  ✓  28 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 430 en true (14.8s)
+  ✓  29 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 768 bg false (14.7s)
+  ✓  31 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 768 en false (12.2s)
+  ✓  30 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 768 bg true (19.4s)
+  ✓  32 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 768 en true (15.2s)
+  ✓  33 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 1440 bg false (14.4s)
+  ✓  34 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 1440 bg true (15.4s)
+  ✓  35 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 1440 en false (14.1s)
+  ✓  37 tests/progressive-forecast.spec.ts:146:1 › current primary missing values stay missing and actual zero stays zero (3.8s)
+  ✓  36 tests/progressive-forecast.spec.ts:113:108 › skeleton and loaded comparison 1440 en true (10.7s)
+
+  37 passed (2.4m)

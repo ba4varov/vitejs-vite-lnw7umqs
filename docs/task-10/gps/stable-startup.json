@@ -1,0 +1,38 @@
+{
+  "gpsDeliveryMs": 3800,
+  "additionalObservationMs": 10000,
+  "first": {
+    "temp": "13°C",
+    "heading": "📍 Варна| 🎯 Трошево☆",
+    "background": "https://picsum.photos/seed/bobbyweather386/1200/800"
+  },
+  "afterLateWindow": {
+    "temp": "13°C",
+    "heading": "📍 Варна| 🎯 Трошево☆",
+    "background": "https://picsum.photos/seed/bobbyweather386/1200/800"
+  },
+  "domHistory": [
+    {
+      "temp": "13°C",
+      "heading": "📍 Варна| 🎯 Трошево☆",
+      "background": "https://picsum.photos/seed/bobbyweather386/1200/800"
+    }
+  ],
+  "calls": [
+    {
+      "source": "weather",
+      "lat": "43.2256"
+    },
+    {
+      "source": "marine",
+      "lat": "43.2256"
+    },
+    {
+      "source": "aqi",
+      "lat": "43.2256"
+    }
+  ],
+  "images": [
+    "https://picsum.photos/seed/bobbyweather386/1200/800"
+  ]
+}
