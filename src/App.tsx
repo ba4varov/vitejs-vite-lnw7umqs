@@ -1,3 +1,4 @@
+import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
@@ -31,6 +32,8 @@ const translations = {
     search: 'Търси град по целия свят...',
     info: '📡 Реални данни от Open-Meteo · Обновява се на всеки 15 мин',
     loading: '⏳ Зареждане...',
+    refreshing: 'Обновяване…',
+    loadingForecast: 'Подготвяме прогнозата за',
     tryAgain: 'Опитай отново',
     favorite: 'Любим град',
     allMetrics: 'Всички показатели',
@@ -75,6 +78,7 @@ const translations = {
     pm10: 'ФПЧ 10 (PM10)',
     pm25: 'ФПЧ 2.5 (PM2.5)',
     aqiChart: 'AQI Индекс (24 часа)',
+    aqiNoData: 'Няма данни',
     chatTitle: 'Попитай Боби за времето',
     chatSubtitle: 'Съветите се съобразяват с актуалната прогноза за избраното място.',
     chatPlaceholder: 'Напр. Да взема ли чадър?',
@@ -116,6 +120,8 @@ const translations = {
     search: 'Search any city in the world...',
     info: '📡 Live data from Open-Meteo · Auto-refresh every 15 min',
     loading: '⏳ Loading...',
+    refreshing: 'Updating…',
+    loadingForecast: 'Preparing the forecast for',
     tryAgain: 'Try Again',
     favorite: 'Favorite City',
     allMetrics: 'All metrics',
@@ -160,6 +166,7 @@ const translations = {
     pm10: 'PM10',
     pm25: 'PM2.5',
     aqiChart: 'AQI (24 Hours)',
+    aqiNoData: 'No data',
     chatTitle: 'Ask Bobby about the weather',
     chatSubtitle: 'Advice is based on the live forecast for the selected location.',
     chatPlaceholder: 'E.g. Should I take an umbrella?',
@@ -249,6 +256,8 @@ const WeatherApp = () => {
   const [error, setError] = useState<string | null>(null)
   const [metricsExpanded, setMetricsExpanded] = useState(false)
   const [weather, setWeather] = useState<any>(null)
+  const [weatherCoords, setWeatherCoords] = useState<{ lat: number, lon: number } | null>(null)
+  const hasCurrentForecast = Boolean(weather && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon)
   const [hourly, setHourly] = useState<any[]>([])
   const [notificationForecast,setNotificationForecast]=useState<any>(null)
   const [plannerLocation,setPlannerLocation]=useState<any>(null)
@@ -798,6 +807,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         })
       }
       setForecast(days)
+      setWeatherCoords({ lat, lon })
       setLoading(false)
       setForecastReady(viewIntent)
       setLastUpdated(new Date())
@@ -814,9 +824,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   }
 
   useEffect(() => {
+    setSelectedDay(null)
+    setSelectedHour(null)
     fetchWeather(coords.lat, coords.lon)
     const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
-    return () => clearInterval(interval)
+    return () => { clearInterval(interval); weatherRequestIdRef.current++ }
   }, [coords.lat, coords.lon])
 
   useEffect(() => {
@@ -971,17 +983,24 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {placesError && <p className="places-error" role="alert">{lang === 'bg' ? 'Местата не можаха да се синхронизират.' : 'Places could not be synchronized.'} <button onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
 
-      {loading && <div className="card center-text"><p style={{ fontSize: '1.5rem' }}>{t.loading}</p></div>}
+      {!hasCurrentForecast && (loading || !error) && (
+        <section className="card forecast-loading" role="status" aria-live="polite" aria-busy="true">
+          <span className="forecast-loading-icon" aria-hidden="true">🌤️</span>
+          <div><h2>{t.loading}</h2><p>{t.loadingForecast} {city}</p></div>
+          <div className="forecast-loading-shapes" aria-hidden="true"><span /><span /><span /></div>
+        </section>
+      )}
 
       {error && !loading && (
         <div className="card center-text">
-          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {t.error}</p>
           <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>{t.tryAgain}</button>
         </div>
       )}
 
-      {!loading && !error && weather && (
+      {hasCurrentForecast && (
         <main ref={forecastDashboardRef} className="forecast-dashboard">
+          {loading && <div className="forecast-refresh" role="status" aria-live="polite">↻ {t.refreshing}</div>}
           {activeAlerts.length > 0 && (
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
@@ -1161,26 +1180,26 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             <WindyMap coords={coords} lang={lang} darkMode={darkMode} title={t.interactiveMap} />
           </section>
 
-          {weather.aqi !== null && weather.aqi !== undefined && (
-            <section className="card aqi-section">
-              <h3>🍃 {t.airQuality}</h3>
-              <div className="stats-grid" style={{ marginBottom: '16px' }}>
-                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
-                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
-                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
-              </div>
-              <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
-                <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
-              </div>
-            </section>
-          )}
+          <section className="card aqi-section">
+            <h3>🍃 {t.airQuality}</h3>
+            <div className="stats-grid" style={{ marginBottom: '16px' }}>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{formatAqiValue(weather.aqi, t.aqiNoData)}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{formatAqiValue(weather.pm10, t.aqiNoData, " µg/m³")}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{formatAqiValue(weather.pm25, t.aqiNoData, " µg/m³")}</p></div>
+            </div>
+            <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
+              <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
+            </div>
+          </section>
         </main>
       )}
 
-      <ProjectShowcase lang={lang} />
-      <AdSlot label={lang === 'bg' ? 'Рекламно пространство' : 'Advertising space'} />
+      {hasCurrentForecast && <>
+        <ProjectShowcase lang={lang} />
+        <AdSlot label={lang === 'bg' ? 'Рекламно пространство' : 'Advertising space'} />
+      </>}
 
-      {selectedDay && (
+      {hasCurrentForecast && selectedDay && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
           <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -1222,7 +1241,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         </div>
       )}
 
-      {selectedHour && (
+      {hasCurrentForecast && selectedHour && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedHour(null)}>
           <div className="card popup-card" style={{ position: 'fixed', top: popupPos.y, left: popupPos.x, margin: 0, background: darkMode ? '#1e293b' : '#ffffff', color: darkMode ? '#ffffff' : '#1e293b', boxShadow: '0 15px 50px rgba(0,0,0,0.15)', zIndex: 9999, cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
