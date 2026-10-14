@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { ChangeEvent, FormEvent, Ref } from 'react'
 import { authConfigured, googleAuthConfigured, signInWithGoogle, consumeGoogleCallback, captchaConfigured, consumeAuthHash, getUser, profileRequest, resendConfirmation, resetPassword, restoreSession, subscribeSession, saveSession, signIn, signOut, signUp, updatePassword, type AuthSession } from './auth-client'
 import { authCallbackView } from './auth-flow.js'
 import { profilePlanLabel } from './profile-plan.js'
@@ -24,7 +24,9 @@ function PasswordField({ label, value, onChange, autoComplete, showLabel, hideLa
   return <label>{label}<span className="password-field"><input type={visible ? 'text' : 'password'} required minLength={8} autoComplete={autoComplete} value={value} onChange={onChange} /><button type="button" className="password-toggle" aria-label={visible ? hideLabel : showLabel} aria-pressed={visible} onClick={() => setVisible(current => !current)}><span aria-hidden="true">{visible ? '◉' : '👁'}</span></button></span></label>
 }
 
-export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
+export type AuthPanelHandle = { openSignIn: () => void }
+
+export function AuthPanel({ lang, ref }: { lang: 'bg' | 'en'; ref?: Ref<AuthPanelHandle> }) {
   const t = copy[lang]
   const stats = signupActivityCopy[lang]
   const [signupStatistics, setSignupStatistics] = useState(false)
@@ -84,6 +86,8 @@ export function AuthPanel({ lang }: { lang: 'bg' | 'en' }) {
   const protectedView = view === 'login' || view === 'register' || view === 'forgot'
   const onCaptchaTokenChange = useCallback((token: string | null) => setCaptchaToken(token), [])
   const changeView = (next: View) => { setCaptchaToken(null); setError(''); setMessage(''); setConfirmationEmail(null); setView(next); if (next === 'register' || next === 'closed') setSignupStatistics(false) }
+
+  useImperativeHandle(ref, () => ({ openSignIn: () => changeView('login') }))
 
   useEffect(() => subscribeSession(active => {
     setSession(active)

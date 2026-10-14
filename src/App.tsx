@@ -9,7 +9,7 @@ import { Chart, SingleChart } from './WeatherCharts'
 import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
-import { AuthPanel } from './AuthPanel'
+import { AuthPanel, type AuthPanelHandle } from './AuthPanel'
 import { WeatherNotifications } from './WeatherNotifications'
 import { WeatherPlanner } from './WeatherPlanner'
 import { AdminLink } from './AdminLink'
@@ -266,6 +266,7 @@ const WeatherApp = () => {
   const [places, setPlaces] = useState<Place[]>([])
   const [localizedPlaces, setLocalizedPlaces] = useState<Place[]>([])
   const [defaultPlaceId, setDefaultPlaceId] = useState<string | null>(null)
+  const plannerAuth = useRef<AuthPanelHandle>(null)
   const [session, setSession] = useState<AuthSession | null>(null)
   const [placesError, setPlacesError] = useState(false)
   const [placesBusy, setPlacesBusy] = useState(false)
@@ -913,7 +914,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
         <HeaderNavigation lang={lang} notifications={<WeatherNotifications locationKey={`${Math.round(coords.lat*10)}:${Math.round(coords.lon*10)}`} key={session?.user.id||'guest'} lang={lang} session={session} forecast={plannerLocation?.lat===coords.lat && plannerLocation?.lon===coords.lon ? notificationForecast : null} city={city} />}>
-          <AuthPanel lang={lang} />
+          <AuthPanel lang={lang} ref={plannerAuth} />
           <AdminLink lang={lang} />
           <button className="lang-btn" aria-label={lang === 'bg' ? 'Switch to English' : 'Превключи на български'} onClick={toggleLanguage}>
             {lang === 'bg' ? '🇬🇧 EN' : '🇧🇬 БГ'}
@@ -1173,7 +1174,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           </ForecastSectionOrder>
 
           <Chart hourly={hourly} darkMode={darkMode} t={t} lang={lang} />
-          <WeatherPlanner lang={lang} session={session} forecast={plannerForecast} city={city} />
+          <WeatherPlanner onSignIn={() => plannerAuth.current?.openSignIn()} lang={lang} session={session} forecast={plannerForecast} city={city} />
 
           <section className="card map-section">
             <h3>🌍 {t.interactiveMap}</h3>
