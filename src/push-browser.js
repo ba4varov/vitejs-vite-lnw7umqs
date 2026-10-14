@@ -26,8 +26,19 @@ export async function enrollPush({scope=window,registration,key,persist}) {
   if(actual.length!==expected.length || actual.some((byte,i)=>byte!==expected[i]))throw Error('KEY_ROTATION_REQUIRED')
  }
  const subscription=existing||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:expected})
- try {return await persist(subscription.toJSON())}
- catch(error) {if(!existing)await subscription.unsubscribe().catch(()=>{});throw error}
+ const payload=subscription.toJSON()
+ try {return await persist(payload)}
+ catch(error) {
+  // A failed response may follow a committed write. Keep the subscription so
+  // another explicit click resubmits the same endpoint to the owner's upsert.
+  // Only known API rejections/preflight session changes are definitive.
+  const rejected=[400,401,403,405,413,429].includes(error?.status)||error?.message==='SESSION_CHANGED'
+  throw Error(rejected?'PUSH_REGISTRATION_REJECTED':'PUSH_REGISTRATION_UNCONFIRMED')
+ }
+}
+export const pushEnrollmentMessages={
+ bg:{PUSH_REGISTRATION_UNCONFIRMED:'Резултатът от записването не е потвърден. Абонаментът може да е записан. Браузърният абонамент е запазен. Натисни „Разреши и регистрирай това устройство“ отново, за да потвърдиш същата регистрация.',PUSH_REGISTRATION_REJECTED:'Заявката за регистрация е отказана. Браузърният абонамент е запазен. Провери сесията и Push настройките, преди да опиташ отново.'},
+ en:{PUSH_REGISTRATION_UNCONFIRMED:'The save result is unconfirmed. The subscription may have been saved. The browser subscription has been kept. Click “Allow and register this device” again to confirm the same registration.',PUSH_REGISTRATION_REJECTED:'The registration request was rejected. The browser subscription has been kept. Check your session and Push preferences before retrying.'},
 }
 export async function removePushDevice({registration,device,persist}) {
  // Remove server authority first. A network failure never falsely reports success.

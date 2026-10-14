@@ -5,7 +5,7 @@ import vm from 'node:vm'
 import {validPushEndpoint,validPushSubscription,validPushPreferences} from '../../server/push-validation.js'
 import {handlePush} from '../../server/push-core.js'
 import {fetchPushForecast,evaluatePushForecast} from '../../server/push-forecast.js'
-import {pushSupport,enrollPush,removePushDevice} from '../../src/push-browser.js'
+import {pushSupport,enrollPush,removePushDevice,pushEnrollmentMessages} from '../../src/push-browser.js'
 const key=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url')
 const sub={endpoint:'https://fcm.googleapis.com/wp/test',keys:{p256dh:key,auth:Buffer.alloc(16,1).toString('base64url')},expirationTime:null}
 const prefs={enabled:true,cities:[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'}],categories:['wind']}
@@ -44,13 +44,13 @@ test('Android/Windows feature detection, iOS Home Screen and unsupported context
  assert.equal(pushSupport({...browser(),isSecureContext:false}),'unsupported')
  const noPush=browser();delete noPush.PushManager;assert.equal(pushSupport(noPush),'unsupported')
 })
-test('denial/dismissal never subscribe; failed persistence rolls back only newly created subscription',async()=>{
+test('denial/dismissal never subscribe; failed persistence keeps newly created subscription',async()=>{
  let prompts=0,subscriptions=0,writes=0,removed=0
  const registration={pushManager:{getSubscription:async()=>null,subscribe:async()=>{subscriptions++;return {toJSON:()=>sub,unsubscribe:async()=>{removed++;return true}}}}}
  for(const permission of ['denied','default'])await assert.rejects(enrollPush({scope:{Notification:{requestPermission:()=>{prompts++;return Promise.resolve(permission)}}},registration,key,persist:async()=>{writes++}}))
  assert.equal(prompts,2);assert.equal(subscriptions,0);assert.equal(writes,0)
  const promise=enrollPush({scope:{Notification:{requestPermission:()=>{prompts++;return Promise.resolve('granted')}}},registration,key,persist:async()=>{throw Error('storage failed')}})
- assert.equal(prompts,3,'permission requested synchronously before first await');await assert.rejects(promise);assert.equal(removed,1)
+ assert.equal(prompts,3,'permission requested synchronously before first await');await assert.rejects(promise,/PUSH_REGISTRATION_UNCONFIRMED/);assert.equal(removed,0)
 })
 test('server unsubscribe precedes browser cleanup and cannot unsubscribe a different device',async()=>{
  const events=[];const fingerprint=await import('node:crypto').then(c=>c.createHash('sha256').update(sub.endpoint).digest('hex'))
@@ -58,6 +58,67 @@ test('server unsubscribe precedes browser cleanup and cannot unsubscribe a diffe
  await removePushDevice({registration,device:{id:'one',fingerprint},persist:async()=>{events.push('server');return {ok:true}}});assert.deepEqual(events,['server','browser'])
  events.length=0;await removePushDevice({registration,device:{id:'other',fingerprint:'other'},persist:async()=>events.push('server')});assert.deepEqual(events,['server'])
  await assert.rejects(removePushDevice({registration,device:{id:'one',fingerprint},persist:async()=>{throw Error('offline')}}))
+})
+function enrollmentFixture(existing=false) {
+ const calls={subscribe:0,unsubscribe:0,persist:0},records=new Map(),payloads=[]
+ const subscription={options:{applicationServerKey:Buffer.from(key,'base64url')},toJSON:()=>structuredClone(sub),unsubscribe:async()=>{calls.unsubscribe++}}
+ let current=existing?subscription:null
+ const registration={pushManager:{getSubscription:async()=>current,subscribe:async()=>{calls.subscribe++;current=subscription;return subscription}}}
+ const scope={Notification:{requestPermission:async()=>'granted'}}
+ const persist=async payload=>{
+  calls.persist++;payloads.push(payload)
+  // Synthetic model of the existing owner-scoped endpoint fingerprint upsert.
+  const id=records.get(payload.endpoint)?.id||'synthetic-device'
+  records.set(payload.endpoint,{id,subscription:payload})
+  return {devices:[...records.values()]}
+ }
+ return {scope,registration,key,persist,calls,records,payloads}
+}
+test('successful enrollment returns acknowledgement; explicit confirmation reuses subscription and record',async()=>{
+ const f=enrollmentFixture()
+ const first=await enrollPush(f)
+ assert.equal(first.devices.length,1);assert.equal(f.calls.persist,1)
+ assert.deepEqual(await enrollPush(f),first)
+ assert.deepEqual(f.calls,{subscribe:1,unsubscribe:0,persist:2})
+ assert.equal(f.records.size,1);assert.deepEqual(f.payloads[0],f.payloads[1])
+})
+test('definitive API refusal preserves new and existing subscriptions, without retrying',async()=>{
+ for(const existing of [false,true])for(const status of [400,401,403,405,413,429]) {
+  const f=enrollmentFixture(existing)
+  await assert.rejects(enrollPush({...f,persist:async()=>{f.calls.persist++;throw Object.assign(Error('private response'),{status})}}),/^Error: PUSH_REGISTRATION_REJECTED$/)
+  assert.deepEqual(f.calls,{subscribe:existing?0:1,unsubscribe:0,persist:1})
+  assert.equal(f.records.size,0)
+ }
+})
+test('interrupted connection before write stays unconfirmed and allows an explicit retry',async()=>{
+ for(const existing of [false,true]) {
+  const f=enrollmentFixture(existing)
+  await assert.rejects(enrollPush({...f,persist:async()=>{f.calls.persist++;throw TypeError('Failed to fetch')}}),/PUSH_REGISTRATION_UNCONFIRMED/)
+  assert.equal(f.records.size,0);assert.equal(f.calls.persist,1);assert.equal(f.calls.unsubscribe,0)
+  await enrollPush(f)
+  assert.equal(f.records.size,1);assert.equal(f.calls.subscribe,existing?0:1);assert.equal(f.calls.persist,2)
+ }
+})
+test('lost HTTP acknowledgement after committed write retains exact endpoint and keys for idempotent retry',async()=>{
+ for(const existing of [false,true])for(const failure of [new DOMException('timeout','TimeoutError'),Object.assign(Error('503'),{status:503}),SyntaxError('truncated JSON'),Error('INVALID_RESPONSE')]) {
+  const f=enrollmentFixture(existing)
+  await assert.rejects(enrollPush({...f,persist:async payload=>{await f.persist(payload);throw failure}}),/^Error: PUSH_REGISTRATION_UNCONFIRMED$/)
+  assert.equal(f.records.size,1);assert.equal(f.calls.persist,1);assert.equal(f.calls.unsubscribe,0)
+  const result=await enrollPush(f)
+  assert.equal(result.devices[0].id,'synthetic-device');assert.equal(f.records.size,1)
+  assert.deepEqual(f.payloads[1],f.payloads[0]);assert.deepEqual(f.calls,{subscribe:existing?0:1,unsubscribe:0,persist:2})
+ }
+})
+test('session preflight rejection and invalid VAPID never bypass checks',async()=>{
+ const f=enrollmentFixture()
+ await assert.rejects(enrollPush({...f,key:Buffer.alloc(64).toString('base64url')}),/INVALID_PUBLIC_KEY/)
+ assert.deepEqual(f.calls,{subscribe:0,unsubscribe:0,persist:0})
+ await assert.rejects(enrollPush({...f,persist:async()=>{throw Error('SESSION_CHANGED')}}),/PUSH_REGISTRATION_REJECTED/)
+ assert.equal(f.calls.unsubscribe,0)
+ for(const lang of ['bg','en'])for(const code of ['PUSH_REGISTRATION_UNCONFIRMED','PUSH_REGISTRATION_REJECTED']) {
+  assert.equal(typeof pushEnrollmentMessages[lang][code],'string')
+  for(const privateValue of [sub.endpoint,sub.keys.auth,sub.keys.p256dh])assert.ok(!pushEnrollmentMessages[lang][code].includes(privateValue))
+ }
 })
 test('VAPID rotation refuses to relabel old or unknown browser subscriptions; never silently unsubscribes',async()=>{
  let writes=0,removed=0

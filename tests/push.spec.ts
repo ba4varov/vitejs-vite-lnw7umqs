@@ -127,12 +127,49 @@ test('explicit permission → register → server delete → local unsubscribe; 
  expect(state.calls.filter(c=>c.method==='DELETE')).toHaveLength(1)
  expect(await page.evaluate(()=>(window as any).pushUnsubscribes)).toBe(1)
 })
-test('failed server registration rolls back subscription and exposes no success',async({page})=>{
+test('failed server registration keeps subscription and exposes unconfirmed result',async({page})=>{
  await setup(page,{failure:true});const panel=await choose(page)
  await panel.getByRole('button',{name:'Разреши и регистрирай това устройство'}).click()
- await expect(panel.getByRole('status')).toContainText('не е потвърдена')
- expect(await page.evaluate(()=>(window as any).pushUnsubscribes)).toBe(1)
+ await expect(panel.getByRole('status')).toContainText('Резултатът от записването не е потвърден.')
+ expect(await page.evaluate(()=>(window as any).pushUnsubscribes)).toBe(0)
  await expect(panel).toContainText('Няма регистрирани устройства.')
+})
+for(const lang of ['bg','en'])for(const outcome of ['success','rejected','disconnected','lost-response'])test(`safe enrollment ${outcome} ${lang}`,async({page})=>{
+ await setup(page);await choose(page)
+ if(lang==='en'){
+  page.once('dialog',d=>d.accept())
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+  await page.locator('.push-settings').getByLabel('Name of this device').fill('Note 13 Pro')
+ }
+ const requests:any[]=[],records=new Map();let attempts=0
+ await page.route('**/api/push',async route=>{
+  if(route.request().method()!=='POST')return route.fallback()
+  const body=route.request().postDataJSON();requests.push(body);attempts++
+  if(attempts===1&&outcome==='rejected')return route.fulfill({status:403,json:{error:'PUSH_FORBIDDEN'}})
+  if(attempts===1&&outcome==='disconnected')return route.abort('internetdisconnected')
+  const fingerprint=await import('node:crypto').then(c=>c.createHash('sha256').update(body.subscription.endpoint).digest('hex'))
+  records.set(fingerprint,{id:'00000000-0000-0000-0000-000000000003',label:body.label,fingerprint,createdAt:'2026-10-14T00:00:00Z'})
+  if(attempts===1&&outcome==='lost-response')return route.abort('connectionclosed')
+  return route.fulfill({json:{contractVersion:1,pro:false,preferences:{enabled:true,cities:[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'}],categories:['wind']},devices:[...records.values()],registrationEnabled:true,publicKey,deliveryEnabled:false}})
+ })
+ const panel=page.locator('.push-settings'),button=panel.getByRole('button',{name:lang==='bg'?'Разреши и регистрирай това устройство':'Allow and register this device',exact:true})
+ await button.click()
+ const success=lang==='bg'?'Устройството е записано за подготовка.':'Device prepared.'
+ const rejected=lang==='bg'?'Заявката за регистрация е отказана.':'The registration request was rejected.'
+ const unknown=lang==='bg'?'Резултатът от записването не е потвърден. Абонаментът може да е записан.':'The save result is unconfirmed. The subscription may have been saved.'
+ await expect(panel.getByRole('status')).toContainText(outcome==='success'?success:outcome==='rejected'?rejected:unknown)
+ if(outcome!=='success')await expect(panel.getByRole('status')).not.toContainText(success)
+ expect(requests).toHaveLength(1)
+ expect(records.size).toBe(['success','lost-response'].includes(outcome)?1:0)
+ expect(await page.evaluate(()=>[(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([1,0])
+ await expect(button).toBeEnabled();await button.click()
+ await expect(panel.getByRole('status')).toContainText(success)
+ expect(requests).toHaveLength(2);expect(requests[1]).toEqual(requests[0]);expect(records.size).toBe(1)
+ await expect(panel.getByRole('button',{name:lang==='bg'?'Отпиши устройство':'Unsubscribe device',exact:true})).toHaveCount(1)
+ expect(await page.evaluate(()=>[(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([1,0])
 })
 for(const pro of [false,true])test(`current Pro ${pro}: personal categories gated; free weather available`,async({page})=>{
  await setup(page,{pro});const panel=page.locator('.push-settings')

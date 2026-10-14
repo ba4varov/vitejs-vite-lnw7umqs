@@ -2,7 +2,7 @@ import {checkPushKeys,pushKeyMessages} from './push-key-diagnostics.js'
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
 import {pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
-import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages} from './push-browser.js'
+import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages,pushEnrollmentMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
 const presets:PushCity[]=[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'},{name:'Пловдив',latitude:42.1354,longitude:24.7453,zone:'Europe/Sofia'},{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'},{name:'Бургас',latitude:42.5048,longitude:27.4626,zone:'Europe/Sofia'}]
@@ -26,7 +26,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   // Permission request occurs synchronously in enrollPush, directly from this click.
   void enrollPush({registration:worker,key:data.publicKey,persist:async(subscription:object)=>{
    const result=await pushRequest(session,'POST',{subscription,label:label.trim()});apply(result);return result
-  }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(fail).finally(()=>{if(live.current)setBusy(false)})
+  }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(error=>{if(live.current){const enrollmentMessage=pushEnrollmentMessages[lang][error.message];if(enrollmentMessage)setMessage(enrollmentMessage);else fail(error)}}).finally(()=>{if(live.current)setBusy(false)})
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
  const check=async(device:PushDevice)=>{setBusy(true);setChecks({});setKeyChecks({});try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}

@@ -8,7 +8,7 @@ export async function pushRequest(session:AuthSession,method='GET',body?:object)
  const active=await restoreSession()
  if(!active||active.user.id!==session.user.id)throw Error('SESSION_CHANGED')
  const response=await fetch('/api/push',{method,headers:{Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store',signal:AbortSignal.timeout(10000)})
- if(!response.ok)throw Error(String(response.status))
+ if(!response.ok)throw Object.assign(Error(String(response.status)),{status:response.status})
  const data=await response.json()
  if(data.contractVersion!==1||data.deliveryEnabled!==false||!Array.isArray(data.devices)||!Array.isArray(data.preferences?.cities)||!Array.isArray(data.preferences?.categories)||typeof data.pro!=='boolean')throw Error('INVALID_RESPONSE')
  return data
