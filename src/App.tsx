@@ -1,3 +1,4 @@
+import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
@@ -75,6 +76,7 @@ const translations = {
     pm10: 'ФПЧ 10 (PM10)',
     pm25: 'ФПЧ 2.5 (PM2.5)',
     aqiChart: 'AQI Индекс (24 часа)',
+    aqiNoData: 'Няма данни',
     chatTitle: 'Попитай Боби за времето',
     chatSubtitle: 'Съветите се съобразяват с актуалната прогноза за избраното място.',
     chatPlaceholder: 'Напр. Да взема ли чадър?',
@@ -160,6 +162,7 @@ const translations = {
     pm10: 'PM10',
     pm25: 'PM2.5',
     aqiChart: 'AQI (24 Hours)',
+    aqiNoData: 'No data',
     chatTitle: 'Ask Bobby about the weather',
     chatSubtitle: 'Advice is based on the live forecast for the selected location.',
     chatPlaceholder: 'E.g. Should I take an umbrella?',
@@ -1161,19 +1164,17 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             <WindyMap coords={coords} lang={lang} darkMode={darkMode} title={t.interactiveMap} />
           </section>
 
-          {weather.aqi !== null && weather.aqi !== undefined && (
-            <section className="card aqi-section">
-              <h3>🍃 {t.airQuality}</h3>
-              <div className="stats-grid" style={{ marginBottom: '16px' }}>
-                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{weather.aqi}</p></div>
-                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{weather.pm10} µg/m³</p></div>
-                <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{weather.pm25} µg/m³</p></div>
-              </div>
-              <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
-                <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
-              </div>
-            </section>
-          )}
+          <section className="card aqi-section">
+            <h3>🍃 {t.airQuality}</h3>
+            <div className="stats-grid" style={{ marginBottom: '16px' }}>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{formatAqiValue(weather.aqi, t.aqiNoData)}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{formatAqiValue(weather.pm10, t.aqiNoData, " µg/m³")}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{formatAqiValue(weather.pm25, t.aqiNoData, " µg/m³")}</p></div>
+            </div>
+            <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
+              <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
+            </div>
+          </section>
         </main>
       )}
 

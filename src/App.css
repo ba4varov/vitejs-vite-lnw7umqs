@@ -569,6 +569,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .map-section iframe { height: clamp(420px, 52vw, 620px); }
 .map-section > div { border: 1px solid var(--weather-line); border-radius: 18px !important; }
 .aqi-section > .stats-grid { grid-template-columns: repeat(3, 1fr); overflow: visible; }
+.aqi-section .stat-box { min-width: 0; }
+.aqi-section .value { overflow-wrap: anywhere; }
 .aqi-section .stat-box { background: var(--weather-blue-soft) !important; color: var(--weather-ink) !important; border: 1px solid #c9e0ee !important; }
 .projects-section { margin-top: 22px; }
 .project-card { border-radius: 19px; box-shadow: none; }
@@ -625,6 +627,30 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .map-section iframe { height: 430px; }
   .aqi-section > .stats-grid { grid-template-columns: 1fr !important; }
   .projects-section { margin-top: 14px; }
+}
+/* Override both the generic mobile !important grid and the AQI 760px rule.
+   Keep all larger viewports exactly as before. */
+@media (max-width: 640px) {
+  .aqi-section > .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .aqi-section .stat-box { min-width: 0; min-height: 0; padding: 10px 8px; border-radius: 14px; }
+  .aqi-section .stat-box:first-child { grid-column: 1 / -1; }
+  .aqi-section .stat-box .label {
+    margin: 4px 0;
+    font-size: .875rem;
+    line-height: 1.35;
+    opacity: 1;
+    color: var(--weather-ink);
+    overflow-wrap: anywhere;
+  }
+  .aqi-section .stat-box .value {
+    font-size: 1.125rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
 }
 @media (max-width: 420px) {
   .header-btns { gap: 7px; }
