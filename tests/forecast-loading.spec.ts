@@ -37,7 +37,7 @@ for (const width of [390, 1440]) for (const lang of ['bg', 'en'] as const) for (
     await expect(page.locator('.forecast-loading')).toContainText(lang === 'bg' ? 'Подготвяме' : 'Preparing')
     await expect(page.locator('.ad-slot')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: lang === 'bg' ? 'Нашите проекти' : 'Our projects' })).toHaveCount(0)
-    expect((await page.locator('.forecast-loading').boundingBox())!.height).toBeLessThan(220)
+    expect((await page.locator('.forecast-loading').boundingBox())!.height).toBeGreaterThan(1000)
     if (width === 390 && lang === 'bg' && !dark) await page.locator('.forecast-loading').screenshot({ path: 'work/forecast-loading.png' })
     release()
     await expect(page.locator('.big-temp')).toHaveText('18°C')

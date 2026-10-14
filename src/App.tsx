@@ -1,12 +1,13 @@
+import { createForecastRequests, enrichForecast } from './forecast-sources.js'
 import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import './App.css'
 import { WeatherAdvice } from './WeatherAdvice'
 import { WindyMap } from './WindyMap'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
 import { Chart, SingleChart } from './WeatherCharts'
-import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex, valuesByTime } from './weather-utils.js'
+import { formatWeatherValue, meanObservation, hourlyNumber, findHourlyStartIndex } from './weather-utils.js'
 import { ProjectShowcase } from './ProjectShowcase'
 import { AdSlot } from './AdSlot'
 import { AuthPanel, type AuthPanelHandle } from './AuthPanel'
@@ -242,6 +243,8 @@ const AnimatedIcon = ({ icon, size }: { icon: string, size?: string }) => {
   )
 }
 
+const tLoading = (lang: 'bg' | 'en') => translations[lang].loading
+
 const WeatherApp = () => {
   const [lang, setLang] = useState<'bg' | 'en'>(() => loadLanguage())
   const [city, setCity] = useState('Варна')
@@ -256,14 +259,25 @@ const WeatherApp = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [metricsExpanded, setMetricsExpanded] = useState(false)
-  const [weather, setWeather] = useState<any>(null)
+  const [baseWeather, setWeather] = useState<any>(null)
   const [weatherCoords, setWeatherCoords] = useState<{ lat: number, lon: number } | null>(null)
-  const hasCurrentForecast = Boolean(weather && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon)
-  const [hourly, setHourly] = useState<any[]>([])
+  const [baseHourly, setHourly] = useState<any[]>([])
   const [notificationForecast,setNotificationForecast]=useState<any>(null)
   const [plannerLocation,setPlannerLocation]=useState<any>(null)
   const [plannerForecast, setPlannerForecast] = useState<any>(null)
-  const [forecast, setForecast] = useState<any[]>([])
+  const [baseForecast, setForecast] = useState<any[]>([])
+  const locationKey = `${coords.lat},${coords.lon}`
+  const locationKeyRef = useRef(locationKey)
+  locationKeyRef.current = locationKey
+  const requestsRef = useRef(createForecastRequests())
+  const [sources, setSources] = useState<any>({ key: locationKey, marine: null, aqi: null, marineStatus: 'loading', aqiStatus: 'loading' })
+  const currentSources = sources.key === locationKey ? sources : null
+  const { weather, hourly, daily: forecast } = useMemo(() => enrichForecast(baseWeather, baseHourly, baseForecast, currentSources), [baseWeather, baseHourly, baseForecast, currentSources])
+  const validLocationRef = useRef(weatherCoords)
+  validLocationRef.current = weatherCoords
+  const hasCurrentForecast = Boolean(weather && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon)
+  const marineMissing = currentSources?.marineStatus === 'loading' ? tLoading(lang) : translations[lang].noSeaData
+  const aqiMissing = currentSources?.aqiStatus === 'loading' ? tLoading(lang) : translations[lang].aqiNoData
   const [places, setPlaces] = useState<Place[]>([])
   const [localizedPlaces, setLocalizedPlaces] = useState<Place[]>([])
   const [defaultPlaceId, setDefaultPlaceId] = useState<string | null>(null)
@@ -275,8 +289,12 @@ const WeatherApp = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
   const [bgImageUrl, setBgImageUrl] = useState<string>('')
   
-  const [selectedDay, setSelectedDay] = useState<any>(null)
-  const [selectedHour, setSelectedHour] = useState<any>(null)
+  const [daySelection, setSelectedDay] = useState<any>(null)
+  const [hourSelection, setSelectedHour] = useState<any>(null)
+  const selectedDay = daySelection && { ...daySelection, ...forecast.find(day => day.dateStr === daySelection.dateStr),
+    dayName: translations[lang].weekDays[new Date(`${daySelection.dateStr}T12:00:00Z`).getUTCDay()],
+    dateFormatted: `${Number(daySelection.dateStr.slice(8, 10))} ${translations[lang].months[Number(daySelection.dateStr.slice(5, 7)) - 1]}` }
+  const selectedHour = hourSelection && (hourly.find(hour => hour.time === hourSelection.time) || hourSelection)
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 })
   const [detailTab, setDetailTab] = useState('main')
   
@@ -440,8 +458,8 @@ const WeatherApp = () => {
       : `Weather in ${city} | Meteo Pulse`
     const description = weather
       ? (lang === 'bg'
-          ? `Актуално време в ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Почасова и 14-дневна прогноза с персонални метео съвети.`
-          : `Current weather in ${city}: ${weather.temp}°C, ${weather.description.toLowerCase()}. Hourly and 14-day forecast with personalized weather advice.`)
+          ? `Актуално време в ${city}: ${formatWeatherValue(weather.temp, '°C')}, ${weather.description.toLowerCase()}. Почасова и 14-дневна прогноза с персонални метео съвети.`
+          : `Current weather in ${city}: ${formatWeatherValue(weather.temp, '°C')}, ${weather.description.toLowerCase()}. Hourly and 14-day forecast with personalized weather advice.`)
       : (lang === 'bg'
           ? `Актуална почасова и 14-дневна прогноза за времето в ${city} с персонални метео съвети.`
           : `Current hourly and 14-day weather forecast for ${city} with personalized weather advice.`)
@@ -631,8 +649,15 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     }
   }
   const fetchWeather = async (lat: number, lon: number) => {
-    setPlannerForecast(null)
-    setNotificationForecast(null)
+    const key = `${lat},${lon}`
+    const sameLocation = validLocationRef.current?.lat === lat && validLocationRef.current?.lon === lon
+    if (!sameLocation) {
+      setPlannerForecast(null)
+      setNotificationForecast(null)
+    }
+    setSources(previous => previous.key === key
+      ? { ...previous, marineStatus: 'loading', aqiStatus: 'loading' }
+      : { key, marine: null, aqi: null, marineStatus: 'loading', aqiStatus: 'loading' })
     const viewIntent = forecastIntent.current
     const requestId = ++weatherRequestIdRef.current
     setLoading(true)
@@ -651,90 +676,47 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       const aqiUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + lat + '&longitude=' + lon + 
         '&current=european_aqi,pm10,pm2_5&hourly=european_aqi&timezone=auto&forecast_days=3';
 
-      const [weatherRes, marineRes, aqiRes] = await Promise.allSettled([
-        fetch(weatherUrl),
-        fetch(marineUrl),
-        fetch(aqiUrl)
-      ])
-      if (requestId !== weatherRequestIdRef.current) return
-      
-      if (weatherRes.status !== 'fulfilled' || !weatherRes.value.ok) throw new Error('Моля проверете връзката си с интернет.')
-      const data = await weatherRes.value.json()
-      if (requestId !== weatherRequestIdRef.current) return
+      const request = requestsRef.current.start({ weather: weatherUrl, marine: marineUrl, aqi: aqiUrl },
+        () => locationKeyRef.current === key,
+        (source, data) => setSources(previous => {
+          if (previous.key !== key || requestId !== weatherRequestIdRef.current || locationKeyRef.current !== key) return previous
+          return { ...previous, [source]: data ?? previous[source], [source + 'Status']: data || previous[source] ? 'ready' : 'unavailable' }
+        }))
+      const data = await request.main
+      if (!request.current() || requestId !== weatherRequestIdRef.current) return
 
-      let seaTemp = null
-      let hourlySeaTemp = new Map<string, number | null>()
-      if (marineRes.status === 'fulfilled' && marineRes.value.ok) {
-        try {
-          const marineData = await marineRes.value.json()
-          if (marineData.current && marineData.current.sea_surface_temperature != null) {
-            seaTemp = Math.round(marineData.current.sea_surface_temperature)
-          }
-          if (marineData.hourly && marineData.hourly.sea_surface_temperature) {
-            hourlySeaTemp = valuesByTime(marineData.hourly, 'sea_surface_temperature')
-          }
-        } catch {}
-      }
-
-      let currentAqi = null, currentPm10 = null, currentPm25 = null;
-      let hourlyAqi = new Map<string, number | null>();
-      if (aqiRes.status === 'fulfilled' && aqiRes.value.ok) {
-        try {
-          const aqiData = await aqiRes.value.json();
-          if (aqiData.current) {
-            currentAqi = aqiData.current.european_aqi == null ? null : Math.round(aqiData.current.european_aqi);
-            currentPm10 = aqiData.current.pm10;
-            currentPm25 = aqiData.current.pm2_5;
-          }
-          if (aqiData.hourly && aqiData.hourly.european_aqi) {
-            hourlyAqi = valuesByTime(aqiData.hourly, 'european_aqi');
-          }
-        } catch {}
-      }
-      if (requestId !== weatherRequestIdRef.current) return
-
+      // Validate the structure before publishing any part of a new snapshot.
+      if (!data.current || !Array.isArray(data.hourly?.time) || !Array.isArray(data.daily?.time) ||
+          ['weather_code', 'temperature_2m', 'apparent_temperature', 'precipitation', 'wind_speed_10m', 'surface_pressure', 'relative_humidity_2m', 'visibility', 'dew_point_2m', 'cloud_cover'].some(field => !Array.isArray(data.hourly[field])) ||
+          ['weather_code', 'temperature_2m_min', 'temperature_2m_max', 'precipitation_sum', 'precipitation_probability_max', 'wind_speed_10m_max', 'uv_index_max', 'apparent_temperature_max'].some(field => !Array.isArray(data.daily[field]))) throw new Error('Incomplete main forecast')
       const cur = decodeWeatherCode(data.current.weather_code)
       
-      setWeather({
-        temp: Math.round(data.current.temperature_2m),
-        minTemp: Math.round(data.daily.temperature_2m_min[0]),
-        maxTemp: Math.round(data.daily.temperature_2m_max[0]),
-        precipProb: data.daily.precipitation_probability_max[0] || 0,
-        precipSum: (data.daily.precipitation_sum[0] || 0).toFixed(1),
-        cloudCover: data.current.cloud_cover || 0,
-        maxWindSpeedDaily: Math.round(data.daily.wind_speed_10m_max[0] || 0),
-        humidity: data.current.relative_humidity_2m,
-        windSpeed: Math.round(data.current.wind_speed_10m),
-        feelsLike: Math.round(data.current.apparent_temperature),
-        visibility: Math.round((data.current.visibility || 0) / 1000),
-        pressure: Math.round(data.current.surface_pressure),
-        uvIndex: Math.round(data.current.uv_index),
+      const nextWeather = {
+        temp: hourlyNumber(data.current.temperature_2m),
+        minTemp: hourlyNumber(data.daily.temperature_2m_min[0]),
+        maxTemp: hourlyNumber(data.daily.temperature_2m_max[0]),
+        precipProb: hourlyNumber(data.daily.precipitation_probability_max[0], false),
+        precipSum: hourlyNumber(data.daily.precipitation_sum[0], false)?.toFixed(1) ?? null,
+        cloudCover: hourlyNumber(data.current.cloud_cover, false),
+        maxWindSpeedDaily: hourlyNumber(data.daily.wind_speed_10m_max[0]),
+        humidity: hourlyNumber(data.current.relative_humidity_2m, false),
+        windSpeed: hourlyNumber(data.current.wind_speed_10m),
+        feelsLike: hourlyNumber(data.current.apparent_temperature),
+        visibility: data.current.visibility == null ? null : hourlyNumber(data.current.visibility / 1000),
+        pressure: hourlyNumber(data.current.surface_pressure),
+        uvIndex: hourlyNumber(data.current.uv_index),
         sunrise: data.daily.sunrise && data.daily.sunrise[0] ? formatTime(data.daily.sunrise[0]) : '--:--',
         sunset: data.daily.sunset && data.daily.sunset[0] ? formatTime(data.daily.sunset[0]) : '--:--',
         code: data.current.weather_code,
-        seaTemp: seaTemp,
+        seaTemp: null,
         description: cur.desc,
         icon: cur.icon,
-        aqi: currentAqi,
-        pm10: currentPm10,
-        pm25: currentPm25
-      })
-
-      // Извикване на AI функцията с реални данни
-      fetchAiAdvice({
-        city: city,
-        temp: Math.round(data.current.temperature_2m),
-        feelsLike: Math.round(data.current.apparent_temperature),
-        wind: Math.round(data.current.wind_speed_10m),
-        rain: Number(data.daily.precipitation_sum[0] || 0).toFixed(1),
-        precipProb: data.daily.precipitation_probability_max[0] || 0,
-        uvIndex: Math.round(data.current.uv_index),
-        code: data.current.weather_code,
-        description: cur.desc
-      }, requestId);
+        aqi: null,
+        pm10: null,
+        pm25: null
+      }
 
       const startIdx = findHourlyStartIndex(data.hourly.time, data.current.time)
-      setPlannerLocation({lat,lon})
       const notificationData = typeof data.timezone === 'string' ? {
         timeZone: data.timezone,
         hours: data.hourly.time.slice(startIdx, startIdx + 72).map((time: string, i: number) => ({
@@ -745,16 +727,12 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           code: data.hourly.weather_code?.[startIdx + i] ?? null,
         })),
       } : null
-      setNotificationForecast(notificationData)
-      setPlannerForecast(notificationData ? {...notificationData,hours:notificationData.hours.map(h=>({...h,feelsLike:hourlyNumber(h.feelsLike),rainProbability:hourlyNumber(h.rainProbability),wind:hourlyNumber(h.wind)}))}:null)
 
       const hr: any[] = []
       for (let i = 0; i < 24; i++) {
         const idx = startIdx + i
         if (idx >= data.hourly.time.length) break
         const code = decodeWeatherCode(data.hourly.weather_code[idx])
-        const sst = hourlySeaTemp.get(data.hourly.time[idx]) ?? null
-        const aqiVal = hourlyAqi.get(data.hourly.time[idx]) ?? null
         
         hr.push({
           time: data.hourly.time[idx],
@@ -770,13 +748,12 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           visibility: data.hourly.visibility[idx] == null ? null : hourlyNumber(data.hourly.visibility[idx] / 1000),
           dewPoint: hourlyNumber(data.hourly.dew_point_2m[idx]),
           cloudCover: hourlyNumber(data.hourly.cloud_cover[idx]),
-          seaTemp: hourlyNumber(sst),
-          aqi: aqiVal !== null ? Math.round(aqiVal) : null,
+          seaTemp: null,
+          aqi: null,
           code: data.hourly.weather_code[idx],
           icon: code.icon
         })
       }
-      setHourly(hr)
 
       const days: any[] = []
       for (let i = 1; i < Math.min(15, data.daily.time.length); i++) {
@@ -785,7 +762,6 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         
         const startH = i * 24
         const mean = (field: string) => meanObservation((data.hourly?.[field] || []).slice(startH, startH + 24))
-        const seaMean = meanObservation(data.hourly.time.slice(startH, startH + 24).map(time => hourlySeaTemp.get(time)))
         const visibility = mean('visibility')
 
         days.push({
@@ -808,21 +784,40 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           visibility: visibility == null ? null : hourlyNumber(visibility / 1000),
           dewPoint: hourlyNumber(mean('dew_point_2m')),
           cloudCover: hourlyNumber(mean('cloud_cover')),
-          seaTemp: hourlyNumber(seaMean),
+          seaTemp: null,
+          seaTimes: data.hourly.time.slice(startH, startH + 24),
           description: code.desc
         })
       }
+      setWeather(nextWeather)
+      setHourly(hr)
+      setPlannerLocation({lat,lon})
+      setNotificationForecast(notificationData)
+      setPlannerForecast(notificationData ? {...notificationData,hours:notificationData.hours.map(h=>({...h,feelsLike:hourlyNumber(h.feelsLike),rainProbability:hourlyNumber(h.rainProbability),wind:hourlyNumber(h.wind)}))}:null)
       setForecast(days)
       setWeatherCoords({ lat, lon })
       setLoading(false)
       setForecastReady(viewIntent)
       setLastUpdated(new Date())
 
+      // Извикване на AI функцията с реални данни
+      fetchAiAdvice({
+        city: city,
+        temp: Math.round(data.current.temperature_2m),
+        feelsLike: Math.round(data.current.apparent_temperature),
+        wind: Math.round(data.current.wind_speed_10m),
+        rain: Number(data.daily.precipitation_sum[0] || 0).toFixed(1),
+        precipProb: data.daily.precipitation_probability_max[0] || 0,
+        uvIndex: Math.round(data.current.uv_index),
+        code: data.current.weather_code,
+        description: cur.desc
+      }, requestId);
+
       const randomId = Math.floor(Math.random() * 1000) + 1;
       setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
 
     } catch (e: any) {
-      if (requestId !== weatherRequestIdRef.current) return
+      if (requestId !== weatherRequestIdRef.current || locationKeyRef.current !== key) return
       console.error(e);
       setError(t.error)
       setLoading(false)
@@ -834,7 +829,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     setSelectedHour(null)
     fetchWeather(coords.lat, coords.lon)
     const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
-    return () => { clearInterval(interval); weatherRequestIdRef.current++ }
+    return () => { clearInterval(interval); weatherRequestIdRef.current++; requestsRef.current.cancel() }
   }, [coords.lat, coords.lon])
 
   useEffect(() => {
@@ -990,10 +985,14 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       </section>
 
       {!hasCurrentForecast && (loading || !error) && (
-        <section className="card forecast-loading" role="status" aria-live="polite" aria-busy="true">
-          <span className="forecast-loading-icon" aria-hidden="true">🌤️</span>
-          <div><h2>{t.loading}</h2><p>{t.loadingForecast} {city}</p></div>
-          <div className="forecast-loading-shapes" aria-hidden="true"><span /><span /><span /></div>
+        <section className="forecast-loading" role="status" aria-live="polite" aria-busy="true">
+          <div className="card skeleton-current">
+            <div className="skeleton-heading"><span aria-hidden="true">🌤️</span><div><h2>{t.loading}</h2><p>{t.loadingForecast} {city}</p></div></div>
+            <div className="skeleton-hero" aria-hidden="true"><span /><span /></div>
+            <div className="skeleton-metrics" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <span key={i} />)}</div>
+          </div>
+          {['hourly', 'daily'].map(period => <div className="card skeleton-periods" key={period} aria-hidden="true"><div className="skeleton-title" /><div className="skeleton-strip">{Array.from({ length: 7 }, (_, i) => <span key={i}><i /><i /><i /></span>)}</div></div>)}
+          <div className="card skeleton-chart" aria-hidden="true"><div className="skeleton-title" /><div /></div>
         </section>
       )}
 
@@ -1072,31 +1071,31 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                  {/* Тук се появява AI съветът от Gemini */}
                   {aiAdvice?.trim() && <WeatherAdvice key={`${weatherRequestIdRef.current}:${aiAdvice}`} advice={aiAdvice} lang={lang} />}
 
-                  <div className="big-temp">{weather.temp}°C</div>
+                  <div className="big-temp">{formatWeatherValue(weather.temp, '°C')}</div>
                   <div className="mobile-weather-summary">
-                    <p>{t.feelsLike}: <strong>{weather.feelsLike}°C</strong></p>
-                    <p>{t.minMaxTemp}: <strong>{weather.minTemp}° / {weather.maxTemp}°</strong></p>
+                    <p>{t.feelsLike}: <strong>{formatWeatherValue(weather.feelsLike, '°C')}</strong></p>
+                    <p>{t.minMaxTemp}: <strong>{formatWeatherValue(weather.minTemp, '°')} / {formatWeatherValue(weather.maxTemp, '°')}</strong></p>
                   </div>
                 </div>
                 <div className="big-icon"><AnimatedIcon icon={weather.icon} size="7.5rem" /></div>
               </div>
               
               <div id="current-weather-metrics" className={`stats-grid current-weather-metrics${metricsExpanded ? " is-expanded" : ""}`} style={{ padding: 0 }}>
-                <div className="stat-box metric-summary"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{weather.minTemp}° / {weather.maxTemp}°</p></div>
-                <div className="stat-box metric-summary"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{weather.feelsLike}°C</p></div>
-                <div className="stat-box metric-precipProb"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{weather.precipProb}%</p></div>
-                <div className="stat-box"><p>🌧️</p><p className="label">{t.precipSum}</p><p className="value">{weather.precipSum} {t.mm}</p></div>
-                <div className="stat-box metric-cloudCover"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{weather.cloudCover}%</p></div>
-                <div className="stat-box metric-humidity"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{weather.humidity}%</p></div>
-                <div className="stat-box metric-wind"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{weather.windSpeed} {t.windUnit}</p></div>
-                <div className="stat-box"><p>🌪️</p><p className="label">{t.maxWind}</p><p className="value">{weather.maxWindSpeedDaily} {t.windUnit}</p></div>
-                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{weather.visibility} {t.km}</p></div>
-                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{weather.pressure} {t.hpa}</p></div>
-                <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{weather.uvIndex}</p></div>
+                <div className="stat-box metric-summary"><p>🌡️↕️</p><p className="label">{t.minMaxTemp}</p><p className="value">{formatWeatherValue(weather.minTemp, '°')} / {formatWeatherValue(weather.maxTemp, '°')}</p></div>
+                <div className="stat-box metric-summary"><p>🌡️</p><p className="label">{t.feelsLike}</p><p className="value">{formatWeatherValue(weather.feelsLike, '°C')}</p></div>
+                <div className="stat-box metric-precipProb"><p>☔</p><p className="label">{t.precipProb}</p><p className="value">{formatWeatherValue(weather.precipProb, '%')}</p></div>
+                <div className="stat-box"><p>🌧️</p><p className="label">{t.precipSum}</p><p className="value">{weather.precipSum == null ? '—' : `${weather.precipSum} ${t.mm}`}</p></div>
+                <div className="stat-box metric-cloudCover"><p>☁️</p><p className="label">{t.cloudCover}</p><p className="value">{formatWeatherValue(weather.cloudCover, '%')}</p></div>
+                <div className="stat-box metric-humidity"><p>💧</p><p className="label">{t.humidity}</p><p className="value">{formatWeatherValue(weather.humidity, '%')}</p></div>
+                <div className="stat-box metric-wind"><p>🌬️</p><p className="label">{t.wind}</p><p className="value">{formatWeatherValue(weather.windSpeed, ' ' + t.windUnit)}</p></div>
+                <div className="stat-box"><p>🌪️</p><p className="label">{t.maxWind}</p><p className="value">{formatWeatherValue(weather.maxWindSpeedDaily, ' ' + t.windUnit)}</p></div>
+                <div className="stat-box"><p>👁️</p><p className="label">{t.visibility}</p><p className="value">{formatWeatherValue(weather.visibility, ' ' + t.km)}</p></div>
+                <div className="stat-box"><p>🔵</p><p className="label">{t.pressure}</p><p className="value">{formatWeatherValue(weather.pressure, ' ' + t.hpa)}</p></div>
+                <div className="stat-box"><p>☀️</p><p className="label">{t.uvIndex}</p><p className="value">{formatWeatherValue(weather.uvIndex)}</p></div>
                 <div className="stat-box"><p>🌅</p><p className="label">{t.sunrise}</p><p className="value">{weather.sunrise}</p></div>
                 <div className="stat-box"><p>🌇</p><p className="label">{t.sunset}</p><p className="value">{weather.sunset}</p></div>
-                {weather.seaTemp !== null && (
-                  <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{weather.seaTemp}°C</p></div>
+                {(weather.seaTemp !== null || currentSources?.marineStatus === 'loading') && (
+                  <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{formatAqiValue(weather.seaTemp, marineMissing, '°C')}</p></div>
                 )}
               </div>
               <button type="button" className="metrics-toggle" aria-expanded={metricsExpanded} aria-controls="current-weather-metrics" onClick={() => setMetricsExpanded(expanded => !expanded)}>
@@ -1189,12 +1188,12 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <section className="card aqi-section">
             <h3>🍃 {t.airQuality}</h3>
             <div className="stats-grid" style={{ marginBottom: '16px' }}>
-              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{formatAqiValue(weather.aqi, t.aqiNoData)}</p></div>
-              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{formatAqiValue(weather.pm10, t.aqiNoData, " µg/m³")}</p></div>
-              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{formatAqiValue(weather.pm25, t.aqiNoData, " µg/m³")}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>😷</p><p className="label">{t.aqi}</p><p className="value">{formatAqiValue(weather.aqi, aqiMissing)}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🌫️</p><p className="label">{t.pm10}</p><p className="value">{formatAqiValue(weather.pm10, aqiMissing, " µg/m³")}</p></div>
+              <div className="stat-box" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : '#ade3ff', color: darkMode ? 'white' : '#1e293b', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}><p>🔬</p><p className="label">{t.pm25}</p><p className="value">{formatAqiValue(weather.pm25, aqiMissing, " µg/m³")}</p></div>
             </div>
             <div className="charts-grid" style={{ gridTemplateColumns: '1fr' }}>
-              <SingleChart hourly={hourly.slice(0, 24)} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
+              <SingleChart hourly={hourly.slice(0, 24)} loading={currentSources?.aqiStatus === 'loading'} darkMode={darkMode} type="aqi" label={t.aqiChart} unit="AQI" color="#0ea5e9" height={200} lang={lang} />
             </div>
           </section>
         </main>
@@ -1239,7 +1238,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 {selectedDay.seaTemp != null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedDay.seaTemp}°C</p></div>
                 ) : (
-                  <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
+                  <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{marineMissing}</p></div>
                 )}
               </>}
             </div>
@@ -1280,7 +1279,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                 {selectedHour.seaTemp != null ? (
                   <div className="stat-box sea-temp-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{selectedHour.seaTemp}°C</p></div>
                 ) : (
-                  <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{t.noSeaData}</p></div>
+                  <div className="stat-box"><p>🌊</p><p className="label">{t.seaTemp}</p><p className="value">{marineMissing}</p></div>
                 )}
               </>}
             </div>

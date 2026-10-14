@@ -1,0 +1,37 @@
+{
+  "base": "c9a384aecf82104d50b1a2802baeae9e0010c9aa",
+  "build": "passed",
+  "lint": "passed",
+  "unit": {
+    "passed": 385,
+    "skipped": 1,
+    "failed": 0
+  },
+  "browser": {
+    "loading": {
+      "passed": 37,
+      "failed": 0,
+      "duration": "5.3m"
+    },
+    "skeleton": {
+      "passed": 24,
+      "failed": 0,
+      "duration": "2.9m"
+    },
+    "regression": {
+      "passed": 163,
+      "failed": 0,
+      "duration": "10.2m"
+    },
+    "charts": {
+      "passed": 71,
+      "failed": 0,
+      "duration": "2.4m"
+    },
+    "cards": {
+      "passed": 72,
+      "failed": 0,
+      "duration": "4.4m"
+    }
+  }
+}
