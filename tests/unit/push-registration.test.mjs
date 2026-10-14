@@ -23,7 +23,7 @@ test('missing subscription, missing worker and unrelated worker never match',asy
   if(kind==='worker')registration.active=null
   if(kind==='script')registration.active.scriptURL='https://meteo.invalid/other-sw.js'
   if(kind==='scope')registration.scope='https://meteo.invalid/other/'
-  assert.equal(await checkPushRegistration({scope,device,key}),'missing-subscription')
+  assert.equal(await checkPushRegistration({scope,device,key}),kind==='subscription'?'missing-subscription':'worker-unavailable')
  }
 })
 test('VAPID mismatch includes absent key and takes precedence over device mismatch',async()=>{
@@ -35,12 +35,22 @@ test('VAPID mismatch includes absent key and takes precedence over device mismat
 test('different device and failures remain distinct; sensitive exception never escapes',async()=>{
  const {scope,registration}=fixture()
  assert.equal(await checkPushRegistration({scope,device:{fingerprint:'0'.repeat(64)},key}),'device-mismatch')
- for(const badKey of [null,'invalid'])assert.equal(await checkPushRegistration({scope,device,key:badKey}),'unavailable')
+ for(const badKey of [null,'invalid'])assert.equal(await checkPushRegistration({scope,device,key:badKey}),'missing-public-key')
  assert.equal(await checkPushRegistration({scope,device:{fingerprint:''},key}),'unavailable')
  registration.pushManager.getSubscription=async()=>{throw Error(endpoint)}
  assert.equal(await checkPushRegistration({scope,device,key}),'unavailable')
- assert.equal(await checkPushRegistration({scope:{isSecureContext:false},device,key}),'unavailable')
- for(const messages of Object.values(pushRegistrationMessages))for(const status of ['match','missing-subscription','vapid-mismatch','device-mismatch','unavailable']){
+ assert.equal(await checkPushRegistration({scope:{isSecureContext:false},device,key}),'worker-unavailable')
+ for(const messages of Object.values(pushRegistrationMessages))for(const status of ['missing-public-key','worker-unavailable','match','missing-subscription','vapid-mismatch','device-mismatch','unavailable']){
   assert.equal(typeof messages[status],'string');assert.ok(!messages[status].includes(endpoint));assert.ok(!messages[status].includes(key))
+ }
+})
+
+test('unavailable Service Worker APIs and lookup errors have a distinct safe status',async()=>{
+ for(const kind of ['absent','throw','push-manager']){
+  const {scope,registration}=fixture()
+  if(kind==='absent')scope.navigator.serviceWorker.getRegistration=async()=>undefined
+  if(kind==='throw')scope.navigator.serviceWorker.getRegistration=async()=>{throw Error(endpoint)}
+  if(kind==='push-manager')delete registration.pushManager
+  assert.equal(await checkPushRegistration({scope,device,key}),'worker-unavailable')
  }
 })
