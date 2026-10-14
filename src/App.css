@@ -1046,3 +1046,33 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .forecast-loading-shapes { display: flex; gap: 10px; width: 100%; }
 .forecast-loading-shapes span { height: 12px; flex: 1; border-radius: 8px; background: currentColor; opacity: .08; }
 .forecast-refresh { grid-column: 1 / -1; font-size: .85rem; opacity: .75; text-align: right; padding: 0 4px; }
+
+/* Planner presentation only; the desktop layout and entitlement flow stay intact. */
+.planner-mobile-copy { display: none; }
+.planner-sign-in { border: 0; padding: 0; background: transparent; color: #1d4ed8; text-decoration: underline; font: inherit; cursor: pointer; }
+.dark .planner-sign-in { color: #93c5fd; }
+.weather-planner :is(button, select, summary):focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+.dark .weather-planner :is(button, select, summary):focus-visible { outline-color: #93c5fd; }
+@media (max-width: 640px) {
+  .weather-planner { padding: 16px; border-radius: 16px; min-width: 0; overflow-wrap: anywhere; }
+  .weather-planner h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.15rem; line-height: 1.35; margin-bottom: 8px; }
+  .weather-planner p { margin: 8px 0; line-height: 1.5; }
+  .weather-planner .planner-desktop-copy { display: none; }
+  .weather-planner .planner-mobile-copy { display: block; }
+  .planner-plans summary .planner-mobile-copy { display: inline; }
+  .planner-plans summary { min-height: 44px; padding: 11px 0; }
+  .planner-plan-grid { grid-template-columns: 1fr; gap: 8px; }
+  .planner-plan-grid h3 { margin-bottom: 4px; }
+  .planner-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 12px 0; }
+  .planner-controls > * { width: 100%; min-width: 0; }
+  .planner-controls select, .planner-controls button, .planner-sign-in { min-height: 44px; }
+  .planner-controls select { width: 100%; border: 1px solid #64748b; }
+  .planner-controls button { white-space: normal; }
+  .planner-sign-in { padding: 10px 0; text-align: left; }
+  .planner-windows { padding: 0; list-style-position: inside; }
+  .planner-windows li { margin: 12px 0; padding: 12px; border: 1px solid #64748b; border-radius: 12px; background: var(--weather-surface-soft); }
+  .planner-windows strong { line-height: 1.5; }
+  .planner-metrics { display: grid; gap: 6px; }
+  .planner-metrics .planner-separator { display: none; }
+  .weather-planner .planner-note { margin-top: 12px; font-size: .8125rem; line-height: 1.5; }
+}
