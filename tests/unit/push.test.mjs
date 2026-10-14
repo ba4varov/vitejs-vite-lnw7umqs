@@ -108,3 +108,38 @@ test('SW never caches/intercepts fetch or opens external notification payload UR
  handlers.notificationclick({notification:{close(){}},waitUntil:p=>waiting=p});await waiting;assert.deepEqual(opened,['https://meteo.invalid/'])
  let handler;vm.runInNewContext(readFileSync(new URL('../../supabase/functions/push-check/index.ts',import.meta.url),'utf8'),{Deno:{serve:fn=>handler=fn},Response,JSON});assert.equal(handler().status,503)
 })
+
+test('disabled registration still exposes only the diagnostic public key after authentication',async()=>{
+ const settings={PUSH_REGISTRATION_ENABLED:'false',PUSH_VAPID_PUBLIC_KEY:key,PUSH_VAPID_PRIVATE_KEY:'private-key-must-stay-server-side'}
+ const snapshot={contractVersion:1,pro:false,preferences:prefs,devices:[{id:'device',label:'Note 13 Pro',fingerprint:'0'.repeat(64),createdAt:'2026-10-14T00:00Z'}],registrationPublicKey:null}
+ const {res,calls}=await api('GET',null,settings,200,snapshot)
+ assert.equal(res.code,200);assert.equal(res.data.publicKey,key);assert.equal(res.data.registrationEnabled,false);assert.equal(res.data.deliveryEnabled,false)
+ assert.equal(res.headers['Cache-Control'],'private, no-store');assert.equal(res.headers.Vary,'Authorization')
+ assert.equal(JSON.parse(calls[1].opts.body).payload.operation,'load')
+ for(const secret of [settings.PUSH_VAPID_PRIVATE_KEY,sub.endpoint,'"auth":','"p256dh":','"endpoint":'])assert.equal(JSON.stringify(res.data).includes(secret),false)
+ const {checkPushRegistration}=await import('../../src/push-browser.js')
+ const {webcrypto,createHash}=await import('node:crypto')
+ const forbidden=()=>{throw Error('unexpected mutation')}
+ const device={fingerprint:createHash('sha256').update(sub.endpoint).digest('hex')}
+ const scope={isSecureContext:true,location:{origin:'https://meteo.invalid'},crypto:webcrypto,navigator:{serviceWorker:{register:forbidden,getRegistration:async()=>({scope:'https://meteo.invalid/',active:{scriptURL:'https://meteo.invalid/push-sw.js'},pushManager:{subscribe:forbidden,getSubscription:async()=>({endpoint:sub.endpoint,options:{applicationServerKey:Buffer.from(key,'base64url')},unsubscribe:forbidden,toJSON:forbidden})}})}},Notification:{requestPermission:forbidden},fetch:forbidden}
+ assert.equal(await checkPushRegistration({scope,device,key:res.data.publicKey}),'match')
+ const off=await api('POST',{subscription:sub,label:'Note 13 Pro'},settings,200,snapshot)
+ assert.equal(off.res.code,503);assert.deepEqual(off.res.data,{error:'PUSH_REGISTRATION_DISABLED'});assert.equal(off.calls.length,1,'no registration RPC when disabled')
+ // Missing/expired session never receives the diagnostic key or reaches the RPC.
+ for(const authorization of [undefined,'Bearer expired']){
+  let requests=0
+  const denied={setHeader(){},status(code){this.code=code;return this},json(data){this.data=data;return this}}
+  await handlePush({method:'GET',headers:{authorization},query:{}},denied,{SUPABASE_URL:'https://db.invalid',SUPABASE_ANON_KEY:'anon',...settings},async()=>{requests++;return Response.json({},{status:401})})
+  assert.equal(denied.code,401);assert.equal(denied.data.publicKey,undefined);assert.ok(requests<=1)
+ }
+})
+test('missing or invalid diagnostic key is null; DB registration gate remains independent',async()=>{
+ for(const publicKey of ['', 'invalid', 'A'.repeat(87)]){
+  const {res}=await api('GET',null,{PUSH_REGISTRATION_ENABLED:'false',PUSH_VAPID_PUBLIC_KEY:publicKey})
+  assert.equal(res.data.publicKey,null);assert.equal(res.data.registrationEnabled,false)
+ }
+ for(const registrationPublicKey of [null,'different-key']){
+  const {res}=await api('GET',null,{PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key},200,{contractVersion:1,registrationPublicKey})
+  assert.equal(res.data.publicKey,key);assert.equal(res.data.registrationEnabled,false)
+ }
+})

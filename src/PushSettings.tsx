@@ -17,7 +17,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const fail=(error:any)=>setMessage(error.message==='KEY_ROTATION_REQUIRED'?(bg?'Ключът е обновен. Отпиши това устройство от списъка или изчисти известията за сайта в браузъра, после го регистрирай отново.':'The key has changed. Remove this device from the list or reset this site’s notifications in browser settings, then register it again.'):error.message==='DENIED'?(bg?'Разрешението е отказано. Можеш да го промениш от настройките на браузъра.':'Permission denied. Change it in browser settings.'):error.message==='DISMISSED'?(bg?'Разрешението не е дадено. Няма регистрирано устройство.':'Permission was not granted. No device registered.'):(bg?'Промяната не е потвърдена. Обнови и опитай отново.':'Change was not confirmed. Refresh and retry.'))
  const save=async(p:PushPreferences)=>{setBusy(true);setMessage('');try{apply(await pushRequest(session,'PATCH',p));setMessage(bg?'Push настройките са запазени. Доставката остава изключена.':'Push preferences saved. Delivery remains disabled.')}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
  const subscribe=()=>{
-  if(!worker||!data?.publicKey)return
+  if(!worker||!data?.registrationEnabled||!data.publicKey)return
   setBusy(true);setMessage('')
   // Permission request occurs synchronously in enrollPush, directly from this click.
   void enrollPush({registration:worker,key:data.publicKey,persist:async(subscription:object)=>{

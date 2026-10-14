@@ -34,7 +34,9 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   const data=await response.json()
   if(data.contractVersion!==1)return res.status(503).json({error:'PUSH_MIGRATION_REQUIRED'})
   const publicKey=env.PUSH_VAPID_PUBLIC_KEY||''
-  const registrationEnabled=env.PUSH_REGISTRATION_ENABLED==='true' && data.registrationPublicKey===publicKey && /^[A-Za-z0-9_-]{87}$/.test(publicKey) && Buffer.from(publicKey,'base64url')[0]===4
-  return res.status(200).json({...data,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false})
+  const validPublicKey=/^[A-Za-z0-9_-]{87}$/.test(publicKey) && Buffer.from(publicKey,'base64url')[0]===4
+  const registrationEnabled=env.PUSH_REGISTRATION_ENABLED==='true' && data.registrationPublicKey===publicKey && validPublicKey
+  // Authenticated diagnostics need only the public key; POST remains gated above.
+  return res.status(200).json({...data,registrationEnabled,publicKey:validPublicKey?publicKey:null,deliveryEnabled:false})
  }catch{return res.status(503).json({error:'PUSH_UNAVAILABLE'})}
 }

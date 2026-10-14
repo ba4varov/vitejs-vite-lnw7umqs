@@ -44,14 +44,17 @@ export async function removePushDevice({registration,device,persist}) {
 // Read only: never register a worker, request permission, serialize or mutate a subscription.
 export async function checkPushRegistration({scope=window,device,key}) {
  try {
-  if(!scope.isSecureContext || !scope.navigator.serviceWorker)return 'unavailable'
-  const registration=await scope.navigator.serviceWorker.getRegistration('/')
+  if(!key)return 'missing-public-key'
+  let expected
+  try {expected=vapidBytes(key)}catch {return 'missing-public-key'}
+  if(!scope.isSecureContext || !scope.navigator.serviceWorker)return 'worker-unavailable'
+  let registration
+  try {registration=await scope.navigator.serviceWorker.getRegistration('/')}catch {return 'worker-unavailable'}
   const expectedWorker=new URL('/push-sw.js',scope.location.origin).href
-  if(!registration?.active || registration.active.scriptURL!==expectedWorker || registration.scope!==new URL('/',scope.location.origin).href)return 'missing-subscription'
+  if(!registration?.active || registration.active.scriptURL!==expectedWorker || registration.scope!==new URL('/',scope.location.origin).href)return 'worker-unavailable'
+  if(typeof registration.pushManager?.getSubscription!=='function')return 'worker-unavailable'
   const subscription=await registration.pushManager.getSubscription()
   if(!subscription)return 'missing-subscription'
-  if(!key)return 'unavailable'
-  const expected=vapidBytes(key)
   const actual=new Uint8Array(subscription.options?.applicationServerKey || [])
   if(actual.length!==expected.length || actual.some((byte,i)=>byte!==expected[i]))return 'vapid-mismatch'
   if(typeof subscription.endpoint!=='string' || !subscription.endpoint || !/^[a-f0-9]{64}$/.test(device.fingerprint))return 'unavailable'
@@ -64,6 +67,6 @@ export async function checkPushRegistration({scope=window,device,key}) {
  }
 }
 export const pushRegistrationMessages={
- bg:{match:'Регистрацията съвпада с това устройство и VAPID ключа.', 'missing-subscription':'Липсва браузърен Push абонамент за Meteo Pulse.', 'vapid-mismatch':'VAPID ключът на браузърния абонамент не съвпада.', 'device-mismatch':'Браузърният абонамент не съвпада с избраното устройство.', unavailable:'Проверката не може да приключи. Публичният ключ или браузърната регистрация са недостъпни. Опитай отново.'},
- en:{match:'Registration matches this device and the VAPID key.', 'missing-subscription':'No browser Push subscription for Meteo Pulse.', 'vapid-mismatch':'The browser subscription VAPID key does not match.', 'device-mismatch':'The browser subscription does not match the selected device.', unavailable:'The check could not complete. The public key or browser registration is unavailable. Try again.'},
+ bg:{'missing-public-key':'Публичният VAPID ключ за проверката липсва или е невалиден.', 'worker-unavailable':'Service Worker за Meteo Pulse е недостъпен. Опитай отново.', match:'Регистрацията съвпада с това устройство и VAPID ключа.', 'missing-subscription':'Липсва браузърен Push абонамент за Meteo Pulse.', 'vapid-mismatch':'VAPID ключът на браузърния абонамент не съвпада.', 'device-mismatch':'Браузърният абонамент не съвпада с избраното устройство.', unavailable:'Проверката не може да приключи. Браузърната регистрация е недостъпна. Опитай отново.'},
+ en:{'missing-public-key':'The public VAPID key for the check is missing or invalid.', 'worker-unavailable':'The Meteo Pulse Service Worker is unavailable. Try again.', match:'Registration matches this device and the VAPID key.', 'missing-subscription':'No browser Push subscription for Meteo Pulse.', 'vapid-mismatch':'The browser subscription VAPID key does not match.', 'device-mismatch':'The browser subscription does not match the selected device.', unavailable:'The check could not complete. The browser registration is unavailable. Try again.'},
 }

@@ -2,14 +2,14 @@ import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 const publicKey=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url')
 const preferences={enabled:false,cities:[],categories:[]}
-async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false,diagnostic=false}:{permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean;diagnostic?:boolean}={}) {
+async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false,diagnostic=false,publicKeyAvailable=true}:{permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean;diagnostic?:boolean;publicKeyAvailable?:boolean}={}) {
  await page.addInitScript(({permission,publicKey}:any)=>{
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}))
   const scope:any=window;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
   let permissionValue='default',subscription:any=null
   scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
-  scope.diagnosticSubscription=(kind:string)=>{subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
-  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>({scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>subscription}})})
+  scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>subscription}})})
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
   Object.defineProperty(navigator.serviceWorker,'register',{value:async()=>({pushManager:{
@@ -35,7 +35,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
    devices=[{id:'00000000-0000-0000-0000-000000000003',label:body.label,fingerprint:hash,createdAt:new Date().toISOString()}]
   }
   if(method==='DELETE')devices=[]
-  return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:registrationEnabled?publicKey:null,deliveryEnabled:false}})
+  return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:publicKeyAvailable?publicKey:null,deliveryEnabled:false}})
  })
  await page.goto('/');await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:'Push известия',exact:true}).click()
@@ -103,6 +103,8 @@ test('default registration off, no prompts, preferences independent of bell and 
  expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
  await expect(page.locator('.push-settings').getByRole('button',{name:'Разреши и регистрирай това устройство'})).toBeDisabled()
  await choose(page)
+ await page.locator('.push-settings').getByLabel('Име на това устройство').fill('Note 13 Pro')
+ await expect(page.locator('.push-settings').getByRole('button',{name:'Разреши и регистрирай това устройство'})).toBeDisabled()
  expect(state.preferences().categories).toEqual(['wind']);expect(state.preferences().cities).toHaveLength(1)
  expect(state.calls.filter(c=>c.method==='POST')).toHaveLength(0)
  await page.locator('.push-settings').getByRole('button',{name:'Спри всички push известия'}).click()
@@ -158,8 +160,8 @@ for(const width of [390,768,1440])for(const lang of ['bg','en'])test(`push layou
  const overflow=await panel.evaluate((e:any)=>e.scrollWidth>e.clientWidth+1);expect(overflow).toBe(false)
 })
 
-for(const lang of ['bg','en'])test(`read-only registration diagnostics on Note 13 Pro ${lang}`,async({page})=>{
- const state=await setup(page,{diagnostic:true})
+for(const registrationEnabled of [false,true])for(const lang of ['bg','en'])test(`read-only registration diagnostics on Note 13 Pro ${lang}, registration ${registrationEnabled}`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,registrationEnabled})
  if(lang==='en'){
   await page.getByRole('button',{name:'Затвори',exact:true}).click()
   await clickHeaderControl(page,page.locator('button.lang-btn'))
@@ -167,7 +169,9 @@ for(const lang of ['bg','en'])test(`read-only registration diagnostics on Note 1
   await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
  }
  const panel=page.locator('.push-settings'),row=panel.locator('li').filter({hasText:'Note 13 Pro'})
+ await expect(panel.getByRole('button',{name:lang==='bg'?'Разреши и регистрирай това устройство':'Allow and register this device'})).toBeDisabled()
  for(const [kind,bg,en] of [
+  ['worker','Service Worker за Meteo Pulse е недостъпен. Опитай отново.','The Meteo Pulse Service Worker is unavailable. Try again.'],
   ['missing','Липсва браузърен Push абонамент за Meteo Pulse.','No browser Push subscription for Meteo Pulse.'],
   ['match','Регистрацията съвпада с това устройство и VAPID ключа.','Registration matches this device and the VAPID key.'],
   ['vapid','VAPID ключът на браузърния абонамент не съвпада.','The browser subscription VAPID key does not match.'],
@@ -180,4 +184,19 @@ for(const lang of ['bg','en'])test(`read-only registration diagnostics on Note 1
  expect(state.calls.every(c=>c.method==='GET')).toBe(true)
  expect(await page.evaluate(()=>[(window as any).pushPrompts,(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0,0])
  await expect(panel).not.toContainText('https://fcm.googleapis.com')
+})
+
+for(const lang of ['bg','en'])test(`missing diagnostic public key ${lang}`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,registrationEnabled:false,publicKeyAvailable:false})
+ if(lang==='en'){
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+ }
+ const row=page.locator('.push-settings li').filter({hasText:'Note 13 Pro'})
+ await row.getByRole('button',{name:lang==='bg'?'Провери регистрацията':'Check registration',exact:true}).click()
+ await expect(row.getByRole('status')).toHaveText(lang==='bg'?'Публичният VAPID ключ за проверката липсва или е невалиден.':'The public VAPID key for the check is missing or invalid.')
+ expect(state.calls.every(c=>c.method==='GET')).toBe(true)
+ expect(await page.evaluate(()=>[(window as any).pushPrompts,(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0,0])
 })
