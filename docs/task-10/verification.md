@@ -1,5 +1,7 @@
 # Task 10 — primary forecast without supplementary blocking
 
+This records the original PR #90 revision `b952c59`. The subsequent GPS startup update and its fresh validation are documented in [the GPS follow-up](gps/verification.md).
+
 Base: `c9a384aecf82104d50b1a2802baeae9e0010c9aa`, main after merged PR #89.
 
 ## Behavior

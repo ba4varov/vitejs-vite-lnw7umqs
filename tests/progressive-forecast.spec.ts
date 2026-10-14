@@ -12,8 +12,8 @@ async function setup(page:Page, lang='en', dark=false) {
  await page.clock.install({time:new Date('2026-10-13T08:00:00Z')})
  await page.addInitScript(lang=>{
   localStorage.setItem('meteoPulseLanguage',lang)
-  // Tag request generations only inside this fully mocked browser fixture.
-  // React StrictMode rehearses the mount effect once in both compared builds.
+  // The unchanged base makes a rehearsal request; the updated app starts once.
+  // Tags exist only in this fully mocked fixture.
   const original=window.fetch;let generation=0
   window.fetch=(input,options)=>{
    const url=String(input)
@@ -25,7 +25,7 @@ async function setup(page:Page, lang='en', dark=false) {
  await page.route('**/*',route=>{
   const url=new URL(route.request().url())
   const source:Source|undefined=url.hostname==='api.open-meteo.com'?'weather':url.hostname==='marine-api.open-meteo.com'?'marine':url.hostname==='air-quality-api.open-meteo.com'?'aqi':undefined
-  if(source){const generation=Number(route.request().headers()['x-fixture-generation']);if(generation===1)return route.abort();pending[source][generation-2]=route;return}
+  if(source){const generation=Number(route.request().headers()['x-fixture-generation']);const baseline=new URL(page.url()).port==='4174';if(baseline&&generation===1)return route.abort();pending[source][generation-(baseline?2:1)]=route;return}
   if(url.hostname==='127.0.0.1'&&!url.pathname.startsWith('/api/'))return route.continue()
   if(url.pathname==='/api/weather-advice')return route.fulfill({json:{advice:'Weather advice fixture.'}})
   if(url.pathname==='/api/alerts')return route.fulfill({json:{contractVersion:2,pro:false,enabled:[],alerts:[]}})

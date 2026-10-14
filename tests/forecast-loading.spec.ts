@@ -72,9 +72,10 @@ for (const scenario of ['initial error', 'geolocation stale response', 'manual s
   test(scenario, async ({ page }) => {
     let fail = scenario === 'initial error'
     const delayed: (() => void)[] = []
-    await page.addInitScript(() => {
+    await page.addInitScript(scenario => {
+      Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({state: scenario === 'initial error' ? 'denied' : 'granted'}) } })
       Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition: (success: any) => { (window as any).locate = success } } })
-    })
+    }, scenario)
     await page.route('**/*', async route => {
       const url = new URL(route.request().url())
       if (url.hostname === '127.0.0.1') return route.continue()

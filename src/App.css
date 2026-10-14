@@ -1114,3 +1114,9 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
   .forecast-loading { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
   .skeleton-current, .skeleton-chart { grid-column: 1 / -1; }
 }
+
+.search-row { display: flex; align-items: center; gap: 8px; }
+.search-row input { flex: 1; min-width: 0; width: 0; }
+.search-row .location-btn { flex: 0 0 44px; min-height: 44px; border: 1px solid var(--weather-line); border-radius: 12px; background: var(--weather-surface); color: var(--weather-ink); font-size: 1.2rem; cursor: pointer; }
+.search-row .location-btn:disabled { opacity: .6; cursor: wait; }
+.search-row .location-btn:focus-visible { outline: 3px solid var(--weather-blue); outline-offset: 2px; }

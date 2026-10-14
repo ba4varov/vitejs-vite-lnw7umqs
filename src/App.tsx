@@ -1,3 +1,4 @@
+import { createInitialLocation } from './initial-location.js'
 import { createForecastRequests, enrichForecast } from './forecast-sources.js'
 import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
@@ -251,6 +252,21 @@ const WeatherApp = () => {
   const [coords, setCoords] = useState({ lat: 43.2141, lon: 27.9147 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
+  const initialLocationRef = useRef(createInitialLocation({ navigator, resolveGps: async (coords, options) => {
+    while (true) {
+      const language = langRef.current
+      const data = await reverseGeocodeLocation(coords, language, options)
+      if (language === langRef.current) return locationFromReverseGeocode(data, translations[language].myLocation)
+    }
+  } }))
+  const [initialLocationReady, setInitialLocationReady] = useState(false)
+  const initialGpsLabelRef = useRef<any>(null)
+  const initialDefaultTicketRef = useRef<any>(null)
+  const explicitGpsPendingRef = useRef(false)
+  const explicitGpsRef = useRef(0)
+  const [gpsBusy, setGpsBusy] = useState(false)
+  const [gpsError, setGpsError] = useState(false)
+  const backgroundLocationRef = useRef<string | null>(null)
   const [locationSource, setLocationSource] = useState<'default' | 'quick' | 'search' | 'place' | 'geolocation'>('default')
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
@@ -349,7 +365,17 @@ const WeatherApp = () => {
     return () => { observer.disconnect(); document.removeEventListener('visibilitychange', recordView) }
   }, [loading, Boolean(weather), forecastReady])
 
+  const finalizeManualLocation = () => {
+    initialLocationRef.current.manual()
+    explicitGpsPendingRef.current = false
+    explicitGpsRef.current++
+    setGpsBusy(false)
+    setGpsError(false)
+    setInitialLocationReady(true)
+  }
+
   const choosePlace = (place: Place, manual = true) => {
+    finalizeManualLocation()
     if (manual) { forecastIntent.current++; placesGuardRef.current.manualSelection() }
     locationChoiceRef.current = true
     setLocationSource('place')
@@ -401,12 +427,22 @@ const WeatherApp = () => {
 
   const placesLoadRef = useRef(0)
   const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
+    const initialRestore = !initialLocationRef.current.settled
+    if (initialRestore) initialLocationRef.current.waitForDefault()
     const load = ++placesLoadRef.current
     const isCurrent = () => load === placesLoadRef.current && placesGuardRef.current.isCurrent(ticket)
     setPlacesBusy(true)
     try {
       const snapshot = await fetchPlaces(active)
       if (!isCurrent()) return
+      // Choose coordinates from the validated snapshot before label lookups.
+      // Slow localization must not turn a settled startup into a second forecast.
+      if (initialRestore) {
+        const preferred = snapshot.places.find(place => place.id === snapshot.defaultPlaceId)
+        const eligible = placesGuardRef.current.resolveDefault(ticket)
+        if (eligible && preferred) initialDefaultTicketRef.current = ticket
+        initialLocationRef.current.defaultResolved(eligible ? preferred : null)
+      }
       const localized = await localizeAccountPlaces(snapshot.places, snapshot.defaultPlaceId, () => langRef.current,
         (place, language) => localizePlace(place, language))
       if (!isCurrent()) return
@@ -415,9 +451,9 @@ const WeatherApp = () => {
       setLocalizedPlaces(localized.localizedPlaces)
       setDefaultPlaceId(snapshot.defaultPlaceId)
       const preferred = localized.preferred
-      if (placesGuardRef.current.resolveDefault(ticket) && preferred) choosePlace(preferred, false)
+      if (!initialRestore && placesGuardRef.current.resolveDefault(ticket) && preferred) choosePlace(preferred, false)
       setOfferImport(localPlaces().length > 0)
-    } catch (error) { if (isCurrent()) setPlacesError(placesFailure(error)) }
+    } catch (error) { if (isCurrent()) { if (initialRestore) initialLocationRef.current.defaultResolved(null); setPlacesError(placesFailure(error)) } }
     finally { if (isCurrent()) setPlacesBusy(false) }
   }
 
@@ -433,7 +469,7 @@ const WeatherApp = () => {
       setLocalizedPlaces([])
     }
     if (active) loadAccountPlaces(active, ticket)
-    else { try { setPlaces(localPlaces()) } catch { setPlaces([]) } }
+    else { initialLocationRef.current.defaultResolved(null); try { setPlaces(localPlaces()) } catch { setPlaces([]) } }
   }); return () => { unsubscribe() } }, [])
 
   useEffect(() => {
@@ -585,6 +621,7 @@ const WeatherApp = () => {
   }
 
   const selectCity = (result: any) => {
+    finalizeManualLocation()
     forecastIntent.current++
     trackActivity('search_complete')
     placesGuardRef.current.manualSelection()
@@ -813,8 +850,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         description: cur.desc
       }, requestId);
 
-      const randomId = Math.floor(Math.random() * 1000) + 1;
-      setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
+      if (backgroundLocationRef.current !== key) {
+        backgroundLocationRef.current = key
+        const randomId = Math.floor(Math.random() * 1000) + 1;
+        setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
+      }
 
     } catch (e: any) {
       if (requestId !== weatherRequestIdRef.current || locationKeyRef.current !== key) return
@@ -825,27 +865,88 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   }
 
   useEffect(() => {
-    setSelectedDay(null)
-    setSelectedHour(null)
-    fetchWeather(coords.lat, coords.lon)
-    const interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
-    return () => { clearInterval(interval); weatherRequestIdRef.current++; requestsRef.current.cancel() }
-  }, [coords.lat, coords.lon])
+    if (!initialLocationReady) return
+    // Defer setup by one microtask. StrictMode cleanup cancels its rehearsal
+    // before it can issue a duplicate request for the same coordinates.
+    let active = true
+    let interval: ReturnType<typeof setInterval>
+    queueMicrotask(() => {
+      if (!active) return
+      setSelectedDay(null)
+      setSelectedHour(null)
+      fetchWeather(coords.lat, coords.lon)
+      interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
+    })
+    return () => { active = false; clearInterval(interval); weatherRequestIdRef.current++; requestsRef.current.cancel() }
+  }, [initialLocationReady, coords.lat, coords.lon])
 
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        if (locationChoiceRef.current) return
-        const lat = pos.coords.latitude, lon = pos.coords.longitude
+    let active = true
+    void initialLocationRef.current.start().then(selection => {
+      if (!active || (selection.source !== 'manual' && locationChoiceRef.current)) return
+      if (selection.source === 'manual' && explicitGpsPendingRef.current) return
+      if (selection.source === 'place') {
+        if (placesGuardRef.current.isCurrent(initialDefaultTicketRef.current)) choosePlace(selection.place, false)
+      }
+      else if (selection.source === 'geolocation') {
         setLocationSource('geolocation')
-        setPlaceDetails({})
-        setCoords({ lat, lon })
-      }, () => {}, { timeout: 5000 })
-    }
+        initialGpsLabelRef.current = { key: `${selection.lat},${selection.lon}`, lang: langRef.current }
+        setCity(selection.name || translations[langRef.current].myLocation)
+        setExactLocation(selection.exactLocation || null)
+        setPlaceDetails({ region: selection.region, country: selection.country })
+        setCoords({ lat: selection.lat, lon: selection.lon })
+      }
+      setInitialLocationReady(true)
+    })
+    return () => { active = false }
   }, [])
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation?.getCurrentPosition) { setGpsError(true); return }
+    initialLocationRef.current.manual()
+    explicitGpsPendingRef.current = true
+    setGpsError(false)
+    forecastIntent.current++
+    placesGuardRef.current.manualSelection()
+    locationChoiceRef.current = true
+    const request = ++explicitGpsRef.current
+    setGpsBusy(true)
+    const timer = setTimeout(() => {
+      if (request !== explicitGpsRef.current) return
+      explicitGpsRef.current++
+      explicitGpsPendingRef.current = false
+      setInitialLocationReady(true)
+      setGpsBusy(false)
+      setGpsError(true)
+    }, 5000)
+    const fail = () => {
+      clearTimeout(timer)
+      if (request === explicitGpsRef.current) { explicitGpsPendingRef.current = false; setInitialLocationReady(true); setGpsBusy(false); setGpsError(true) }
+    }
+    try { navigator.geolocation.getCurrentPosition(position => {
+      clearTimeout(timer)
+      if (request !== explicitGpsRef.current) return
+      explicitGpsPendingRef.current = false
+      setInitialLocationReady(true)
+      const lat = position.coords.latitude, lon = position.coords.longitude
+      if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lon) || Math.abs(lon) > 180) { setGpsBusy(false); setGpsError(true); return }
+      locationChoiceRef.current = false
+      initialGpsLabelRef.current = null
+      setGpsBusy(false)
+      setLocationSource('geolocation')
+      setCity(translations[langRef.current].myLocation)
+      setPlaceDetails({})
+      setExactLocation(null)
+      setCoords({ lat, lon })
+    }, fail, { timeout: 5000, maximumAge: 60000 }) } catch { fail() }
+  }
+
+  useEffect(() => () => { explicitGpsRef.current++ }, [])
 
   useEffect(() => {
     if (locationSource !== 'geolocation') return
+    if (initialGpsLabelRef.current?.key === locationKey && initialGpsLabelRef.current.lang === lang) return
+    initialGpsLabelRef.current = null
     const controller = new AbortController()
     void reverseGeocodeLocation(coords, lang, { signal: controller.signal }).then(data => {
       if (controller.signal.aborted || locationChoiceRef.current) return
@@ -941,6 +1042,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               }
             }}
             autoComplete="off" />
+          <button type="button" className="location-btn" aria-label={lang === 'bg' ? 'Използвай моето местоположение' : 'Use my location'} title={lang === 'bg' ? 'Използвай моето местоположение' : 'Use my location'} aria-busy={gpsBusy} disabled={gpsBusy} onClick={useMyLocation}>📍</button>
         </div>
         {suggestions.length > 0 && (
           <div className="suggestions">
@@ -959,6 +1061,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         }</p>}
       </div>
 
+      {gpsError && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
+
       <div className="info-line">{t.info}</div>
 
       <div className="city-row">
@@ -966,7 +1070,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           return (
             <button key={c.name}
               aria-pressed={city === c.name}
-              onClick={() => { forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              onClick={() => { finalizeManualLocation(); forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -987,7 +1091,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       {!hasCurrentForecast && (loading || !error) && (
         <section className="forecast-loading" role="status" aria-live="polite" aria-busy="true">
           <div className="card skeleton-current">
-            <div className="skeleton-heading"><span aria-hidden="true">🌤️</span><div><h2>{t.loading}</h2><p>{t.loadingForecast} {city}</p></div></div>
+            <div className="skeleton-heading"><span aria-hidden="true">🌤️</span><div><h2>{t.loading}</h2><p>{initialLocationReady ? `${t.loadingForecast} ${city}` : (lang === 'bg' ? 'Определяме началното местоположение…' : 'Choosing your starting location…')}</p></div></div>
             <div className="skeleton-hero" aria-hidden="true"><span /><span /></div>
             <div className="skeleton-metrics" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <span key={i} />)}</div>
           </div>
