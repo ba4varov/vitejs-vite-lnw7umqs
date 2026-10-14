@@ -8,7 +8,7 @@ function fixture({approve=true,fail,diagnostic={category:'accepted',providerStat
   calls.push(b);if(b.operation==='prepare')return {error:'PUSH_TEST_READY',permitId:id,userId:o.user,deviceId:o.device,category:o.category}
   if(b.operation==='cancel'){if(fail==='cancel')throw Error('private');return {error:'PUSH_TEST_CLOSED'}}
   if(fail==='send')throw Error('private-token');return {diagnostic}
- },confirm:async phrase=>{assert.equal(phrase,`SEND ONE ${o.user} ${o.device}`);return approve},output:s=>output.push(s)}}
+ },confirm:async phrase=>{assert.equal(phrase,'SEND ONE');return approve?'SEND ONE':'CANCEL'},output:s=>output.push(s)}}
 }
 test('strict Production selection requires no psql, approver argument or DB credentials',()=>{
  assert.equal(o.category,'wind')
@@ -22,6 +22,7 @@ test('one confirmed send even after uncertainty; cancellation is never a deliver
  for(const fail of [undefined,'send']){
   const f=fixture({fail});if(fail)await assert.rejects(runOperator(o,f.deps));else await runOperator(o,f.deps)
   assert.deepEqual(f.calls.map(b=>b.operation),['prepare','send','cancel'])
+  assert.equal(f.calls[1].confirmation,`SEND ONE ${o.user} ${o.device}`)
  }
 })
 test('actual provider status/category survives; untrusted diagnostics are never printed',async()=>{
@@ -34,4 +35,14 @@ test('failed cleanup is explicit; failed preflight never confirms or sends',asyn
  const f=fixture({fail:'cancel'});await runOperator(o,f.deps);assert.ok(f.output.some(s=>s.includes('не е потвърдено')))
  const x=fixture();x.deps.edge=async b=>{x.calls.push(b);return {error:'FORBIDDEN'}}
  await assert.rejects(runOperator(o,x.deps),/NOT_READY/);assert.equal(x.calls.length,1)
+})
+
+test('only the exact short confirmation sends; cancellation always closes the permit',async()=>{
+ for(const answer of ['',true,'send one',' SEND ONE','SEND ONE ','SEND ONE\n','SEND ONE extra',`SEND ONE ${o.user} ${o.device}`]){
+  const f=fixture();f.deps.confirm=async()=>answer;await runOperator(o,f.deps)
+  assert.deepEqual(f.calls.map(b=>b.operation),['prepare','cancel'])
+ }
+ const f=fixture();f.deps.confirm=async()=>{throw Error('CANCELLED')}
+ await assert.rejects(runOperator(o,f.deps),/CANCELLED/)
+ assert.deepEqual(f.calls.map(b=>b.operation),['prepare','cancel'])
 })
