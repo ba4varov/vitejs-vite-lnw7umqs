@@ -71,3 +71,14 @@ test('only allowlisted provider reasons reach replies/logs, including after fail
   assert.ok(!JSON.stringify([body,logs]).includes(device.endpoint))
  }
 })
+
+test('body status is allowlisted in replies/logs and retained after failed finish',async()=>{
+ for(const [providerBodyStatus,fail] of [['empty',false],['unknown_format',false],['incomplete',false],['timeout',true],[device.endpoint,false]]){
+  const logs=[];let sends=0
+  const handler=createTestHandler({env,resolver,diagnose:d=>logs.push(d),rpc:async name=>{if(fail&&name==='finish_push_test')throw Error('private');return name==='claim_push_test'?device:true},send:async()=>{sends++;return {status:400,providerBodyStatus,body:device.endpoint}}})
+  const body=await (await handler(request())).json()
+  assert.equal(body.diagnostic.providerStatus,400);assert.equal(sends,1)
+  assert.equal(body.diagnostic.providerBodyStatus,providerBodyStatus===device.endpoint?undefined:providerBodyStatus)
+  assert.ok(!JSON.stringify([body,logs]).includes(device.endpoint))
+ }
+})

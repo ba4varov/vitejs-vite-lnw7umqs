@@ -56,3 +56,12 @@ test('operator prints only allowlisted provider reasons',async()=>{
   assert.ok(output.includes('400'))
  }
 })
+
+test('operator prints only allowlisted provider body status',async()=>{
+ for(const status of ['empty','unknown_format','incomplete','timeout','private body']){
+  const f=fixture({diagnostic:{category:'request_rejected',providerStatus:400,providerBodyStatus:status}})
+  await runOperator(o,f.deps)
+  assert.equal(f.output.join().includes(status),status!=='private body')
+  assert.deepEqual(f.calls.map(b=>b.operation),['prepare','send','cancel'])
+ }
+})

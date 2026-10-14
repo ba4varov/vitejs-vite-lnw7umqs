@@ -17,10 +17,11 @@ const id='b0000000-0000-0000-0000-000000000001',config={...keys,subject:'mailto:
 const device={endpoint:'https://fcm.googleapis.com/wp/isolated',publicKey:keys.publicKey,p256dh:receiverKeys.publicKey,auth:auth.toString('base64url'),language:'bg',claimId:id}
 const resolver=async()=>[{address:'8.8.8.8',family:4}]
 const privateText='private endpoint subscription token key must never escape'
+const htmlRejection='<HTML><HEAD><TITLE>UnauthorizedRegistration</TITLE></HEAD><BODY><H1>UnauthorizedRegistration</H1><H2>Error 400</H2><!--'+privateText+'--></BODY></HTML>'
 const rejection=JSON.stringify({error:{code:400,status:'INVALID_ARGUMENT',message:privateText,details:[{fieldViolations:[{description:privateText}]}]}})
 
 function validate(req,body){
- assert.equal(req.method,'POST');assert.equal(req.url,'/wp/isolated');assert.equal(req.headers.host,'fcm.googleapis.com')
+ assert.equal(req.method,'POST');assert.ok(['/wp/isolated','/fcm/send/isolated'].includes(req.url));assert.equal(req.headers.host,'fcm.googleapis.com')
  assert.equal(req.socket.servername,'fcm.googleapis.com');assert.equal(req.socket.alpnProtocol,'http/1.1')
  assert.equal(req.headers['content-type'],'application/octet-stream');assert.equal(req.headers['content-encoding'],'aes128gcm')
  assert.equal(req.headers['content-length'],String(body.length));assert.equal(req.headers['transfer-encoding'],undefined)
@@ -62,6 +63,11 @@ async function fixture(run){
    const mode=req.headers['x-fixture-mode']||'accepted'
    if(mode==='accepted'){res.writeHead(201);res.end();return}
    if(mode==='json'){res.writeHead(400,{'content-type':'application/json','content-length':Buffer.byteLength(rejection)});res.end(rejection);return}
+   if(mode==='html'){res.writeHead(400,{'content-type':'text/html; charset=UTF-8'});res.end(htmlRejection);return}
+   if(mode==='empty'){res.writeHead(400,{'content-length':0});res.end();return}
+   if(mode==='unknown'){res.writeHead(400,{'content-type':'text/html'});res.end('<p>'+privateText+'</p>');return}
+   if(mode==='incomplete'){res.writeHead(400,{'content-type':'text/plain','content-length':100});res.end('short');return}
+   if(mode==='timeout'){res.writeHead(400,{'content-type':'text/plain','content-length':100});res.flushHeaders();return}
    if(mode==='chunked'){res.writeHead(400,{'content-type':'application/json'});res.write(rejection.slice(0,29));res.end(rejection.slice(29));return}
   })
  })
@@ -74,32 +80,39 @@ async function fixture(run){
  finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));rmSync(root,{recursive:true,force:true})}
 }
 test('pinned wire request matches web-push@3.6.7 standard sender byte-for-byte in body and semantically in headers',async()=>fixture(async({connector,requests,port,cert})=>{
- const details=preparePush(device,config,id),standard=new WebPushLib(),agent=new Agent({keepAlive:false})
+ for(const path of ['/wp/isolated','/fcm/send/isolated']){
+ const endpoint='https://fcm.googleapis.com'+path
+ const details=preparePush({...device,endpoint},config,id),standard=new WebPushLib(),agent=new Agent({keepAlive:false})
  // Replay the identical generated details: encryption uses a fresh salt/ephemeral key otherwise.
  agent.createConnection=options=>connect({...options,host:'127.0.0.1',port,servername:'fcm.googleapis.com',ca:cert,ALPNProtocols:['http/1.1']})
  standard.generateRequestDetails=()=>({...details,agent})
  try{
-  assert.equal((await standard.sendNotification({endpoint:device.endpoint})).statusCode,201)
+  assert.equal((await standard.sendNotification({endpoint})).statusCode,201)
   assert.equal((await sendPinned({...details,headers:{...details.headers,'Content-Length':1}},resolver,connector)).status,201)
-  assert.deepEqual(requests[0],requests[1]);assert.equal(requests.length,2)
+  assert.deepEqual(requests.at(-2),requests.at(-1))
  }finally{agent.destroy()}
+ }
+ assert.equal(requests.length,4)
 }))
 test('one authorized attempt reads safe 400 diagnostics from local content-length/chunked provider, then closes gate',async()=>fixture(async({connector,requests})=>{
- for(const mode of ['json','chunked']){
+ for(const mode of ['json','chunked','html','empty','unknown','incomplete','timeout']){
   const calls=[],logs=[]
   const env={PUSH_TEST_DELIVERY_ENABLED:'true',PUSH_TEST_OPERATOR_TOKEN:'a'.repeat(43),PUSH_VAPID_PUBLIC_KEY:keys.publicKey,PUSH_VAPID_PRIVATE_KEY:keys.privateKey,PUSH_VAPID_SUBJECT:config.subject}
   const handler=createTestHandler({env,resolver,diagnose:d=>logs.push(d),rpc:async(name,args)=>{calls.push([name,args]);return name==='claim_push_test'?device:true},send:(details,dns)=>sendPinned({...details,headers:{...details.headers,'X-Fixture-Mode':mode}},dns,connector)})
   const response=await handler(new Request('https://edge.example.invalid/',{method:'POST',headers:{authorization:'Bearer '+env.PUSH_TEST_OPERATOR_TOKEN},body:JSON.stringify({permitId:id})}))
   assert.equal(response.status,502)
-  const body=await response.json();assert.deepEqual(body.diagnostic,{category:'request_rejected',providerStatus:400,providerReason:'fcm_invalid_argument'})
+  const body=await response.json()
+  const providerReason=['json','chunked'].includes(mode)?'fcm_invalid_argument':mode==='html'?'fcm_unauthorized_registration':undefined
+  const providerBodyStatus=providerReason?'recognized':mode==='unknown'?'unknown_format':mode
+  assert.deepEqual(body.diagnostic,{category:'request_rejected',providerStatus:400,...(providerReason?{providerReason}:{}),providerBodyStatus})
   assert.deepEqual(calls.map(c=>c[0]),['claim_push_test','authorize_push_test','finish_push_test','close_push_operator'])
   assert.equal(calls[2][1].outcome,'failed')
   const output=JSON.stringify([body,logs]);for(const secret of [privateText,device.endpoint,device.auth,keys.privateKey,id])assert.ok(!output.includes(secret))
  }
- assert.equal(requests.length,2)
+ assert.equal(requests.length,7)
 }))
 test('native Deno TLS writes valid encrypted FCM wire requests and reads bounded rejection diagnostics',{skip:!process.env.DENO_BINARY},async()=>fixture(async({requests,root,port})=>{
  const {stdout}=await exec(process.env.DENO_BINARY,['run','--frozen','--cached-only','--config','supabase/functions/push-test/deno.json','--allow-net=127.0.0.1','--allow-env=ECE_KEYLOG,DEBUG,NODE_DEBUG','--allow-read='+root,'tests/edge-push/wire-client.mjs',join(root,'ca.pem'),String(port)],{env:{...process.env,DENO_DIR:resolve('work/deno-cache'),ECE_KEYLOG:'',DEBUG:'',NODE_DEBUG:''},timeout:15000})
- assert.deepEqual(JSON.parse(stdout),{results:[{status:201},{status:400,providerReason:'fcm_invalid_argument'},{status:400,providerReason:'fcm_invalid_argument'}],wrongNameRejected:true})
- assert.equal(requests.length,3)
+ assert.deepEqual(JSON.parse(stdout),{results:[{status:201},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_unauthorized_registration',providerBodyStatus:'recognized'},{status:400,providerBodyStatus:'empty'}],wrongNameRejected:true})
+ assert.equal(requests.length,5)
 }))
