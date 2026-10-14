@@ -1,3 +1,4 @@
+import {renewPush,pushRenewalMessages} from './push-renewal.js'
 import {checkPushKeys,pushKeyMessages} from './push-key-diagnostics.js'
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
@@ -12,6 +13,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
  const [checks,setChecks]=useState<Record<string,string>>({})
  const [keyChecks,setKeyChecks]=useState<Record<string,{p256dh:string;auth:string}>>({})
+ const renewalLock=useRef(false)
  const diagnosticEpoch=useRef(0)
  useEffect(()=>{diagnosticEpoch.current++;setChecks({});setKeyChecks({});return()=>{diagnosticEpoch.current++}},[session.user.id,session.access_token])
  const live=useRef(true)
@@ -29,6 +31,18 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(error=>{if(live.current){const enrollmentMessage=pushEnrollmentMessages[lang][error.message];if(enrollmentMessage)setMessage(enrollmentMessage);else fail(error)}}).finally(()=>{if(live.current)setBusy(false)})
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
+ const renew=async(device:PushDevice)=>{
+  if(renewalLock.current||busy||dirty||!data?.registrationEnabled||!data.publicKey)return
+  const epoch=diagnosticEpoch.current
+  renewalLock.current=true;setBusy(true);setMessage(pushRenewalMessages[lang].checking)
+  try {
+   const result=await renewPush({device,key:data.publicKey,load:()=>pushRequest(session),
+    authorize:async()=>live.current&&epoch===diagnosticEpoch.current&&await pushKeySessionMatches(session)&&live.current&&epoch===diagnosticEpoch.current,
+    confirm:()=>live.current&&epoch===diagnosticEpoch.current&&window.confirm(pushRenewalMessages[lang].warning),
+    persist:(subscription:object,deviceLabel:string)=>pushRequest(session,'POST',{subscription,label:deviceLabel})})
+   if(live.current&&epoch===diagnosticEpoch.current){if(result.data)apply(result.data);setMessage(pushRenewalMessages[lang][result.status])}
+  }finally{renewalLock.current=false;if(live.current)setBusy(false)}
+ }
  const check=async(device:PushDevice)=>{setBusy(true);setChecks({});setKeyChecks({});try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}
  const checkKeys=async(device:PushDevice)=>{
   const epoch=diagnosticEpoch.current
@@ -84,6 +98,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
      {' '}{bg?'Съвпадението не доказва, че FCM ще приеме известие.':'A match does not prove that FCM will accept a notification.'}
     </p>}
     {checks[d.id]&&<p role="status">{pushRegistrationMessages[lang][checks[d.id]]}</p>}
+    {' '}<button type="button" disabled={busy||dirty||support!=='supported'||!data.registrationEnabled||!data.publicKey||!data.preferences.enabled||!data.preferences.cities.length||!data.preferences.categories.length||Notification.permission!=='granted'} onClick={()=>void renew(d)}>{bg?'Поднови Push регистрацията':'Renew Push registration'}</button>
     {' '}<button type="button" disabled={busy} onClick={()=>void remove(d)}>{bg?'Отпиши устройство':'Unsubscribe device'}</button>
    </li>)}</ul>
    <label>{bg?'Име на това устройство':'Name of this device'}<input value={label} maxLength={80} disabled={busy} onChange={e=>setLabel(e.target.value)}/></label>
