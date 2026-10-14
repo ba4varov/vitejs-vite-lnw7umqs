@@ -22,7 +22,7 @@ const connector=async(target,signal)=>{
  return {...connection,write:bytes=>connection.write(bytes.subarray(0,31))}
 }
 const results=[]
-for(const mode of ['accepted','json','chunked']){
+for(const mode of ['accepted','json','chunked','html','empty']){
  results.push(await sendPinned({...details,headers:{...details.headers,'X-Fixture-Mode':mode}},resolver,connector))
 }
 const wrongConnector=denoConnector({

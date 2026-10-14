@@ -4,7 +4,7 @@ import {createECDH, timingSafeEqual} from 'node:crypto'
 import {lookup} from 'node:dns/promises'
 import {connect as tlsConnect} from 'node:tls'
 import {Buffer} from 'node:buffer'
-import {readProviderReason,safeProviderReason} from './push-provider.mjs'
+import {readProviderDiagnostic,safeProviderReason,safeProviderBodyStatus,providerPhraseReason} from './push-provider.mjs'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const invalidHeaderText=value=>['\r','\n','\0'].some(char=>String(value).includes(char))
@@ -121,7 +121,7 @@ export async function sendPinned(details, resolver=lookup, connector=connectNode
    const end=Buffer.from(response.subarray(0,used)).indexOf('\r\n\r\n')
    if(end<0)continue
    const lines=Buffer.from(response.subarray(0,end)).toString('latin1').split('\r\n')
-   const match=/^HTTP\/1\.[01] ([1-5][0-9]{2})(?: [^\r\n]*)?$/.exec(lines.shift())
+   const match=/^HTTP\/1\.[01] ([1-5][0-9]{2})(?: ([^\r\n]*))?$/.exec(lines.shift())
    if(!match)throw Error('INVALID_RESPONSE')
    if(lines.some(line=>line.indexOf(':')<1 || invalidHeaderText(line)))throw Error('INVALID_RESPONSE')
    // Interim responses are not delivery outcomes. Bound total bytes and count.
@@ -137,8 +137,11 @@ export async function sendPinned(details, resolver=lookup, connector=connectNode
    }
    finalResult={status:Number(match[1]),retryAfter}
    if(host==='fcm.googleapis.com'&&finalResult.status>=400){
-    const reason=await readProviderReason(connection,response.subarray(end+4,used),lines)
-    if(reason)finalResult.providerReason=reason
+    const phraseReason=providerPhraseReason(match[2])
+    if(phraseReason)finalResult.providerReason=phraseReason
+    finalResult.providerBodyStatus='timeout' // Fallback if the overall deadline interrupts body reading.
+    const diagnostic=await readProviderDiagnostic(connection,response.subarray(end+4,used),lines)
+    Object.assign(finalResult,diagnostic)
    }
    return finalResult
   }
@@ -182,7 +185,7 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
   }catch{return reply(400,'INVALID_REQUEST')}
   const config={publicKey:env.PUSH_VAPID_PUBLIC_KEY,privateKey:env.PUSH_VAPID_PRIVATE_KEY,subject:env.PUSH_VAPID_SUBJECT}
   if(!validVapid(config.publicKey,config.privateKey,config.subject))return reply(503,'PUSH_TEST_UNCONFIGURED')
-  let claim,phase='claim',providerStatus,providerReason
+  let claim,phase='claim',providerStatus,providerReason,providerBodyStatus
   const report=diagnostic=>{try{diagnose(diagnostic)}catch{/* Diagnostics must not affect authorization or delivery. */}}
   try {
    claim=await rpc('claim_push_test',{permit_id:body.permitId,key_public:config.publicKey})
@@ -204,7 +207,8 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
    if(!Number.isInteger(result.status) || result.status<200 || result.status>599)throw Error('INVALID_RESPONSE')
    providerStatus=result.status
    providerReason=safeProviderReason(result.providerReason)
-   const diagnostic={category:providerDiagnostic(result.status),providerStatus:result.status,...(providerReason?{providerReason}:{})}
+   providerBodyStatus=safeProviderBodyStatus(result.providerBodyStatus)
+   const diagnostic={category:providerDiagnostic(result.status),providerStatus:result.status,...(providerReason?{providerReason}:{}),...(providerBodyStatus?{providerBodyStatus}:{})}
    report(diagnostic)
    const outcome=result.status>=200 && result.status<300?'sent':[404,410].includes(result.status)?'expired':result.status===429?'throttled':'failed'
    phase='finish'
@@ -212,7 +216,7 @@ export function createTestHandler({env,rpc,send=sendPinned,prepare=preparePush,r
    return reply(outcome==='sent'?200:502,outcome==='sent'?'PUSH_TEST_ACCEPTED':'PUSH_TEST_NOT_CONFIRMED',diagnostic)
   }catch(error){
    // Reservations are never replayed. Unknown provider/DB outcomes stay uncertain.
-   const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus}),...(providerReason?{providerReason}:{})}
+   const diagnostic={category:phase==='transport'?(['tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed'].includes(error?.diagnosticCode)?error.diagnosticCode:'transport_uncertain'):phase==='dns'?'dns_failed':phase==='prepare'?'preparation_failed':'database_uncertain',phase,...(providerStatus===undefined?{}:{providerStatus}),...(providerReason?{providerReason}:{}),...(providerBodyStatus?{providerBodyStatus}:{})}
    report(diagnostic)
    return reply(503,'PUSH_TEST_UNCERTAIN',diagnostic)
   }finally{
