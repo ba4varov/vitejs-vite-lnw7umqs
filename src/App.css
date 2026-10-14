@@ -1037,3 +1037,12 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
     white-space: normal; overflow-wrap: anywhere; text-align: center;
   }
 }
+
+/* Compact initial/location loading; refresh keeps the forecast in place. */
+.forecast-loading { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.forecast-loading-icon { font-size: 2.8rem; }
+.forecast-loading h2 { font-size: 1.15rem; margin: 0 0 6px; }
+.forecast-loading p { margin: 0; opacity: .75; }
+.forecast-loading-shapes { display: flex; gap: 10px; width: 100%; }
+.forecast-loading-shapes span { height: 12px; flex: 1; border-radius: 8px; background: currentColor; opacity: .08; }
+.forecast-refresh { grid-column: 1 / -1; font-size: .85rem; opacity: .75; text-align: right; padding: 0 4px; }
