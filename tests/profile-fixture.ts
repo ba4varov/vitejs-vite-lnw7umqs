@@ -1,19 +1,22 @@
 import { openHeaderMenu } from './header-navigation'
 import { expect, type Page } from '@playwright/test'
-export async function fixture(page: Page, lang: 'bg' | 'en', initialPlan = 'free') {
+export async function fixture(page: Page, lang: 'bg' | 'en', initialPlan = 'free', preserveSession = false) {
   let plan = initialPlan, failed = false, hold = false
   const requests: string[] = []
   let release = () => {}
-  await page.addInitScript(lang => {
+  await page.addInitScript(({lang, preserveSession}) => {
     localStorage.setItem('meteoPulseLanguage', lang)
+    if (preserveSession && localStorage.getItem('meteo-pulse-auth')) return
     localStorage.setItem('meteo-pulse-auth', JSON.stringify({
       access_token: 'profile-test-token', refresh_token: 'profile-test-refresh',
       expires_at: Math.floor(Date.now() / 1000) + 3600,
       user: { id: '00000000-0000-0000-0000-000000000002', email: 'profile@example.invalid' },
     }))
-  }, lang)
+  }, {lang, preserveSession})
   await page.route('**/*', route => new URL(route.request().url()).origin === new URL(process.env.PROFILE_PREVIEW_URL || 'http://127.0.0.1:4173').origin
     ? route.fallback() : route.fulfill({ json: {} }))
+  await page.route('**/rest/v1/favorite_places?**', route => route.fulfill({ json: [] }))
+  await page.route('**/rest/v1/place_settings?**', route => route.fulfill({ json: [] }))
   await page.route('**/api/push', route => route.fulfill({json:{contractVersion:1,pro:initialPlan==='pro',preferences:{enabled:false,cities:[],categories:[]},devices:[],registrationEnabled:false,publicKey:null,deliveryEnabled:false}}))
   await page.route('**/api/activity', route => route.fulfill({ json: { enabled: false } }))
   await page.route('**/api/alerts**', route => route.fulfill({ json: { contractVersion: 2, pro: false, enabled: [], alerts: [] } }))

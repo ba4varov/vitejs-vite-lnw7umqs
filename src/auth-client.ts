@@ -9,6 +9,7 @@ const storageKey = 'meteo-pulse-auth'
 let currentSession: AuthSession | null = null
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let refreshPromise: Promise<AuthSession | null> | undefined
+let refreshForced = false
 let revision = 0
 const refreshMargin = 60_000
 const retryDelay = 30_000
@@ -47,15 +48,16 @@ window.addEventListener('storage', event => {
 document.addEventListener('visibilitychange', () => scheduleRefresh())
 window.addEventListener('online', () => scheduleRefresh())
 
-async function refreshSession(): Promise<AuthSession | null> {
+async function refreshSession(rejectedToken?: string): Promise<AuthSession | null> {
   if (refreshPromise) return refreshPromise
+  refreshForced = Boolean(rejectedToken)
   const refresh = async () => {
     // Another tab may have rotated the refresh token while this tab waited for the lock.
     const stored = readSession()
     if (stored?.refresh_token !== currentSession?.refresh_token) applySession(stored)
     const session = currentSession
     if (!session) return null
-    if ((session.expires_at || 0) * 1000 - Date.now() > refreshMargin) {
+    if (session.access_token !== rejectedToken && (session.expires_at || 0) * 1000 - Date.now() > refreshMargin) {
       scheduleRefresh(); return session
     }
     const startedAt = revision
@@ -114,6 +116,19 @@ export async function restoreSession(): Promise<AuthSession | null> {
   if (!currentSession) applySession(readSession())
   if (!currentSession) return null
   return refreshSession()
+}
+
+/** Refresh through the shared lock, and never send a different account's token. */
+export async function accountSession(accountId: string, rejectedToken?: string): Promise<AuthSession | null> {
+  if (!currentSession) applySession(readSession())
+  // A concurrent restore of a still-unexpired token may be a no-op. Wait for it
+  // before asking for a forced refresh; concurrent forced refreshes still share.
+  if (rejectedToken && refreshPromise && !refreshForced) await refreshPromise
+  if (currentSession?.user.id !== accountId) return null
+  const active = await refreshSession(rejectedToken)
+  if (active?.user.id !== accountId || (active.expires_at != null && active.expires_at * 1000 <= Date.now())) return null
+  if (rejectedToken && active.access_token === rejectedToken) return null
+  return active
 }
 
 export async function signUp(email: string, password: string, redirectTo: string, captchaToken?: string) {
