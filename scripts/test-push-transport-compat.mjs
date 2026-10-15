@@ -117,6 +117,7 @@ try{
   report.startupDiagnostics={
    categories:[['missing_module',/Module not found|Cannot find module|not cached/],['unsupported_sync_read',/readTextFileSync.*not a function|readSync.*not supported/],['permission_denied',/PermissionDenied|Requires read access/],['type_error',/TypeError/],['syntax_error',/SyntaxError/],['boot_error',/boot error|boot failure/],['fs_error',/No such file|NotFound/]].filter(([,pattern])=>pattern.test(boot)).map(([name])=>name),
    locations:[...new Set(boot.match(/(?:file:\/\/\/app\/tests\/transport-compat\/index.ts|ext:[\w/._-]+):\d+(?::\d+)?/g)??[])],
+   details:[['graph_creation',/create graph|graph creation/],['npm_resolution',/npm|package/],['network_error',/network|connection|sending request|Download/],['dns_error',/dns|resolve host/i],['cache_error',/cache|cached/],['certificate_error',/certificate|UnknownIssuer/],['import_map_error',/import map|not prefixed/],['lock_error',/lockfile|lock file/],['entrypoint_error',/entrypoint|entry point/],['static_files_error',/static file|static asset/],['filesystem_error',/file system|filesystem|not found|No such file/],['unsupported_api',/not supported|not implemented/],['typescript_error',/parse|transpile|TypeScript/],['missing_web_push',/web-push/]].filter(([,pattern])=>pattern.test(boot)).map(([name])=>name),
   }
  }
  process.exitCode=1
