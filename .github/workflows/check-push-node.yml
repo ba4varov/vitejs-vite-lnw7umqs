@@ -1,0 +1,52 @@
+name: Check disabled Node push sender
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-node-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# No deployment job/environment, project link, Supabase access or repository secrets.
+env:
+  PUSH_NODE_OPERATOR_ENABLED: 'false'
+  PUSH_TEST_DELIVERY_ENABLED: 'false'
+
+jobs:
+  node-proof:
+    name: Node 24 security tests and local Vercel Lambda artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.19.0'
+          check-latest: false
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run unit tests, including local TLS, Preview refusal and atomic RPC models
+        run: npm test
+      - name: Check types, frontend build and lint
+        run: |
+          npm run build
+          npm run lint
+      - name: Install the locked official builder in an isolated test directory
+        run: npm ci --prefix tests/push-node-build --ignore-scripts --no-audit --no-fund
+      - name: Build and execute a local Node Lambda with synthetic configuration
+        run: node scripts/verify-push-node-build.mjs
+      - name: Confirm checks changed no dependencies or Supabase files
+        run: git diff --exit-code -- package.json package-lock.json tests/push-node-build supabase
+      - name: Upload safe local build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: disabled-node-push-build-evidence
+          path: work/push-node-build/evidence.json
+          if-no-files-found: error

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@vercel/node": "23.0.0"
+  }
+}
