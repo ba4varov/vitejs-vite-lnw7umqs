@@ -37,26 +37,28 @@ jobs:
           check-latest: false
       - name: Install locked test dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Install checksum-verified Deno for dependency preparation only
+      - name: Prepare offline dependencies with matching Deno 2.1.4 only
         run: |
           set -euo pipefail
-          tools_dir="$RUNNER_TEMP/transport-compat-tools"
-          mkdir -p "$tools_dir"
-          cd "$tools_dir"
-          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-            'https://github.com/denoland/deno/releases/download/v2.5.6/deno-x86_64-unknown-linux-gnu.zip' \
-            --output deno.zip
-          echo 'fd4f6abc1b6a134fa9a4dba56519f1631f44c88e04e4e3e9a8ff5975dfa66e1a  deno.zip' | sha256sum --check --strict
-          unzip -q deno.zip deno
-          echo "$tools_dir" >> "$GITHUB_PATH"
-      - name: Prepare frozen dependency cache without executing the experiment
-        run: |
-          set -euo pipefail
-          deno --version
           docker --version
-          DENO_DIR=work/transport-compat-cache deno cache --frozen \
-            --config tests/transport-compat/deno.json \
-            --lock supabase/functions/push-test/deno.lock tests/transport-compat/index.ts
+          docker pull denoland/deno:2.1.4
+          docker run --rm --network none denoland/deno:2.1.4 --version | tee /tmp/transport-deno-version.txt
+          grep -Fx 'deno 2.1.4 (stable, release, x86_64-unknown-linux-gnu)' /tmp/transport-deno-version.txt
+          mkdir -p work/transport-compat-cache work/transport-compat-lock
+          python3 - <<'PY'
+          import json, pathlib
+          lock=json.loads(pathlib.Path('supabase/functions/push-test/deno.lock').read_text())
+          # Test-only v4 representation for Deno 2.1.4; package versions/integrities unchanged.
+          lock['version']='4'
+          pathlib.Path('work/transport-compat-lock/deno.lock').write_text(json.dumps(lock,indent=2)+'\n')
+          PY
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,src=$PWD/tests/transport-compat,dst=/app/tests/transport-compat,readonly" \
+            --mount "type=bind,src=$PWD/work/transport-compat-cache,dst=/cache" \
+            --mount "type=bind,src=$PWD/work/transport-compat-lock,dst=/locks,readonly" \
+            -e DENO_DIR=/cache denoland/deno:2.1.4 cache --frozen \
+            --config /app/tests/transport-compat/deno.json \
+            --lock /locks/deno.lock /app/tests/transport-compat/index.ts
       - name: Run actual digest-pinned Edge Runtime with external networking disabled
         run: node scripts/test-push-transport-compat.mjs
       - name: Confirm production and dependency files are untouched

@@ -4,7 +4,7 @@
 
 ## Възпроизводима среда
 
-Workflow: `.github/workflows/push-transport-compat.yml`, включително за draft PR. Ubuntu 24.04, Node 24.14.0 и checksum-verified Deno 2.5.6 за подготовка на npm cache. Самият експеримент се изпълнява единствено в:
+Workflow: `.github/workflows/push-transport-compat.yml`, включително за draft PR. Ubuntu 24.04, Node 24.14.0 и отделен официален контейнер Deno 2.1.4 само за подготовка на npm cache. Версията на cache preparer се проверява чрез `--version`; той не изпълнява експеримента. Самият експеримент се изпълнява единствено в:
 
 ```
 supabase/edge-runtime:v1.76.2@sha256:edd22bef4477b900d5c300e287ce9b18bff9b81a0291bee14ee0b7c7b71a2899
@@ -16,7 +16,7 @@ Runner независимо изтегля release tag `supabase/edge-runtime:v1
 
 Edge контейнерът е `--network none`; Node TLS fixture споделя неговия network namespace. Няма публикувани портове, външен DNS или достъп до Интернет по време на пробите. Зависимостите/образите се изтеглят предварително.
 
-Тестовият Deno config изисква `nodeModulesDir: none`, за да запълни глобалния offline npm cache независимо от Node инсталацията на runner. Само Node референтният контейнер монтира `node_modules`; Edge използва подготвения Deno cache.
+Тестовият Deno config изисква `nodeModulesDir: none`, за да запълни глобалния offline npm cache независимо от Node инсталацията на runner. Само Node референтният контейнер монтира `node_modules`; Edge използва подготвения Deno cache. Cache се създава със съответстващия Deno 2.1.4; първоначалната подготовка с 2.5.6 не позволи offline bootstrap. В `work/` се създава тестово v4 представяне на съществуващия lock със същите npm версии/integrities, без промяна на Production lock.
 
 Един локален CA подписва сертификат за `push.test.invalid` и redirect името. `wrong.test.invalid` не е в сертификата. Избраният адрес е 127.0.0.1, но hostname е свързан чрез `/etc/hosts` с 127.0.0.2, където втори TLS listener има същия валиден сертификат. Redirect target е 127.0.0.3. Тези loopback адреси са само fixtures; това не разрешава private endpoints в Production.
 
@@ -44,7 +44,7 @@ Fixture сравнява exact body bytes, стойностите на всич�
 
 ```
 npm ci --ignore-scripts --no-audit --no-fund
-DENO_DIR=work/transport-compat-cache deno cache --frozen --config tests/transport-compat/deno.json --lock supabase/functions/push-test/deno.lock tests/transport-compat/index.ts
+# Подготви cache с Deno 2.1.4 и тестовия v4 lock, както е записано в workflow.
 node scripts/test-push-transport-compat.mjs
 ```
 
