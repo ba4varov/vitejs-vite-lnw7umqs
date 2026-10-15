@@ -12,7 +12,14 @@ async function ctl(path:string,mode?:string){
  const response=await fetch(control+path,{method:mode===undefined?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(3000),...(mode===undefined?{}:{body:JSON.stringify({mode})})})
  check(response.ok,'CONTROL_FAILED');return response.json()
 }
-const safeError=(error:any)=>String(error?.message).includes('ClientRequest.options.lookup')?'lookup_unsupported':'transport_rejected'
+const safeError=(error:any)=>{
+ const message=String(error?.message)
+ if(message.includes('ClientRequest.options.lookup'))return 'lookup_unsupported'
+ if(/NotValidForName|not valid for name|certificate.*(?:hostname|IP address)|ERR_TLS_CERT_ALTNAME_INVALID/i.test(message))return 'tls_name_rejected'
+ if(/UnknownIssuer|unknown issuer|unable to verify|self.signed/i.test(message))return 'tls_ca_rejected'
+ if(/missing field .url.|proxy.*url/i.test(message))return 'proxy_option_rejected'
+ return 'transport_rejected'
+}
 // Standard HTTPS client, library-generated binary request, bounded diagnostics, wall deadline.
 async function httpsAttempt(kind:string,endpoint=fixture.endpoint){
  let lookups=0

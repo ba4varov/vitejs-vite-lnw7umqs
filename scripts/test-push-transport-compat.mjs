@@ -56,7 +56,7 @@ try{
  docker(['run','-d','--pull','never','--name',`${prefix}-edge`,'--network','none',
   '--add-host','push.test.invalid:127.0.0.2','--add-host','wrong.test.invalid:127.0.0.2','--add-host','redirect.test.invalid:127.0.0.3',
   ...mounts,'--mount',`type=bind,src=${cache},dst=/cache`,
-  '-e','DENO_DIR=/cache','-e','DENO_CERT=/fixtures/ca.pem','-e','DENO_TLS_CA_STORE=system',
+  '-e','DENO_DIR=/cache','-e','DENO_CERT=/fixtures/ca.pem','-e','DENO_TLS_CA_STORE=system','-e','NODE_EXTRA_CA_CERTS=/fixtures/ca.pem',
   // Ensure no inherited proxy settings are injected into this isolated experiment.
   '-e','HTTP_PROXY=','-e','HTTPS_PROXY=','-e','ALL_PROXY=','-e','http_proxy=','-e','https_proxy=','-e','all_proxy=',
   image,'start','--main-service','/app/tests/transport-compat','--static','/fixtures/*'])
@@ -98,7 +98,7 @@ try{
  const response=JSON.parse(result.stdout)
  report.experiment=response.body
  assert.equal(response.status,200,'Actual Edge compatibility assertion failed')
- assert.ok(report.experiment.runtime?.deno,'Missing in-runtime Deno version')
+ assert.equal(report.experiment.runtime?.deno,'supabase-edge-runtime-1.76.2 (compatible with Deno v2.1.4)','Wrong actual in-runtime version; no Deno substitution')
  assert.equal(report.experiment.library,'web-push@3.6.7')
  report.reproduced=true
  // Every probe is one attempt. Failed pinning/TLS must not be called a safe transport.
