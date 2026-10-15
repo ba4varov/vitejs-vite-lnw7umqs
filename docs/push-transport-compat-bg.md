@@ -50,4 +50,35 @@ npm ci --ignore-scripts --no-audit --no-fund
 node scripts/test-push-transport-compat.mjs
 ```
 
-Резултатът е `work/transport-compat-report.json` и Actions artifact `push-https-edge-v1.76.2-evidence`. Към момента на първоначалния commit резултатът още не е установен; докладът от реалното Actions изпълнение е източникът на доказателство.
+Резултатът е `work/transport-compat-report.json` и Actions artifact `push-https-edge-v1.76.2-evidence`.
+
+## Доказан резултат — 15 октомври 2026 г.
+
+[Успешно реално Actions изпълнение](https://github.com/ba4varov/vitejs-vite-lnw7umqs/actions/runs/38676341545) на source commit `587c99ef325858407b27a743355eed225e2db65b`; [безопасен JSON artifact](https://github.com/ba4varov/vitejs-vite-lnw7umqs/actions/runs/38676341545/artifacts/11946022714), retention 14 дни. Съществуващите PR проверки също са успешни: [run](https://github.com/ba4varov/vitejs-vite-lnw7umqs/actions/runs/38676341526).
+
+Самият worker отчете и runner изиска точно:
+
+```
+deno: supabase-edge-runtime-1.76.2 (compatible with Deno v2.1.4)
+v8: 11.6.189.12
+typescript: 5.1.6
+```
+
+Release tag и pinned digest имат еднакъв image ID `sha256:4ddc035dcf37b087ff06a38e54036867e4d82ce3c70b6a0567825c878e984e06`. CLI output остава `edge-runtime 0.1.0 / deno 2.1.4`; това е записано изрично, не е подменена средата.
+
+| Вариант в действителния Edge runtime | Наблюдение |
+| --- | --- |
+| Node HTTPS с пряк lookup | `lookup_unsupported`; нула връзки и нула callback извиквания. |
+| Node HTTPS с Agent lookup | HTTP 201 от DNS примамката; 0 заявки към избрания IP, 0 callback извиквания. |
+| Стандартен web-push.sendNotification с Agent lookup | HTTP 201 от DNS примамката; 0 заявки към избрания IP, 0 callback извиквания. |
+| Node HTTPS към числов IP с оригинален servername/Host | Връзка към избрания IP, `tls_name_rejected`, нула HTTP заявки. |
+| Fetch към hostname, положителен контрол | HTTP 201 от DNS примамката; точни библиотечни headers/body и оригинално SNI. |
+| Fetch с предложена lookup опция | HTTP 201 от DNS примамката; 0 callback извиквания. |
+| Fetch към числов IP с оригинален Host | `tls_name_rejected`; нула HTTP заявки. |
+| Fetch с TCP transport в proxy опциите | `transport_rejected`; нула мрежови връзки. Не е доказана поддръжка на тази опция. |
+
+Отделните fetch контроли са успешни: грешното TLS име е отказано преди HTTP; 307 не създава дори TCP връзка към redirect адреса; голямото body дава `too_large`; body stall запазва HTTP 400 и приключва за 303 ms; липсващи headers водят до timeout за 1202 ms. HTTP 400 дава само status и фиксиран body status, без суров отговор. Всяка проба има най-много една HTTP заявка.
+
+Node референцията с оригиналния web-push sender получава 201 от избрания IP, извиква lookup точно веднъж и минава byte/header/SNI сравнението. След изричното доверяване на синтетичния CA Node HTTPS вариантите в Edge също минават header/body сравнението, но към грешния IP. Следователно проблемът с pinning не може да се обясни с недоверен тестов сертификат или невалидна синтетична заявка.
+
+**Заключение: `reproduced: true`, `complete: true`, `pinnedCandidates: []`, `decision: no_safe_standard_transport`.** Нито един от осемте проверени варианта не удовлетворява всички изисквания. Тази посока се прекратява за v1.76.2; няма предложена Production интеграция, транспортен selector или промяна на sendPinned. Експериментът не установява причината за реалните FCM HTTP 400.
