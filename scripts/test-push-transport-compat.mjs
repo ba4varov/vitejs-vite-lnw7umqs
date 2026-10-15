@@ -51,8 +51,7 @@ try{
  writeFileSync(`${fixtures}/request.json`,JSON.stringify({...details,body:details.body.toString('base64')}),{mode:0o600})
  // Only the leaf key/cert, test CA and synthetic request enter the containers.
  // The generated VAPID private key is never saved or mounted.
- const mounts=['--mount',`type=bind,src=${root}/tests/transport-compat,dst=/app/tests/transport-compat,readonly`,
-  '--mount',`type=bind,src=${root}/node_modules,dst=/app/node_modules,readonly`]
+ const mounts=['--mount',`type=bind,src=${root}/tests/transport-compat,dst=/app/tests/transport-compat,readonly`]
  for(const file of ['key.pem','cert.pem','ca.pem','request.json'])mounts.push('--mount',`type=bind,src=${fixtures}/${file},dst=/fixtures/${file},readonly`)
  docker(['run','-d','--pull','never','--name',`${prefix}-edge`,'--network','none',
   '--add-host','push.test.invalid:127.0.0.2','--add-host','wrong.test.invalid:127.0.0.2','--add-host','redirect.test.invalid:127.0.0.3',
@@ -62,6 +61,7 @@ try{
   '-e','HTTP_PROXY=','-e','HTTPS_PROXY=','-e','ALL_PROXY=','-e','http_proxy=','-e','https_proxy=','-e','all_proxy=',
   image,'start','--main-service','/app/tests/transport-compat','--static','/fixtures/*'])
  docker(['run','-d','--pull','never','--name',`${prefix}-provider`,'--network',`container:${prefix}-edge`,...mounts,
+  '--mount',`type=bind,src=${root}/node_modules,dst=/app/node_modules,readonly`,
   '-e','HTTP_PROXY=','-e','HTTPS_PROXY=','-e','ALL_PROXY=','-e','http_proxy=','-e','https_proxy=','-e','all_proxy=',
   nodeImage,'node','/app/tests/transport-compat/provider.mjs'])
  phase='provider_startup'

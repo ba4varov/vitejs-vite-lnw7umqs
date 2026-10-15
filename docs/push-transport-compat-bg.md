@@ -16,6 +16,8 @@ Runner независимо изтегля release tag `supabase/edge-runtime:v1
 
 Edge контейнерът е `--network none`; Node TLS fixture споделя неговия network namespace. Няма публикувани портове, външен DNS или достъп до Интернет по време на пробите. Зависимостите/образите се изтеглят предварително.
 
+Тестовият Deno config изисква `nodeModulesDir: none`, за да запълни глобалния offline npm cache независимо от Node инсталацията на runner. Само Node референтният контейнер монтира `node_modules`; Edge използва подготвения Deno cache.
+
 Един локален CA подписва сертификат за `push.test.invalid` и redirect името. `wrong.test.invalid` не е в сертификата. Избраният адрес е 127.0.0.1, но hostname е свързан чрез `/etc/hosts` с 127.0.0.2, където втори TLS listener има същия валиден сертификат. Redirect target е 127.0.0.3. Тези loopback адреси са само fixtures; това не разрешава private endpoints в Production.
 
 Генерират се временни синтетични VAPID/subscriber ключове и payload. VAPID private key не се записва. TLS leaf private key и синтетичната подписана заявка се монтират само за теста и се изтриват при cleanup. Artifact съдържа единствено версии, статуси, фиксирани категории, броячи, времена и булеви сравнения — без ключове, Authorization или raw provider response.
