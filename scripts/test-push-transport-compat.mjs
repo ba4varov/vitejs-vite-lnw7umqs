@@ -13,6 +13,7 @@ mkdirSync('work',{recursive:true})
 const fixtures=mkdtempSync(resolve('work/transport-compat-fixtures-'))
 const report={schema:1,image,expectedEdgeVersion:'1.76.2',reproduced:false,isolation:{network:'none',externalEndpoints:0,syntheticOnly:true},productionIntegration:false}
 const environment={...process.env}
+let phase='offline_cache'
 for(const name of ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH'])delete environment[name]
 function docker(args,{allowFailure=false,timeout=60000}={}){
  const result=spawnSync('docker',['--host=unix:///var/run/docker.sock',...args],{env:environment,encoding:'utf8',timeout,maxBuffer:2*1024*1024})
@@ -22,15 +23,18 @@ function docker(args,{allowFailure=false,timeout=60000}={}){
 function openssl(args){assert.equal(spawnSync('openssl',args,{stdio:'ignore'}).status,0,'Synthetic certificate generation failed')}
 try{
  assert.ok(existsSync(cache),'Missing offline dependency cache; run the documented Deno cache step')
+ phase='docker_and_images'
  docker(['info'])
  docker(['pull',image],{timeout:180000})
  docker(['pull',nodeImage],{timeout:180000})
+ phase='edge_version'
  const version=docker(['run','--rm','--network','none',image,'--version'])
  report.edgeVersionOutput=(version.stdout+version.stderr).trim()
  assert.match(report.edgeVersionOutput,/\b1\.76\.2\b/,'Actual Edge Runtime version does not match; no substitute allowed')
  report.imageId=docker(['image','inspect',image,'--format','{{.Id}}']).stdout.trim()
  report.repoDigests=JSON.parse(docker(['image','inspect',image,'--format','{{json .RepoDigests}}']).stdout)
  assert.ok(report.repoDigests.some(d=>d.endsWith(image.split('@')[1])),'Image digest mismatch')
+ phase='synthetic_fixtures'
  openssl(['req','-x509','-newkey','ec','-pkeyopt','ec_paramgen_curve:P-256','-nodes','-keyout',`${fixtures}/ca-key.pem`,'-out',`${fixtures}/ca.pem`,'-days','1','-subj','/CN=Synthetic Transport CA','-addext','basicConstraints=critical,CA:TRUE','-addext','keyUsage=critical,keyCertSign,cRLSign'])
  openssl(['req','-new','-newkey','ec','-pkeyopt','ec_paramgen_curve:P-256','-nodes','-keyout',`${fixtures}/key.pem`,'-out',`${fixtures}/cert.csr`,'-subj','/CN=push.test.invalid'])
  writeFileSync(`${fixtures}/extensions.cnf`,'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:push.test.invalid,DNS:redirect.test.invalid\n')
@@ -53,6 +57,7 @@ try{
  docker(['run','-d','--pull','never','--name',`${prefix}-provider`,'--network',`container:${prefix}-edge`,...mounts,
   '-e','HTTP_PROXY=','-e','HTTPS_PROXY=','-e','ALL_PROXY=','-e','http_proxy=','-e','https_proxy=','-e','all_proxy=',
   nodeImage,'node','/app/tests/transport-compat/provider.mjs'])
+ phase='provider_startup'
  let ready=false
  for(let i=0;i<40;i++){
   const logs=docker(['logs',`${prefix}-provider`],{allowFailure:true})
@@ -62,6 +67,7 @@ try{
  assert.ok(ready,'Synthetic TLS provider could not start')
  const request=(url,method='GET',timeout=40000)=>docker(['exec',`${prefix}-provider`,'node','--input-type=module','-e',
   `const r=await fetch(${JSON.stringify(url)},{method:${JSON.stringify(method)},signal:AbortSignal.timeout(${timeout})}); process.stdout.write(JSON.stringify({status:r.status,body:await r.json()}));`],{allowFailure:true,timeout:timeout+5000})
+ phase='node_reference'
  const reference=request('http://127.0.0.1:9080/baseline','POST',5000)
  assert.equal(reference.status,0,'Standard library reference request failed')
  report.reference=JSON.parse(reference.stdout).body
@@ -72,12 +78,14 @@ try{
  assert.equal(report.reference.wireMatches,true)
  assert.equal(report.reference.sniMatches,true)
  // Wait only for the service to accept TCP; the experiment itself is invoked exactly once.
+ phase='edge_startup'
  let listening=false
  for(let i=0;i<40;i++){
   const probe=docker(['exec',`${prefix}-provider`,'node','--input-type=module','-e',"import{connect}from'node:net';const s=connect(9000,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),500);"],{allowFailure:true,timeout:2000})
   if(probe.status===0){listening=true;break}await delay(250)
  }
  assert.ok(listening,'Actual Edge service could not start; ordinary Deno is not a substitute')
+ phase='edge_experiment'
  const result=request('http://127.0.0.1:9000/')
  assert.equal(result.status,0,'Actual Edge experiment failed to return JSON')
  const response=JSON.parse(result.stdout)
@@ -94,6 +102,7 @@ try{
 }catch{
  report.complete=false
  report.failure='COMPATIBILITY_HARNESS_FAILED_NO_RUNTIME_SUBSTITUTION'
+ report.failureStage=phase
  process.exitCode=1
 }finally{
  for(const suffix of ['provider','edge'])docker(['rm','-f',`${prefix}-${suffix}`],{allowFailure:true})
