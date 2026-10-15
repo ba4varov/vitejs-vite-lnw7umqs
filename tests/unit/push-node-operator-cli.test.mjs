@@ -1,0 +1,78 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {options,createNodeClient,runNodeOperator,PRODUCTION_URL,SELECTED_DEVICE} from '../../scripts/push-node-operator.mjs'
+const user='b0000000-0000-0000-0000-000000000001',permit='c0000000-0000-0000-0000-000000000002'
+const selection=options([user,SELECTED_DEVICE])
+const ready={error:'PUSH_TEST_READY',permitId:permit,userId:user,deviceId:SELECTED_DEVICE,category:'wind'}
+const accepted={error:'PUSH_TEST_ACCEPTED',diagnostic:{category:'accepted',providerStatus:201}}
+const secret='SYNTHETIC_SECRET_NEVER_OUTPUT',token='A'.repeat(43),session='synthetic.jwt.signature'
+function fixture({prepare=ready,send=accepted,confirmation='SEND ONE',failure}={}){
+ const calls=[],logs=[]
+ const node=createNodeClient(token,session,async(url,init)=>{
+  assert.equal(url,PRODUCTION_URL);assert.equal(init.redirect,'error');assert.equal(init.cache,'no-store');assert.ok(init.signal)
+  assert.equal(init.headers.authorization,`Bearer ${token}.${session}`)
+  const body=JSON.parse(init.body);calls.push(body)
+  if(body.operation===failure)throw Error(secret)
+  return Response.json(body.operation==='prepare'?prepare:body.operation==='send'?send:{error:'PUSH_TEST_CLOSED'})
+ })
+ return {calls,logs,run:()=>runNodeOperator(selection,{node,confirm:async phrase=>{assert.equal(phrase,'SEND ONE');return confirmation},output:s=>logs.push(s)})}
+}
+test('requires explicit selected device and rejects endpoint/project/argument overrides',()=>{
+ for(const args of [[],[user],[user,permit],[user,SELECTED_DEVICE,'bad'],[user,SELECTED_DEVICE,'wind',PRODUCTION_URL]])assert.throws(()=>options(args))
+ assert.throws(()=>createNodeClient('bad',session));assert.throws(()=>createNodeClient(token,'bad'))
+})
+test('prepare → one confirmed send → cancel uses selected account/device and server phrase',async()=>{
+ const f=fixture();await f.run();assert.deepEqual(f.calls.map(x=>x.operation),['prepare','send','cancel'])
+ assert.equal(f.calls[0].deviceId,SELECTED_DEVICE);assert.equal(f.calls[0].userId,user)
+ assert.deepEqual(f.calls[1],{operation:'send',permitId:permit,confirmation:`SEND ONE ${user} ${SELECTED_DEVICE}`})
+})
+test('only exact SEND ONE confirms; rejected or mismatched prepare never sends',async()=>{
+ for(const confirmation of ['','send one','SEND ONE ','SEND ONE\n']){const f=fixture({confirmation});await f.run();assert.deepEqual(f.calls.map(x=>x.operation),['prepare','cancel'])}
+ for(const prepare of [{error:'PUSH_NODE_DISABLED'}, {...ready,userId:permit},{...ready,deviceId:permit},{...ready,category:'rain'}]){
+  const f=fixture({prepare});await assert.rejects(f.run());assert.equal(f.calls.some(x=>x.operation==='send'),false)
+ }
+})
+test('disabled flag, invalid session, wrong permissions, redirects and HTTP failures stop after one request',async()=>{
+ for(const [status,error] of [[503,'PUSH_NODE_DISABLED'],[401,'INVALID_SESSION'],[403,'FORBIDDEN'],[307,secret],[429,secret],[500,secret]]){
+  let calls=0
+  const node=createNodeClient(token,session,async()=>{calls++;return Response.json({error},{status})})
+  await assert.rejects(runNodeOperator(selection,{node,confirm:()=>assert.fail('must not prompt'),output:()=>assert.fail('must not output response')}),/NODE_REQUEST_STOPPED/)
+  assert.equal(calls,1)
+ }
+})
+test('lost or unknown send stops without retry and only cancels; untrusted data never printed',async()=>{
+ for(const config of [{failure:'send'},{send:{error:secret,endpoint:secret}},{send:{...accepted,diagnostic:{category:secret,providerStatus:201}}}]){
+  const f=fixture(config);await assert.rejects(f.run());assert.deepEqual(f.calls.map(x=>x.operation),['prepare','send','cancel'])
+  for(const value of [secret,token,session])assert.equal(f.logs.join('').includes(value),false)
+ }
+ const f=fixture({send:{...accepted,endpoint:secret,diagnostic:{...accepted.diagnostic,raw:secret}}});await f.run();assert.equal(f.logs.join('').includes(secret),false)
+})
+test('malformed, oversized, empty and redirected responses fail closed',async()=>{
+ for(const response of [new Response('not-json'),new Response('x'.repeat(2049)),new Response(null),Response.json([])]){
+  await assert.rejects(createNodeClient(token,session,async()=>response)({operation:'prepare'}),/NODE_REQUEST_STOPPED/)
+ }
+ const response=Response.json(ready);Object.defineProperty(response,'redirected',{value:true})
+ await assert.rejects(createNodeClient(token,session,async()=>response)({operation:'prepare'}))
+})
+test('concurrent clients sharing one atomic synthetic permit never replay a denied send',async()=>{
+ let burned=false,sends=0;const counts=[]
+ const runs=Array.from({length:16},()=>{
+  const calls=[];counts.push(calls)
+  const node=createNodeClient(token,session,async(_url,init)=>{
+   const body=JSON.parse(init.body);calls.push(body.operation)
+   if(body.operation==='prepare')return Response.json(ready)
+   if(body.operation==='cancel')return Response.json({error:'PUSH_TEST_CLOSED'})
+   if(burned)return Response.json({error:'PUSH_TEST_NOT_ALLOWED'},{status:409})
+   burned=true;sends++;return Response.json(accepted)
+  })
+  return runNodeOperator(selection,{node,confirm:async()=> 'SEND ONE',output:()=>{}})
+ })
+ const results=await Promise.allSettled(runs)
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(sends,1)
+ for(const calls of counts)assert.deepEqual(calls,['prepare','send','cancel'])
+ // Cross-instance DB authority is tested separately by push-node-operator.test.mjs.
+})
+test('cleanup failure is not silently treated as success and is never retried',async()=>{
+ const f=fixture({failure:'cancel'});await assert.rejects(f.run(),/CANCEL_UNCONFIRMED/)
+ assert.deepEqual(f.calls.map(x=>x.operation),['prepare','send','cancel'])
+})
