@@ -110,6 +110,15 @@ try{
  report.complete=false
  report.failure='COMPATIBILITY_HARNESS_FAILED_NO_RUNTIME_SUBSTITUTION'
  report.failureStage=phase
+ if(phase==='edge_startup'){
+  // No experiment request has been sent yet. Emit only known startup categories/locations.
+  const logs=docker(['logs',`${prefix}-edge`],{allowFailure:true})
+  const boot=logs.stdout+logs.stderr
+  report.startupDiagnostics={
+   categories:[['missing_module',/Module not found|Cannot find module|not cached/],['unsupported_sync_read',/readTextFileSync.*not a function|readSync.*not supported/],['permission_denied',/PermissionDenied|Requires read access/],['type_error',/TypeError/],['syntax_error',/SyntaxError/],['boot_error',/boot error|boot failure/],['fs_error',/No such file|NotFound/]].filter(([,pattern])=>pattern.test(boot)).map(([name])=>name),
+   locations:[...new Set(boot.match(/(?:file:\/\/\/app\/tests\/transport-compat\/index.ts|ext:[\w/._-]+):\d+(?::\d+)?/g)??[])],
+  }
+ }
  process.exitCode=1
 }finally{
  for(const suffix of ['provider','edge'])docker(['rm','-f',`${prefix}-${suffix}`],{allowFailure:true})
