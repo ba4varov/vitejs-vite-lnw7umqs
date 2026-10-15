@@ -10,7 +10,7 @@ Workflow: `.github/workflows/push-transport-compat.yml`, включително 
 supabase/edge-runtime:v1.76.2@sha256:edd22bef4477b900d5c300e287ce9b18bff9b81a0291bee14ee0b7c7b71a2899
 ```
 
-Runner проверява `--version` за 1.76.2 и записва image ID, RepoDigests и `Deno.version` от действителния runtime. Липсващ образ, различна версия, неработещ cache или runtime са неуспех на възпроизвеждането; няма замяна с обикновен Deno. GitHub-hosted runner предоставя Docker.
+Runner независимо изтегля release tag `supabase/edge-runtime:v1.76.2` и изисква неговият image ID да съвпада с digest-pinned образа. Записва image ID, RepoDigests, CLI output и `Deno.version` от действителния runtime. Образът отчита generic Cargo версия `edge-runtime 0.1.0` и `deno 2.1.4`; този CLI текст самостоятелно не удостоверява release версията. Първата runtime подготовка спря точно на тази разлика, преди пробите. Липсващ образ, несъвпадащ tag/digest, неработещ cache или runtime са неуспех на възпроизвеждането; няма замяна с обикновен Deno. GitHub-hosted runner предоставя Docker.
 
 ## Мрежа и синтетични данни
 

@@ -30,8 +30,15 @@ try{
  phase='edge_version'
  const version=docker(['run','--rm','--network','none',image,'--version'])
  report.edgeVersionOutput=(version.stdout+version.stderr).trim()
- assert.match(report.edgeVersionOutput,/\b1\.76\.2\b/,'Actual Edge Runtime version does not match; no substitute allowed')
+ // Release images can embed the generic Cargo package version 0.1.0.
+ // Verify release identity by independently resolving its tag to the exact same image.
+ const releaseTag='supabase/edge-runtime:v1.76.2'
+ docker(['pull',releaseTag],{timeout:180000})
  report.imageId=docker(['image','inspect',image,'--format','{{.Id}}']).stdout.trim()
+ report.releaseTagImageId=docker(['image','inspect',releaseTag,'--format','{{.Id}}']).stdout.trim()
+ assert.equal(report.imageId,report.releaseTagImageId,'Release tag differs from pinned image; no substitute allowed')
+ assert.match(report.edgeVersionOutput,/^edge-runtime (?:0\.1\.0|1\.76\.2)\ndeno 2\.1\.4 /,'Unexpected embedded binary version')
+ report.versionVerification='release_tag_equals_pinned_image_id_and_repo_digest'
  report.repoDigests=JSON.parse(docker(['image','inspect',image,'--format','{{json .RepoDigests}}']).stdout)
  assert.ok(report.repoDigests.some(d=>d.endsWith(image.split('@')[1])),'Image digest mismatch')
  phase='synthetic_fixtures'
