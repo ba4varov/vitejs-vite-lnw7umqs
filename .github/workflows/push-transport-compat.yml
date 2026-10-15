@@ -1,0 +1,74 @@
+name: Isolated Push HTTPS compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/push-transport-compat.yml'
+      - 'tests/transport-compat/**'
+      - 'scripts/test-push-transport-compat.mjs'
+      - 'docs/push-transport-compat-bg.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-transport-compat-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  edge-https:
+    name: Actual Edge v1.76.2 synthetic TLS experiment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout without retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.14.0'
+          check-latest: false
+      - name: Install locked test dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Prepare offline dependencies with matching Deno 2.1.4 only
+        run: |
+          set -euo pipefail
+          docker --version
+          docker pull denoland/deno:2.1.4
+          docker run --rm --network none denoland/deno:2.1.4 --version | tee /tmp/transport-deno-version.txt
+          grep -Fx 'deno 2.1.4 (stable, release, x86_64-unknown-linux-gnu)' /tmp/transport-deno-version.txt
+          mkdir -p work/transport-compat-cache work/transport-compat-lock
+          python3 - <<'PY'
+          import json, pathlib
+          lock=json.loads(pathlib.Path('supabase/functions/push-test/deno.lock').read_text())
+          # Test-only v4 representation for Deno 2.1.4; package versions/integrities unchanged.
+          lock['version']='4'
+          pathlib.Path('work/transport-compat-lock/deno.lock').write_text(json.dumps(lock,indent=2)+'\n')
+          PY
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,src=$PWD/tests/transport-compat,dst=/app/tests/transport-compat,readonly" \
+            --mount "type=bind,src=$PWD/work/transport-compat-cache,dst=/cache" \
+            --mount "type=bind,src=$PWD/work/transport-compat-lock,dst=/locks,readonly" \
+            -e DENO_DIR=/cache denoland/deno:2.1.4 cache --frozen \
+            --config /app/tests/transport-compat/deno.json \
+            --lock /locks/deno.lock /app/tests/transport-compat/index.ts
+      - name: Run actual digest-pinned Edge Runtime with external networking disabled
+        run: node scripts/test-push-transport-compat.mjs
+      - name: Confirm production and dependency files are untouched
+        if: always()
+        run: git diff --exit-code -- supabase api src server package.json package-lock.json
+      - name: Upload safe compatibility evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: push-https-edge-v1.76.2-evidence
+          path: work/transport-compat-report.json
+          if-no-files-found: error
+          retention-days: 14
