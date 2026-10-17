@@ -9,23 +9,41 @@ export function options(args){
  return Object.freeze({user:args[0],device:args[1],category:args[2]||'wind'})
 }
 
+// Only locally constructed diagnostics can reach stderr; exception messages are untrusted.
+const diagnostics=new WeakMap()
+const serverCodes=new Set(['UNAUTHORIZED','INVALID_SESSION','FORBIDDEN','OPERATOR_UNAVAILABLE','PUSH_NODE_DISABLED','PUSH_NODE_UNCONFIGURED','PUSH_TEST_DISABLED','PUSH_TEST_UNCONFIGURED','PUSH_TEST_UNCERTAIN','PUSH_TEST_NOT_READY','PUSH_TEST_NOT_ALLOWED'])
+const httpMessages=new Map([[401,'HTTP 401: неуспешно удостоверяване.'],[403,'HTTP 403: отказан достъп.'],[409,'HTTP 409: конфликт или отказана подготовка.'],[503,'HTTP 503: услугата е недостъпна или не е активирана.']])
+function stopped(message){
+ const error=Error('NODE_REQUEST_STOPPED');diagnostics.set(error,message);return error
+}
+export function failureDiagnostic(error){
+ return diagnostics.get(error)||'Операцията спря: непотвърден резултат.'
+}
+
 // Credentials only enter through the hidden TTY prompts, never argv, env or files.
 export function createNodeClient(token,session,fetcher=fetch){
  if(!/^[A-Za-z0-9_-]{43,128}$/.test(token)||!/^([A-Za-z0-9_-]+\.){2}[A-Za-z0-9_-]+$/.test(session))throw Error('INVALID_CREDENTIALS')
  return async body=>{
   const signal=AbortSignal.timeout(55000)
-  let reader,timer
+  let reader,timer,response
   try{
-   const response=await fetcher(PRODUCTION_URL,{method:'POST',redirect:'error',cache:'no-store',signal,headers:{authorization:`Bearer ${token}.${session}`,'content-type':'application/json'},body:JSON.stringify(body)})
-   if(response.status!==200||response.redirected)throw Error('REFUSED')
-   reader=response.body?.getReader();if(!reader)throw Error('INVALID_RESPONSE')
-   const aborted=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('TIMEOUT')),Math.max(1,55000))})
-   const chunks=[];let size=0
-   while(true){const part=await Promise.race([reader.read(),aborted]);if(part.done)break;size+=part.value.length;if(size>2048)throw Error('RESPONSE_LIMIT');chunks.push(Buffer.from(part.value))}
-   const result=JSON.parse(Buffer.concat(chunks).toString('utf8'))
-   if(!result||typeof result!=='object'||Array.isArray(result))throw Error('INVALID_RESPONSE')
+   try{response=await fetcher(PRODUCTION_URL,{method:'POST',redirect:'error',cache:'no-store',signal,headers:{authorization:`Bearer ${token}.${session}`,'content-type':'application/json'},body:JSON.stringify(body)})}
+   catch{throw stopped('Мрежова грешка: заявката не е потвърдена.')}
+   if(response.redirected)throw stopped('Невалиден отговор от сървъра.')
+   const httpFailure=response.status!==200
+   const httpMessage=httpMessages.get(response.status)||'HTTP отказ: неочакван статус.'
+   let result
+   try{
+    reader=response.body?.getReader();if(!reader)throw Error('INVALID_RESPONSE')
+    const aborted=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('TIMEOUT')),Math.max(1,55000))})
+    const chunks=[];let size=0
+    while(true){const part=await Promise.race([reader.read(),aborted]);if(part.done)break;size+=part.value.length;if(size>2048)throw Error('RESPONSE_LIMIT');chunks.push(Buffer.from(part.value))}
+    result=JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    if(!result||typeof result!=='object'||Array.isArray(result))throw Error('INVALID_RESPONSE')
+   }catch{throw stopped(httpFailure?httpMessage:'Невалиден отговор от сървъра.')}
+   if(httpFailure)throw stopped(httpMessage+(serverCodes.has(result.error)?` Код: ${result.error}.`:''))
    return result
-  }catch{throw Error('NODE_REQUEST_STOPPED')}
+  }catch(error){throw diagnostics.has(error)?error:stopped('Невалиден отговор от сървъра.')}
   finally{clearTimeout(timer);if(reader)void reader.cancel().catch(()=>{})}
  }
 }
@@ -38,8 +56,8 @@ export async function runNodeOperator(selection,{node,confirm,output,requestId=r
   const ready=await node({operation:'prepare',userId:o.user,deviceId:o.device,category:o.category,requestId})
   // Retain a returned permit for cancellation even if the selection echo is invalid.
   if(uuid(ready?.permitId))permit=ready.permitId
-  if(ready?.error!=='PUSH_TEST_READY'||!permit||ready.userId!==o.user||ready.deviceId!==o.device||ready.category!==o.category)throw Error('NOT_READY')
-  output(`Production: ${PRODUCTION_URL}\nUSER_UUID: ${o.user}\nDEVICE_UUID: ${o.device}\nКатегория: ${o.category}`)
+  if(ready?.error!=='PUSH_TEST_READY'||!permit||ready.userId!==o.user||ready.deviceId!==o.device||ready.category!==o.category)throw stopped('Невалиден отговор при предварителната проверка.'+ (serverCodes.has(ready?.error)?` Код: ${ready.error}.`:''))
+  output(`USER_UUID: ${o.user}\nDEVICE_UUID: ${o.device}\nКатегория: ${o.category}`)
   if(await confirm('SEND ONE')!=='SEND ONE'){output('Отказано. Няма опит за изпращане.');return}
   const result=await node({operation:'send',permitId:permit,confirmation:`SEND ONE ${o.user} ${o.device}`})
   if(result?.error!=='PUSH_TEST_ACCEPTED'||result.diagnostic?.category!=='accepted'||!Number.isInteger(result.diagnostic?.providerStatus)||result.diagnostic.providerStatus<200||result.diagnostic.providerStatus>299)throw Error('SEND_UNCONFIRMED')
@@ -114,7 +132,8 @@ async function main(){
   await runNodeOperator(o,{node:createNodeClient(token,session),confirm:phrase=>prompt('За един-единствен опит въведете точно: '+phrase),output:console.log})
  }finally{token='';session=''}
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{
+ console.error(failureDiagnostic(error))
  console.error('Операцията спря. Не повтаряйте при грешка или неизвестен резултат.')
  console.error('Употреба: node scripts/push-node-operator.mjs USER_UUID DEVICE_UUID [wind]')
  process.exitCode=1

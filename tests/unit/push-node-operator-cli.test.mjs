@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {options,createNodeClient,runNodeOperator,PRODUCTION_URL,SELECTED_DEVICE} from '../../scripts/push-node-operator.mjs'
+import {failureDiagnostic,options,createNodeClient,runNodeOperator,PRODUCTION_URL,SELECTED_DEVICE} from '../../scripts/push-node-operator.mjs'
 const user='b0000000-0000-0000-0000-000000000001',permit='c0000000-0000-0000-0000-000000000002'
 const selection=options([user,SELECTED_DEVICE])
 const ready={error:'PUSH_TEST_READY',permitId:permit,userId:user,deviceId:SELECTED_DEVICE,category:'wind'}
@@ -75,4 +75,58 @@ test('concurrent clients sharing one atomic synthetic permit never replay a deni
 test('cleanup failure is not silently treated as success and is never retried',async()=>{
  const f=fixture({failure:'cancel'});await assert.rejects(f.run(),/CANCEL_UNCONFIRMED/)
  assert.deepEqual(f.calls.map(x=>x.operation),['prepare','send','cancel'])
+})
+
+const failureText=async fetcher=>{
+ let error
+ try{await runNodeOperator(selection,{node:createNodeClient(token,session,fetcher),confirm:()=>assert.fail('must not prompt'),output:()=>assert.fail('must not output')})}
+ catch(caught){error=caught}
+ assert.ok(error)
+ return failureDiagnostic(error)
+}
+test('preflight diagnostics distinguish HTTP statuses and allow only exact server codes',async()=>{
+ for(const [status,code] of [[401,'UNAUTHORIZED'],[401,'INVALID_SESSION'],[403,'FORBIDDEN'],[409,'PUSH_TEST_NOT_READY'],[409,'PUSH_TEST_NOT_ALLOWED'],[503,'PUSH_NODE_DISABLED'],[503,'PUSH_NODE_UNCONFIGURED'],[503,'OPERATOR_UNAVAILABLE'],[503,'PUSH_TEST_DISABLED'],[503,'PUSH_TEST_UNCONFIGURED'],[503,'PUSH_TEST_UNCERTAIN']]){
+  let calls=0
+  const text=await failureText(async()=>{calls++;return Response.json({error:code,endpoint:secret,permitId:permit,token,session,stack:secret},{status})})
+  assert.ok(text.includes(`HTTP ${status}:`));assert.ok(text.includes(`Код: ${code}.`));assert.equal(calls,1)
+  for(const value of [secret,token,session,permit,PRODUCTION_URL])assert.ok(!text.includes(value))
+ }
+ for(const error of [secret,'FORBIDDEN\n'+secret,'constructor','__proto__',{code:'FORBIDDEN'},null]){
+  const text=await failureText(async()=>Response.json({error,message:secret},{status:403}))
+  assert.equal(text,'HTTP 403: отказан достъп.')
+ }
+})
+test('HTTP status survives malformed, empty, oversized or non-object error bodies',async()=>{
+ for(const status of [401,403,409,503]){
+  for(const body of [secret,'x'.repeat(2049),'','[]','null']){
+   const text=await failureText(async()=>new Response(body,{status}))
+   assert.ok(text.startsWith(`HTTP ${status}:`));assert.ok(!text.includes('Код:'))
+  }
+ }
+ for(const status of [307,429,500])assert.equal(await failureText(async()=>Response.json({error:secret},{status})),'HTTP отказ: неочакван статус.')
+})
+test('network errors and invalid responses have distinct safe diagnostics',async()=>{
+ for(const error of [Error(secret),new DOMException(secret,'TimeoutError')]){
+  let calls=0
+  assert.equal(await failureText(async()=>{calls++;throw error}),'Мрежова грешка: заявката не е потвърдена.')
+  assert.equal(calls,1)
+ }
+ for(const response of [new Response(secret),new Response('x'.repeat(2049)),new Response(null),Response.json([]),Response.json(null)]){
+  assert.equal(await failureText(async()=>response),'Невалиден отговор от сървъра.')
+ }
+ const response=Response.json(ready);Object.defineProperty(response,'redirected',{value:true})
+ assert.equal(await failureText(async()=>response),'Невалиден отговор от сървъра.')
+ const broken=new Response(new ReadableStream({start(controller){controller.error(Error(secret))}}))
+ assert.equal(await failureText(async()=>broken),'Невалиден отговор от сървъра.')
+})
+test('invalid prepare echo is diagnosed without confirmation and still cancels a known permit',async()=>{
+ const f=fixture({prepare:{...ready,userId:permit}})
+ await assert.rejects(f.run(),error=>failureDiagnostic(error)==='Невалиден отговор при предварителната проверка.')
+ assert.deepEqual(f.calls.map(x=>x.operation),['prepare','cancel'])
+ for(const error of ['PUSH_NODE_DISABLED',secret]){
+  const text=await failureText(async()=>Response.json({error,permit:secret}))
+  assert.equal(text,'Невалиден отговор при предварителната проверка.'+(error==='PUSH_NODE_DISABLED'?' Код: PUSH_NODE_DISABLED.':''))
+ }
+ assert.equal(failureDiagnostic(Error(secret)),'Операцията спря: непотвърден резултат.')
+ assert.equal(failureDiagnostic(Error('HTTP 401: '+secret)),'Операцията спря: непотвърден резултат.')
 })
