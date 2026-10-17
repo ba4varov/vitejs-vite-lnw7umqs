@@ -44,7 +44,7 @@ finally:
  if child.poll() is None: child.kill();child.wait()
  os.close(master)
 `
-function cli(session,valid,{confirmation=['CANCEL\r'],send=false,inputSession=session}={}){
+function cli(session,valid,{confirmation=['CANCEL\r'],send=false,inputSession=session,preflight=null}={}){
  const dir=mkdtempSync(join(tmpdir(),'meteo-cli-'))
  try{
   const preload=join(dir,'mock-fetch.mjs')
@@ -58,9 +58,15 @@ globalThis.fetch=async(url,options)=>{
  const body=JSON.parse(options.body);calls.push(body.operation)
  assert.ok(body.operation==='prepare'||body.operation==='cancel'||(${send}&&body.operation==='send'),'Unexpected send')
  if(body.operation==='send')assert.deepEqual(body,{operation:'send',permitId:'${id}',confirmation:'SEND ONE ${id} ${device}'})
+ if(${JSON.stringify(preflight)}!==null){
+  assert.equal(body.operation,'prepare')
+  const failure=${JSON.stringify(preflight)}
+  if(failure.network)throw Error('SYNTHETIC_PRIVATE_ERROR')
+  return new Response(failure.body,{status:failure.status})
+ }
  return new Response(JSON.stringify(body.operation==='prepare'?{error:'PUSH_TEST_READY',permitId:'${id}',userId:'${id}',deviceId:'${device}',category:'wind'}:body.operation==='send'?{error:'PUSH_TEST_ACCEPTED',diagnostic:{category:'accepted',providerStatus:201}}:{error:'PUSH_TEST_CLOSED'}))
 }
-process.on('exit',()=>{assert.deepEqual(calls,${JSON.stringify(valid?(send?['prepare','send','cancel']:['prepare','cancel']):[])});console.log('CLI_FIXTURE_OK')})
+process.on('exit',()=>{assert.deepEqual(calls,${JSON.stringify(preflight?['prepare']:valid?(send?['prepare','send','cancel']:['prepare','cancel']):[])});console.log('CLI_FIXTURE_OK')})
 `)
   const result=spawnSync('python3',['-c',harness,JSON.stringify({cmd:[process.execPath,'--import',preload,'scripts/push-node-operator.mjs',id,device],operator,jwt:inputSession,confirmation})],{encoding:'utf8',timeout:15000})
   assert.equal(result.status,0,'PTY harness must complete')
@@ -108,4 +114,22 @@ test('Ctrl+C cancels and cleans up the prepared permit without sending',()=>{
  assert.equal(result.code,1)
  assert.match(result.output,/Разрешението е затворено/)
  assert.ok(result.output.includes('\x1b[?2004l'))
+})
+
+test('actual CLI prints safe preflight diagnostics and exits before SEND ONE',()=>{
+ for(const [preflight,expected] of [
+  [{status:401,body:JSON.stringify({error:'INVALID_SESSION'})},'HTTP 401:'],
+  [{status:403,body:JSON.stringify({error:'FORBIDDEN'})},'HTTP 403:'],
+  [{status:409,body:JSON.stringify({error:'PUSH_TEST_NOT_READY'})},'HTTP 409:'],
+  [{status:503,body:JSON.stringify({error:'PUSH_NODE_DISABLED'})},'HTTP 503:'],
+  [{network:true},'Мрежова грешка:'],
+  [{status:200,body:'SYNTHETIC_PRIVATE_ERROR'},'Невалиден отговор'],
+  [{status:403,body:JSON.stringify({error:'SYNTHETIC_PRIVATE_ERROR',endpoint:'PRIVATE_ENDPOINT',permitId:id})},'HTTP 403:'],
+ ]){
+  const result=cli(jwt,true,{preflight,confirmation:[]})
+  assert.equal(result.code,1);assert.equal(result.prompts,2)
+  assert.ok(result.output.includes(expected))
+  for(const value of ['SYNTHETIC_PRIVATE_ERROR','PRIVATE_ENDPOINT',id,device,'https://','SEND ONE','Error:',' at '])assert.ok(!result.output.includes(value))
+  if(preflight.body?.includes('PUSH_NODE_DISABLED'))assert.ok(result.output.includes('Код: PUSH_NODE_DISABLED.'))
+ }
 })
