@@ -66,8 +66,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
   function log(endpoint, error) {
     logger(`[${endpoint}]`, {
       endpoint, stage: error.stage, status: error.httpStatus ?? null,
-      upstreamStatus: error.upstreamStatus ?? null, code: error.code,
-      model: error.model ?? null, message: error.safeMessage ?? null
+      code: error.code
     })
   }
 
@@ -77,7 +76,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
     try {
       response = await fetchImpl(`${API_ROOT}/models`, { signal, method: 'GET', headers: { 'x-goog-api-key': apiKey } })
     } catch {
-      throw new GeminiServiceError(stage, 'models-list-failed', { safeMessage: 'Model discovery network failure' })
+      throw new GeminiServiceError(stage, signal?.aborted ? 'timeout' : 'models-list-failed', { safeMessage: 'Model discovery network failure' })
     }
     if (!response.ok) {
       throw new GeminiServiceError(stage, 'models-list-failed', { httpStatus: response.status, ...await upstreamDetails(response, apiKey) })
@@ -122,7 +121,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
           response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
             signal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
           })
-        } catch { throw new GeminiServiceError(stage, 'network-error', { model, safeMessage: 'Gemini network failure' }) }
+        } catch { throw new GeminiServiceError(stage, signal.aborted ? 'timeout' : 'network-error', { model, safeMessage: 'Gemini network failure' }) }
         if (response.ok) return { payload: await response.json(), model }
         const details = await upstreamDetails(response, env.GEMINI_API_KEY)
         if (response.status === 404 && attempt === 0) {

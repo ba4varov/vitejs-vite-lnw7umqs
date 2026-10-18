@@ -102,6 +102,15 @@ test('aborted discovery fails safely instead of attempting generation', async t 
     controller.abort()
     signal.throwIfAborted()
   } })
-  await assert.rejects(client.generate({ endpoint: 'weather-chat', stage: 'test', body: {} }), error => error.code === 'models-list-failed')
+  await assert.rejects(client.generate({ endpoint: 'weather-chat', stage: 'test', body: {} }), error => error.code === 'timeout')
   assert.equal(calls, 1)
+})
+
+test('Gemini diagnostics omit untrusted model/status/prose even when they contain personal data', async () => {
+  const { client, logs } = fakeClient([
+    response(200, { models: [model('gemini-2.5-flash')] }),
+    response(500, { error: { status: 'PERSONAL_STATUS', message: 'User Jane at 42.14, 24.75' } })
+  ])
+  await assert.rejects(client.generate({ endpoint: 'weather-chat', stage: 'gemini-understanding', body: {} }))
+  assert.deepEqual(logs, [['[weather-chat]', { endpoint: 'weather-chat', stage: 'gemini-understanding', status: 500, code: 'upstream-http' }]])
 })

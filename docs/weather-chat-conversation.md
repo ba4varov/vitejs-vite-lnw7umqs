@@ -102,3 +102,48 @@ CHROMIUM_PATH=/usr/bin/chromium npx playwright test tests/weather-chat-clarifica
 
 The handler and browser suites mock external services; they do not test live
 Open-Meteo availability.
+
+## Thunderstorms and Gemini clarification resolution
+
+`thunderstorm` is a separate validated intent, supported by Gemini and the local
+BG/EN parser (thunder, lightning, thunderstorms, гръмотевици, гърми, мълнии).
+On a pending intent question, a valid Gemini weather intent can resolve the slot
+even when local vocabulary/fragment rules do not recognize the wording. This
+also applies to other weather intents; it is not a phrase-specific exception.
+The local slot resolver still controls confirmed city/period inheritance,
+explicit changes, cancellation, date ambiguity and location clarification. A
+standalone question continues to clear pending context.
+
+The deterministic thunderstorm renderer uses only Open-Meteo WMO codes 95, 96
+and 99. Current questions use current codes; calendar days use the daily code
+and hourly evidence for that day; hourly windows use only matching hours, and
+weekends are evaluated per requested day. Daily codes summarize the day's most
+severe condition. Positive hourly evidence is retained even when daily data are
+missing or disagree. An hourly-only negative requires complete timestamp/code
+coverage; gaps, null/unknown codes or duplicate rows cannot substitute for the
+missing hours. Without enough data the answer says so. A nonstorm forecast is
+phrased as no indication, never a guarantee. Rain probability is not used as
+thunderstorm probability. Responses do not invent warnings or lightning-strike
+locations/times. An unspecified period (`general`) covers the next 12 hours and
+is labelled accordingly.
+
+## Safe server diagnostics
+
+Each eligible turn emits `[weather-chat:understanding]` with fixed `source`,
+`reason` and `attempted` fields. `gemini_used` means `generate` returned a valid
+structured interpretation. `attempted: true` means the client was invoked; it
+does not prove that a failed discovery reached the generation endpoint.
+Fallback reasons distinguish `missing_configuration`, `quick_action`,
+`budget_exhausted`, `invalid_json`, `invalid_structure`, `quota`, `timeout`,
+`network_error`, `discovery_failed`, `model_unavailable`, `upstream_http` and
+`unexpected_error`. No messages, cities, coordinates, keys, model prose or raw
+errors are logged. The Gemini client's error log also omits upstream prose,
+upstream status strings and model names, which can contain untrusted data.
+
+Handler tests exercise the real Gemini client through a simulated HTTP
+transport, checking model discovery and `:generateContent`, response validation,
+context and fallback diagnostics. They use dummy keys. This verifies the
+invocation path without implying a successful live Google API/deployment test;
+the development environment has no configured Gemini key. Deployment operators
+can distinguish configuration/fallback from successful Gemini use with the
+fixed server events above, without logging user input or credentials.
