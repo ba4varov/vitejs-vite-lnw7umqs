@@ -76,6 +76,14 @@ export async function groundLocation(candidates, requestedCity, explicitAI, reso
     if (qualified && !('ambiguous' in qualified)) return { status: 'verified', place: qualified, candidates: candidates.length }
     return { status: qualified ? 'ambiguous' : 'unverified', requestedCity, candidates: candidates.length }
   }
+  // A semantic subspan is its own geocoding candidate. Rejected surrounding
+  // prose is not a geographic contradiction. An independently verified other
+  // place (or an independently ambiguous name) still needs clarification.
+  if (explicitAI && anchored && !sameQuery && aiPlace && !('ambiguous' in aiPlace)) {
+    const conflict = probes.some(({ place }) => place && !samePlace(place, aiPlace))
+    if (conflict) return { status: 'ambiguous', requestedCity: null, candidates: candidates.length }
+    return { status: 'verified', place: aiPlace, candidates: candidates.length }
+  }
   if (places.length === 1 && !probes.some(({ place }) => place && 'ambiguous' in place)) {
     const place = places[0]
     const locativeEvidence = probes.some(probe => samePlace(probe.place, place) && (probe.candidate.anchored ?? probe.candidate.strength !== 'name'))
@@ -84,9 +92,6 @@ export async function groundLocation(candidates, requestedCity, explicitAI, reso
     return { status: 'verified', place, candidates: candidates.length }
   }
   if (explicitAI && sameQuery?.place && !('ambiguous' in sameQuery.place)) return { status: 'verified', place: sameQuery.place, candidates: candidates.length }
-  if (explicitAI && requestedCity && anchored && !sameQuery) {
-    if (aiPlace && !('ambiguous' in aiPlace) && (!places.length || places.some(place => place.latitude === aiPlace.latitude && place.longitude === aiPlace.longitude))) return { status: 'verified', place: aiPlace, candidates: candidates.length }
-  }
   const ambiguous = probes.filter(({ place }) => place && 'ambiguous' in place)
   if (places.length > 1 || ambiguous.length) return { status: 'ambiguous', requestedCity: !places.length && ambiguous.length === 1 ? ambiguous[0].candidate.text : null, candidates: candidates.length }
   if (strong.length) return { status: 'unverified', requestedCity: strong[0].text, candidates: candidates.length }
