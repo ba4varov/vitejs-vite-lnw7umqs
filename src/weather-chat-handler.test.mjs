@@ -112,3 +112,23 @@ test('message language changes the answer without changing interface settings', 
   const { body } = await invoke(t, 'Каква е температурата утре?', 'en')
   assert.match(body.answer, /температурата/)
 })
+
+for (const lang of ['bg', 'en']) test(`weekday follow-up ${lang}: inherits resolved city and measure without geocoding weekday`, async t => {
+  const first = await invoke(t, lang === 'bg' ? 'Ще вали ли утре във Варна?' : 'Will it rain tomorrow in Varna?', lang)
+  const { body, calls } = await invoke(t, lang === 'bg' ? 'А в неделя?' : 'What about Monday?', lang, { context: first.body.context })
+  assert.equal(body.intent, 'rain')
+  assert.equal(body.context.city, first.body.context.city)
+  assert.equal(body.targetDate, lang === 'bg' ? '2026-10-11' : '2026-10-12')
+  assert.equal(calls.some(url => url.hostname.startsWith('geocoding-')), false)
+  assert.equal(calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '43.21')
+})
+for (const lang of ['bg', 'en']) test(`weekday ${lang}: selected timezone decides whether Sunday is today or next week`, async t => {
+  const { body } = await invoke(t, lang === 'bg' ? 'Времето в неделя?' : 'Weather on Sunday?', lang, {}, { ...forecast, timezone: 'Asia/Tokyo' }, '2026-10-11T23:30:00Z')
+  assert.equal(body.targetDate, '2026-10-18')
+})
+for (const lang of ['bg', 'en']) for (const missing of ['precipitation', 'precipitation_probability']) test(`partial rain ${lang}: absent ${missing} does not justify a dry verdict`, async t => {
+  const hourly = { ...forecast.hourly, [missing]: undefined }
+  const { body } = await invoke(t, lang === 'bg' ? 'Трябва ли ми чадър?' : 'Should I take an umbrella?', lang, {}, { ...forecast, hourly })
+  assert.match(body.answer, lang === 'bg' ? /непълни/ : /incomplete/)
+  assert.doesNotMatch(body.answer, /No umbrella|не е нужен чадър/)
+})

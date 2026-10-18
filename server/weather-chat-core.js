@@ -134,6 +134,14 @@ export function weekendForecastDates(scope, now = new Date(), timezone = 'UTC') 
   return [saturday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)]
 }
 
+// Bare weekdays mean the nearest occurrence, including today in the selected city.
+const WEEKDAYS = new Map([
+  ...'неделя понеделник вторник сряда четвъртък петък събота'.split(' ').map((name, day) => [name, day]),
+  ...'sunday monday tuesday wednesday thursday friday saturday'.split(' ').map((name, day) => [name, day])
+])
+const WEEKDAY_NAMES = [...WEEKDAYS.keys()].join('|')
+const weekdayOnly = value => WEEKDAYS.has(normalizeQuestion(value))
+
 export function extractRequestedDate(message, now = new Date(), timezone = 'UTC', _lang = 'bg') {
   const text = normalizeQuestion(message)
   const englishRelative = text.match(/(?:^|\s)in\s+(\d{1,2})\s+days?(?=\s|$)/u)
@@ -159,7 +167,15 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
     if (!match) {
       const englishMonths = new Map('january february march april may june july august september october november december'.split(' ').map((name, i) => [name, i + 1]))
       match = text.match(/(?:^|\s)(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?(?=\s|$)/u)
-      if (!match) return null
+      if (!match) {
+        const city = extractRequestedCity(message)
+        const dateText = city ? text.replace(normalizeQuestion(city), '') : text
+        const weekday = dateText.match(new RegExp(`(?:^|\\s)(?:${WEEKDAY_NAMES})(?=\\s|$)`, 'u'))?.[0].trim()
+        if (!weekday) return null
+        const date = new Date(`${localIsoDate(now, timezone)}T12:00:00Z`)
+        date.setUTCDate(date.getUTCDate() + (WEEKDAYS.get(weekday) - date.getUTCDay() + 7) % 7)
+        return date.toISOString().slice(0, 10)
+      }
       day = match[2]; month = englishMonths.get(match[1]); year = match[3]
     } else {
       day = match[1]; month = MONTHS_BG.get(match[2]); year = match[3]
@@ -177,7 +193,8 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
 
 export function extractRequestedCity(message, _lang = 'bg') {
   const cleaned = normalizeBulgarianTimeExpressions(message).replace(/[?!]+$/u, '').trim()
-  const stop = String.raw`(?=[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
+  const weekdayBoundary = String.raw`\s+(?:във|в|на|on|for)\s+(?:${WEEKDAY_NAMES})(?:\s|$)`
+  const stop = String.raw`(?=${weekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
   // "за" denotes a place only when attached to an explicit weather construction.
   const patterns = [
     new RegExp(String.raw`(?:^|\s)(?:във|в)\s+([\p{L}][\p{L}'’.,-]*(?:\s+[\p{L}][\p{L}'’.,-]*){0,4}?)${stop}`, 'giu'),
@@ -187,16 +204,16 @@ export function extractRequestedCity(message, _lang = 'bg') {
   ]
   const candidates = patterns.flatMap(pattern => [...cleaned.matchAll(pattern)].map(match => match[1]
     .replace(/,\s*(?:докато|когато|а|но|when|while)(?=\s|$).*$/iu, '')
-    .replace(/\s+(?:какво|каква|какъв|ще|е|бъде|времето|прогнозата).*$/iu, '').trim()))
+    .replace(/\s+(?:какво|каква|какъв|ще|е|бъде|времето|прогнозата).*$/iu, '').trim())).filter(candidate => !weekdayOnly(candidate))
   if (candidates.length) {
     const candidate = candidates.at(-1)
     if (!candidate.split(/\s+/u).every(word => PROTECTED_LOCATION.has(normalizeQuestion(word).replace(/[.,]/g, '')))) return candidate
   }
   // Common free word order: a proper-name phrase immediately before the time word.
   const followup = cleaned.match(/^(?:а|and|what about)\s+([\p{Lu}][\p{L}'’.-]*(?:\s+[\p{Lu}][\p{L}'’.-]*){0,3})$/u)?.[1]
-  if (followup && !followup.split(/\s/u).some(word => PROTECTED_LOCATION.has(normalizeQuestion(word))) && !/^(?:tomorrow|today|wind|rain|temperature|yesterday)$/iu.test(followup)) return followup
+  if (followup && !weekdayOnly(followup) && !followup.split(/\s/u).some(word => PROTECTED_LOCATION.has(normalizeQuestion(word))) && !/^(?:tomorrow|today|wind|rain|temperature|yesterday)$/iu.test(followup)) return followup
   const bare = cleaned.match(/(?:^|\s)([\p{Lu}][\p{L}'’.-]*(?:[ ,]+[\p{Lu}][\p{L}'’.-]*){0,3})\s+(?:днес|утре|вдругиден)(?=\s|$)/u)?.[1]
-  return bare && !PROTECTED_LOCATION.has(normalizeQuestion(bare)) ? bare.trim() : null
+  return bare && !weekdayOnly(bare) && !PROTECTED_LOCATION.has(normalizeQuestion(bare)) ? bare.trim() : null
 }
 
 export function extractTimeScope(message) {
@@ -369,6 +386,10 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
 
   if (understood.intent === 'rain') {
     const needed = wetCode || rainMm > 0.1 || (rainChance ?? 0) >= 35
+    const complete = hours.length > 0 && hours.every(hour => number(hour.rainMm) !== null && number(hour.rainChancePct) !== null)
+    if (!needed && !complete) return lang === 'bg'
+      ? `Данните за валежите ${period} са непълни. Не мога надеждно да преценя дали ще ти трябва чадър; вземи го за всеки случай.`
+      : `Precipitation data ${period} are incomplete. I cannot reliably tell whether you will need an umbrella; take one just in case.`
     if (lang === 'en') return `${needed ? 'Yes, take an umbrella' : 'No umbrella is needed'} ${period}: precipitation probability is up to ${rainChance ?? '?'}% and about ${(rainMm === null ? '?' : rainMm.toFixed(1))} mm is expected.`
     return `${needed ? 'Да, вземи чадър' : 'Не, не е нужен чадър'} ${period}: вероятността за валеж е до ${rainChance ?? '?'}%, очакват се около ${(rainMm === null ? '?' : rainMm.toFixed(1))} мм.`
   }
