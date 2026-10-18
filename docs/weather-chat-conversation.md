@@ -137,16 +137,23 @@ is labelled accordingly.
 
 ## Safe server diagnostics
 
-Diagnostics distinguish three events, joined by a random per-request `requestId`
-that is neither persisted nor a user/session identifier:
+Diagnostics distinguish understanding, transport stages and the final decision,
+joined by a random per-request `requestId` that is neither persisted nor a
+user/session identifier:
 
 - `[weather-chat:understanding]`, phase `invocation`, reason `gemini_invoked`:
   the client is about to be invoked. A failed discovery may not reach generation.
 - The same prefix, phase `result`: `gemini_valid` means the entire semantic
   contract validated. Fallback reasons distinguish `missing_configuration`,
   `quick_action`, `budget_exhausted`, `invalid_json`, `invalid_structure`, `quota`,
-  `timeout`, `network_error`, `discovery_failed`, `model_unavailable`,
+  `authentication` (401), `permission` (403), `timeout`, `network_error`,
+  `discovery_failed`, `model_unavailable`,
   `upstream_http` and `unexpected_error`.
+- `[weather-chat:gemini-stage]` records `discovery` or `generation`, monotonic
+  `durationMs`, `code` (`ok` on success) and HTTP error `status` (null otherwise).
+  A direct configured-model request emits only generation. A 404 recovery emits
+  generation failure, discovery, then at most one more generation. All share
+  the handler request ID. See [latency budgets](bobi-gemini-production-latency.md).
 - `[weather-chat:decision]` is emitted at the response boundary. `source` is the
   interpreter actually used (`gemini`/`local`, or `none` for a rejected request),
   `outcome` distinguishes an answer, clarification, unrelated request,
@@ -154,7 +161,8 @@ that is neither persisted nor a user/session identifier:
   decision category. A valid AI result followed by a geocoding/calendar
   clarification is visible as such; it is not logged as a local fallback.
 
-Only fixed enums, status codes and random request IDs are logged. No messages,
+Only fixed enums, numeric durations/status codes and random request IDs are
+logged. No messages,
 cities, coordinates, keys, model prose, raw errors or stable personal identifiers
 are included. The Gemini client's error log also omits upstream prose, upstream
 status strings and model names, which can contain untrusted data.

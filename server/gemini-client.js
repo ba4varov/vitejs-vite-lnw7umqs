@@ -1,4 +1,7 @@
 const API_ROOT = 'https://generativelanguage.googleapis.com/v1beta'
+// Per understanding, including HTTP bodies and the single 404 recovery.
+export const GEMINI_BUDGET_MS = Object.freeze({ total: 8000, discovery: 1500, generation: 6500 })
+const STABLE_TEXT_MODEL = /^gemini-\d+(?:\.\d+)?-(?:flash(?:-lite)?|pro)(?:-\d{3})?$/
 const EXCLUDED_MODEL_KINDS = /(?:image|imagen|live|audio|tts|speech|transcri|embed|preview|experimental|\bexp\b)/i
 
 export class GeminiServiceError extends Error {
@@ -20,7 +23,7 @@ function normalizeName(name) {
 
 function isCompatible(model) {
   const name = normalizeName(model?.name)
-  return name.startsWith('gemini-') &&
+  return STABLE_TEXT_MODEL.test(name) &&
     Array.isArray(model.supportedGenerationMethods) &&
     model.supportedGenerationMethods.includes('generateContent') &&
     !EXCLUDED_MODEL_KINDS.test(`${name} ${model.displayName ?? ''}`)
@@ -59,84 +62,122 @@ async function upstreamDetails(response, apiKey) {
   } catch { return {} }
 }
 
-export function createGeminiClient({ fetchImpl = fetch, env = process.env, logger = console.error } = {}) {
-  // One deadline covers discovery, generation and a possible stale-model retry.
+export function createGeminiClient({ fetchImpl = fetch, env = process.env, logger = (prefix, data) => (data.code === 'ok' ? console.info : console.error)(prefix, data), now = () => performance.now() } = {}) {
   let cachedModel
 
-  function log(endpoint, error) {
+  function log(endpoint, error, requestId) {
     logger(`[${endpoint}]`, {
       endpoint, stage: error.stage, status: error.httpStatus ?? null,
-      code: error.code
+      code: error.code, ...(requestId ? { requestId } : {})
     })
   }
 
-  async function listModels(stage, signal) {
-    const apiKey = env.GEMINI_API_KEY
-    let response
+  // Abort fetch AND bound awaiting its body. Clear timers/listeners on every exit.
+  async function timedStage({ endpoint, stage, phase, signal: parent, requestId }, operation) {
+    const started = now()
+    const controller = new AbortController()
+    const signal = parent ? AbortSignal.any([parent, controller.signal]) : controller.signal
+    const timer = setTimeout(() => controller.abort(), GEMINI_BUDGET_MS[phase])
+    let onAbort
+    let failure
     try {
-      response = await fetchImpl(`${API_ROOT}/models`, { signal, method: 'GET', headers: { 'x-goog-api-key': apiKey } })
-    } catch {
-      throw new GeminiServiceError(stage, signal?.aborted ? 'timeout' : 'models-list-failed', { safeMessage: 'Model discovery network failure' })
+      signal.throwIfAborted()
+      const aborted = new Promise((_, reject) => {
+        onAbort = () => reject(new GeminiServiceError(stage, 'timeout'))
+        signal.addEventListener('abort', onAbort, { once: true })
+        if (signal.aborted) onAbort()
+      })
+      return await Promise.race([operation(signal), aborted])
+    } catch (error) {
+      failure = signal.aborted ? new GeminiServiceError(stage, 'timeout')
+        : error instanceof GeminiServiceError ? error
+          : new GeminiServiceError(stage, phase === 'discovery' ? 'models-list-failed' : 'network-error')
+      throw failure
+    } finally {
+      clearTimeout(timer)
+      if (onAbort) signal.removeEventListener('abort', onAbort)
+      logger(`[${endpoint}:gemini-stage]`, {
+        endpoint, stage, phase, durationMs: Math.max(0, Math.round(now() - started)),
+        status: failure?.httpStatus ?? null, code: failure?.code ?? 'ok',
+        ...(requestId ? { requestId } : {})
+      })
     }
-    if (!response.ok) {
-      throw new GeminiServiceError(stage, 'models-list-failed', { httpStatus: response.status, ...await upstreamDetails(response, apiKey) })
-    }
-    let payload
-    try { payload = await response.json() } catch {
-      throw new GeminiServiceError(stage, 'models-list-failed', { httpStatus: response.status, safeMessage: 'Invalid model discovery response' })
-    }
-    return Array.isArray(payload?.models) ? payload.models : []
   }
 
-  async function resolveModel(stage, { exclude, ignoreConfigured = false, signal } = {}) {
+  async function listModels(stage, { signal, endpoint, requestId }) {
+    return timedStage({ endpoint, stage, phase: 'discovery', signal, requestId }, async stageSignal => {
+      const apiKey = env.GEMINI_API_KEY
+      const response = await fetchImpl(`${API_ROOT}/models`, { signal: stageSignal, method: 'GET', headers: { 'x-goog-api-key': apiKey } })
+      if (!response.ok) {
+        throw new GeminiServiceError(stage, 'models-list-failed', { httpStatus: response.status, ...await upstreamDetails(response, apiKey) })
+      }
+      let payload
+      try { payload = await response.json() } catch {
+        throw new GeminiServiceError(stage, 'models-list-failed', { httpStatus: response.status, safeMessage: 'Invalid model discovery response' })
+      }
+      return Array.isArray(payload?.models) ? payload.models : []
+    })
+  }
+
+  async function resolveModel(stage, { exclude, ignoreConfigured = false, signal, endpoint = 'gemini', requestId } = {}) {
     if (cachedModel && cachedModel !== exclude) return cachedModel
-    const models = await listModels(stage, signal)
     const configured = !ignoreConfigured ? normalizeName(env.GEMINI_MODEL) : ''
     if (configured) {
-      const found = models.find(model => normalizeName(model.name) === configured)
-      if (!found || !isCompatible(found)) {
-        throw new GeminiServiceError(stage, 'configured-model-unavailable', { model: configured, safeMessage: 'Configured model is unavailable or incompatible' })
+      // A conservative stable text-model grammar is checked locally. Availability
+      // is checked by generateContent itself; 404 triggers discovery below.
+      if (!STABLE_TEXT_MODEL.test(configured)) {
+        throw new GeminiServiceError(stage, 'configured-model-unavailable', { safeMessage: 'Configured model is incompatible' })
       }
-      cachedModel = configured
-      return cachedModel
+      return configured
     }
+    const models = await listModels(stage, { signal, endpoint, requestId })
     const selected = compatibleFlashModels(models).map(model => normalizeName(model.name)).find(name => name !== exclude)
     if (!selected) throw new GeminiServiceError(stage, 'no-compatible-model', { safeMessage: 'No compatible stable Gemini Flash model is available' })
     cachedModel = selected
     return cachedModel
   }
 
-  async function generate({ endpoint, stage, body }) {
+  async function generate({ endpoint, stage, body, requestId = undefined }) {
     if (!env.GEMINI_API_KEY) {
       const error = new GeminiServiceError(stage, 'missing-configuration', { safeMessage: 'Gemini is not configured' })
-      log(endpoint, error); throw error
+      log(endpoint, error, requestId); throw error
     }
-    const signal = AbortSignal.timeout(5000)
+    const deadline = new AbortController()
+    const timer = setTimeout(() => deadline.abort(), GEMINI_BUDGET_MS.total)
+    const signal = deadline.signal
     let model
     try {
-      model = await resolveModel(stage, { signal })
+      model = await resolveModel(stage, { signal, endpoint, requestId })
       for (let attempt = 0; attempt < 2; attempt++) {
-        let response
         try {
-          response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
-            signal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
+          const payload = await timedStage({ endpoint, stage, phase: 'generation', signal, requestId }, async stageSignal => {
+            const response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
+              signal: stageSignal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
+            })
+            if (!response.ok) {
+              throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: response.status, model, ...await upstreamDetails(response, env.GEMINI_API_KEY) })
+            }
+            try { return await response.json() } catch {
+              throw new GeminiServiceError(stage, 'invalid-json', { httpStatus: response.status })
+            }
           })
-        } catch { throw new GeminiServiceError(stage, signal.aborted ? 'timeout' : 'network-error', { model, safeMessage: 'Gemini network failure' }) }
-        if (response.ok) return { payload: await response.json(), model }
-        const details = await upstreamDetails(response, env.GEMINI_API_KEY)
-        if (response.status === 404 && attempt === 0) {
-          const previous = model
-          cachedModel = undefined
-          model = await resolveModel(stage, { exclude: previous, ignoreConfigured: true, signal })
-          continue
+          cachedModel = model
+          return { payload, model }
+        } catch (error) {
+          if (error instanceof GeminiServiceError && error.httpStatus === 404) cachedModel = undefined
+          if (error instanceof GeminiServiceError && error.httpStatus === 404 && attempt === 0) {
+            const previous = model
+            model = await resolveModel(stage, { exclude: previous, ignoreConfigured: true, signal, endpoint, requestId })
+            continue
+          }
+          throw error
         }
-        throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: response.status, model, ...details })
       }
     } catch (error) {
-      const serviceError = error instanceof GeminiServiceError ? error : new GeminiServiceError(stage, 'unexpected-error', { model })
-      log(endpoint, serviceError)
+      const serviceError = error instanceof GeminiServiceError ? error : new GeminiServiceError(stage, 'unexpected-error')
+      log(endpoint, serviceError, requestId)
       throw serviceError
-    }
+    } finally { clearTimeout(timer) }
   }
 
   return { generate, resolveModel, invalidate: () => { cachedModel = undefined } }
