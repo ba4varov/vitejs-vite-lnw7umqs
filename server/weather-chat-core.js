@@ -200,7 +200,10 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
 }
 
 export function extractRequestedCity(message, _lang = 'bg') {
+  // Remove a weekday phrase before another location preposition, so the first
+  // Bulgarian "в" cannot swallow both the date and the actual city as one name.
   const cleaned = normalizeBulgarianTimeExpressions(message).replace(/[?!]+$/u, '').trim()
+    .replace(new RegExp(String.raw`(?:^|\s)(?:във|в|на|on|for)\s+(?:${WEEKDAY_MODIFIER}\s+)?(?:${WEEKDAY_NAMES})(?=\s+(?:във|в|in|at|near)\s)`, 'giu'), ' ')
   const weekdayBoundary = String.raw`\s+(?:във|в|на|on|for)\s+(?:${WEEKDAY_MODIFIER}\s+)?(?:${WEEKDAY_NAMES})(?:\s|$)`
   const qualifiedWeekdayBoundary = String.raw`\s+${WEEKDAY_MODIFIER}\s+(?:${WEEKDAY_NAMES})(?:\s|$)`
   const stop = String.raw`(?=${weekdayBoundary}|${qualifiedWeekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
