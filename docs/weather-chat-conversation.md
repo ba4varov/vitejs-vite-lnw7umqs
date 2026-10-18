@@ -32,8 +32,17 @@ with mocked upstream responses, including a local-midnight date boundary and
 message/interface language differences. No external service is called by these
 chat tests.
 
-Weekday names (понеделник–неделя and Monday–Sunday) select the nearest occurrence,
-including today, using the selected location's local calendar date. A weekday
+Bare weekday names (понеделник–неделя and Monday–Sunday) select the nearest
+occurrence, including today, using the selected location's local calendar date.
+Qualified weekdays use Monday–Sunday calendar weeks: `този`/`тази`/`this` select
+the day in the current week (possibly in the past); `следващия`, `следващият`,
+`следващата`, `идния`, `идният`, `идната` and `next` select the day in the next
+week. For example, on Sunday 2026-10-18, `в неделя` and `тази неделя` mean
+October 18, `следващата неделя` / `next Sunday` mean October 25, and `this Monday`
+means October 12. Calendar arithmetic uses the destination's local date, so DST,
+midnight and year changes do not depend on the server's timezone. Dates outside
+the returned forecast retain conversation context and produce an availability
+message without substituting today's measurements. A weekday
 follow-up inherits the city and measure, and never triggers geocoding for the
 weekday itself. Weekday words inside compound place names remain part of the
 location (for example Friday Harbor and Света Неделя).

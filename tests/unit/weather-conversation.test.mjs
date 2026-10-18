@@ -90,3 +90,59 @@ test('weekday dates cross a year boundary in local time', () => {
   assert.equal(extractRequestedDate('on Friday', new Date('2026-12-31T23:30:00Z'), 'Asia/Tokyo'), '2027-01-01')
   assert.equal(extractRequestedDate('в четвъртък', new Date('2026-12-31T23:30:00Z'), 'Asia/Tokyo'), '2027-01-07')
 })
+
+// Exercise every local weekday against every requested weekday, including year/DST boundaries.
+for (const monday of ['2026-10-12', '2026-10-19', '2026-12-28']) {
+  for (const timezone of ['Europe/Sofia', 'Asia/Tokyo', 'America/Los_Angeles', 'Pacific/Kiritimati']) {
+    test(`calendar weekday matrix: ${monday}, ${timezone}`, () => {
+      const shift = days => {
+        const date = new Date(`${monday}T12:00:00Z`)
+        date.setUTCDate(date.getUTCDate() + days)
+        return date.toISOString().slice(0, 10)
+      }
+      for (let today = 0; today < 7; today++) {
+        // Pick the instant whose local date is the requested test day.
+        const instant = new Date(`${shift(today)}T00:00:00Z`)
+        const local = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant)
+        if (local < shift(today)) instant.setUTCHours(12)
+        for (const [day, [bg, en]] of weekdays.entries()) {
+          for (const [name, modifiers] of [[bg, ['', 'този', 'тази', 'текущата', 'следващия', 'следващият', 'следващата', 'идния', 'идният', 'идната']], [en, ['', 'this', 'next']]]) {
+            for (const modifier of modifiers) {
+              const message = `А в ${modifier} ${name}?`.replace(/\s+/g, ' ')
+              const next = /^(следващ|идн|next)/u.test(modifier)
+              const expected = modifier ? shift(day + (next ? 7 : 0)) : shift(day >= today ? day : day + 7)
+              const result = parseConversationQuestion(message, 'bg', { context, now: instant, timezone })
+              assert.equal(result.targetDate, expected, `${message} on ${shift(today)}`)
+              assert.equal(result.requestedCity, null)
+              assert.equal(result.intent, 'rain')
+            }
+          }
+        }
+      }
+    })
+  }
+}
+test('qualified weekday expressions preserve real multiword locations', () => {
+  for (const [message, city, date] of [
+    ['Rain in Friday Harbor next Sunday?', 'Friday Harbor', '2026-10-25'],
+    ['Времето в Света Неделя в следващата сряда?', 'Света Неделя', '2026-10-21'],
+    ['Времето в Горна Оряховица в идната неделя?', 'Горна Оряховица', '2026-10-25'],
+    ['Времето в София следващата неделя?', 'София', '2026-10-25'],
+    ['Времето в Пловдив идната сряда?', 'Пловдив', '2026-10-21'],
+    ['Weather in London on this Monday?', 'London', '2026-10-12']
+  ]) {
+    const result = parseConversationQuestion(message, 'en', { now: new Date('2026-10-18T12:00:00Z'), timezone: 'Europe/Sofia' })
+    assert.equal(result.requestedCity, city)
+    assert.equal(result.targetDate, date)
+  }
+})
+
+test('next and current weeks use the local calendar at midnight and New Year', () => {
+  const instant = new Date('2026-10-18T23:30:00Z')
+  assert.equal(extractRequestedDate('next Sunday', instant, 'Asia/Tokyo'), '2026-11-01')
+  assert.equal(extractRequestedDate('следващата неделя', instant, 'America/Los_Angeles'), '2026-10-25')
+  assert.equal(extractRequestedDate('this Monday', instant, 'Asia/Tokyo'), '2026-10-19')
+  assert.equal(extractRequestedDate('this Monday', instant, 'America/Los_Angeles'), '2026-10-12')
+  assert.equal(extractRequestedDate('next Friday', new Date('2026-12-31T23:30:00Z'), 'Asia/Tokyo'), '2027-01-08')
+  assert.equal(extractRequestedDate('тази неделя', new Date('2026-10-18T12:00:00Z'), 'Europe/Sofia'), '2026-10-18')
+})

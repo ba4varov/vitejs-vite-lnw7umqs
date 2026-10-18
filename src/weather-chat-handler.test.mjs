@@ -25,7 +25,10 @@ async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, n
   t.mock.method(globalThis, 'fetch', async url => {
     const parsed = new URL(url); calls.push(parsed)
     let payload = weatherPayload
-    if (parsed.hostname.startsWith('geocoding-')) payload = { results: [{ name: lang === 'bg' ? 'Варна' : 'Varna', latitude: 43.21, longitude: 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
+    if (parsed.hostname.startsWith('geocoding-')) {
+      const sofia = /^(София|Sofia)$/u.test(parsed.searchParams.get('name'))
+      payload = { results: [{ name: sofia ? (lang === 'bg' ? 'София' : 'Sofia') : (lang === 'bg' ? 'Варна' : 'Varna'), latitude: sofia ? 42.7 : 43.21, longitude: sofia ? 23.3 : 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
+    }
     if (parsed.hostname.startsWith('archive-')) payload = { timezone: 'Europe/Sofia', daily: daily([parsed.searchParams.get('start_date')]) }
     if (parsed.hostname.startsWith('air-quality-')) payload = { current: { european_aqi: 12, pm10: 4, pm2_5: 2 } }
     if (parsed.hostname.startsWith('marine-')) payload = { current: { sea_surface_temperature: 20 } }
@@ -131,4 +134,35 @@ for (const lang of ['bg', 'en']) for (const missing of ['precipitation', 'precip
   const { body } = await invoke(t, lang === 'bg' ? 'Трябва ли ми чадър?' : 'Should I take an umbrella?', lang, {}, { ...forecast, hourly })
   assert.match(body.answer, lang === 'bg' ? /непълни/ : /incomplete/)
   assert.doesNotMatch(body.answer, /No umbrella|не е нужен чадър/)
+})
+
+for (const lang of ['bg', 'en']) for (const available of [true, false]) test(`next Sunday conversation ${lang}, available=${available}`, async t => {
+  const now = '2026-10-18T12:00:00Z'
+  const payload = { ...forecast, daily: daily(available ? [...dates, '2026-10-25'] : dates) }
+  const ask = (message, context) => invoke(t, message, lang, context ? { context } : {}, payload, now)
+  const first = await ask(lang === 'bg' ? 'Ще вали ли във Варна?' : 'Will it rain in Varna?')
+  const sunday = await ask(lang === 'bg' ? 'А в неделя?' : 'And on Sunday?', first.body.context)
+  assert.equal(sunday.body.context.targetDate, '2026-10-18')
+  let previous = sunday.body.context
+  for (const [message, intent] of (lang === 'bg' ? [
+    ['А в следващата неделя?', 'rain'], ['А вятърът?', 'wind'], ['А в София?', 'wind'], ['Как да се облека?', 'clothing']
+  ] : [
+    ['Next Sunday?', 'rain'], ['And wind?', 'wind'], ['And in Sofia?', 'wind'], ['What should I wear?', 'clothing']
+  ])) {
+    const { body, calls } = await ask(message, previous)
+    assert.equal(body.context.targetDate, '2026-10-25')
+    assert.equal(body.intent, intent)
+    if (/София|Sofia/u.test(message)) {
+      assert.equal(body.context.city, lang === 'bg' ? 'София' : 'Sofia')
+      assert.equal(body.context.latitude, 42.7)
+    } else {
+      assert.equal(body.context.city, previous.city)
+      assert.equal(calls.some(url => url.hostname.startsWith('geocoding-')), false)
+    }
+    if (!available) {
+      assert.match(body.answer, lang === 'bg' ? /няма надеждна прогноза/ : /reliable forecast.*not available/)
+      assert.doesNotMatch(body.answer, /°|км\/ч|km\/h|%/)
+    }
+    previous = body.context
+  }
 })
