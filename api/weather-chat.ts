@@ -1,8 +1,8 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
-import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent } from '../server/weather-chat-core.js'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseConversationQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
+import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent, PendingClarification } from '../server/weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, clarificationTurn, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
 import { geminiClient } from '../server/gemini-client.js'
 
 type ChatInput = ValidChatInput
@@ -96,8 +96,8 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null): Pro
     Math.log10(Math.max(1, Number(place.population) || 1))
   })).sort((a, b) => b.score - a.score)
   if (!ranked.length) return null
-  if (!requestedQualifier && ranked.length > 1 && ranked[0].score - ranked[1].score < 1) {
-    return { ambiguous: true, name: namePart, options: ranked.slice(0, 3).map(({ place }) => place.admin1 || place.country).filter((value): value is string => Boolean(value)) }
+  if ((requestedQualifier && ![ranked[0].place.country, ranked[0].place.country_code, ranked[0].place.admin1, ranked[0].place.admin2].some(value => normalized(value).includes(requestedQualifier))) || (ranked.length > 1 && ranked[0].score - ranked[1].score < 1)) {
+    return { ambiguous: true, name: namePart, options: ranked.slice(0, 3).map(({ place }) => [place.admin1, place.country].filter(Boolean).join(', ')).filter((value): value is string => Boolean(value)) }
   }
   const place = ranked[0].place
   if (!place || typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return null
@@ -162,7 +162,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (/[а-я]/iu.test(input.message)) input.lang = 'bg'
     else if (/\b(weather|rain|wind|temperature|tomorrow|today|and|what|wear|umbrella|forecast)\b/i.test(input.message)) input.lang = 'en'
 
-    let understood: Understanding | null = parseConversationQuestion(input.message, input.lang, { quickAction: input.quickAction, context: input.context })
+    const turn = clarificationTurn(input.message, input.lang, input)
+    if (turn.answer) return response.status(200).json({ answer: turn.answer, pendingClarification: turn.pendingClarification, intent: 'unclear', needsClarification: true })
+    input.context = turn.context
+    input.message = turn.message
+    let understood: Understanding | null = turn.understanding
     if (!understood) understood = await optionalGeminiUnderstanding(input)
     if (!understood || understood.needsClarification || understood.intent === 'unclear') {
       return response.status(200).json({ answer: understood?.clarificationQuestion ?? clarification(input.lang), intent: 'unclear', needsClarification: true })
@@ -170,8 +174,14 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (understood.intent === 'unrelated') return response.status(200).json({ answer: unrelatedWeatherAnswer(input.lang), intent: understood.intent, needsClarification: false })
 
     const place = await resolvePlace(input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input, understood.requestedCity)
-    if (!place) return response.status(200).json({ answer: input.lang === 'bg' ? `Не намирам място „${understood.requestedCity}“. Как се изписва?` : `I cannot find “${understood.requestedCity}”. How is it spelled?`, intent: understood.intent, needsClarification: true })
-    if ('ambiguous' in place) return response.status(200).json({ answer: input.lang === 'bg' ? `Кой ${place.name} имаш предвид — ${place.options.join(', ')}?` : `Which ${place.name} do you mean—${place.options.join(', ')}?`, intent: understood.intent, needsClarification: true })
+    if (!place || 'ambiguous' in place) {
+      const attempts = (turn.continuation && input.pendingClarification?.missing === 'location' ? input.pendingClarification.attempts : 0) + 1
+      const snapshot = parseUnderstanding({ intent: understood.intent, requestedCity: understood.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false, clarificationQuestion: null }, input.lang)!
+      const pendingClarification: PendingClarification | null = attempts <= 3 ? { understanding: snapshot, message: input.message, missing: 'location', locationMode: place ? 'qualifier' : 'name', attempts, ...(input.context ? { context: input.context } : {}) } : null
+      const answer = !place ? (input.lang === 'bg' ? `Не намирам място „${understood.requestedCity}“. Посочи правилното име и държава.` : `I cannot find “${understood.requestedCity}”. Please provide its name and country.`)
+        : input.lang === 'bg' ? `Кой ${place.name} имаш предвид — ${place.options.join(', ')}?` : `Which ${place.name} do you mean—${place.options.join(', ')}?`
+      return response.status(200).json({ answer, pendingClarification, intent: understood.intent, needsClarification: true })
+    }
     // Re-resolve yearless dates using the explicitly requested location's local date.
     const localTargetDate = extractRequestedDate(input.message, new Date(), place.timezone ?? 'UTC', input.lang)
     if (localTargetDate) understood = { ...understood, targetDate: localTargetDate, timeScope: 'specific_date' }

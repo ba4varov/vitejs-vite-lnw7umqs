@@ -67,7 +67,7 @@ test('Gemini remains optional and weather advice is deterministic', async () => 
   const [chat, advice] = await Promise.all([readFile(new URL('../../api/weather-chat.ts', import.meta.url), 'utf8'), readFile(new URL('../../api/weather-advice.ts', import.meta.url), 'utf8')])
   assert.match(chat, /import \{ geminiClient \} from '\.\.\/server\/gemini-client\.js'/)
   assert.doesNotMatch(advice, /gemini|generativelanguage/i)
-  assert.match(chat, /parseConversationQuestion\(input\.message.*\)[\s\S]+if \(!understood\) understood = await optionalGeminiUnderstanding/)
+  assert.match(chat, /clarificationTurn\(input\.message.*\)[\s\S]+if \(!understood\) understood = await optionalGeminiUnderstanding/)
   assert.doesNotMatch(`${chat}\n${advice}`, /models\/gemini-[^'"`]+:generateContent/)
 })
 

@@ -52,3 +52,47 @@ probability values for every selected hourly row. Explicit numeric zeros are val
 null, undefined and non-finite values are missing. If the available data do not show
 rain but are incomplete, the answer explains the uncertainty and suggests carrying
 an umbrella as a precaution. Positive rain evidence can still support taking one.
+
+## Pending clarification
+
+The optional `pendingClarification` request/response field keeps a bounded,
+data-only understanding (`intent`, explicit city, time scope, calendar date), the
+original question, optional prior context, missing slot and attempt count. The
+client sends it back on the next message. It uses an in-memory ref and clears it
+on a completed/new turn or together with conversation reset on city/language
+changes; stale/aborted responses cannot restore it. Older API clients still work
+without this optional field. No UI or dependencies changed.
+
+`clarificationTurn` wraps the existing deterministic conversation parser. A new
+city without a measure asks whether to reuse the previous measure or provide the
+general forecast. Without context it asks what weather information is wanted for
+that city. Explicit questions proceed directly. Short measure, date and region
+answers complete the pending request while preserving its other entities. A new
+question, unrelated request, cancellation or quick action starts a fresh turn.
+Unresolved dates ask only for a day; geocoding ties ask for a region/country and
+keep the original measure and date. A qualifier that still leaves a tie cannot
+silently select a city. Missing place names can be corrected separately.
+
+Both languages use the same transitions. Up to three clarification prompts are
+retained; the next unresolved answer explains the missing information and drops
+the pending state. Validation rejects extra fields, invalid coordinates/enums,
+invalid calendar dates, questions over 400 characters, city names over 100,
+clarification text over 180 and attempt counts outside 1–3. Pending context never
+contains measurements and cannot nest another pending state.
+
+Intent/date clarification returns before geocoding, forecasts, AQI, marine or
+Gemini calls. Location ambiguity needs geocoding only; weather retrieval waits
+until the location resolves. Relative scopes retain destination timezone behavior;
+yearless calendar expressions remain available for local date resolution. Missing
+weather measurements still use the existing deterministic availability rules.
+
+Additional verification: `tests/unit/weather-clarification.test.mjs`, actual
+request sequences in `src/weather-chat-handler.test.mjs`, and browser state/reset
+coverage with:
+
+```sh
+CHROMIUM_PATH=/usr/bin/chromium npx playwright test tests/weather-chat-clarification.spec.ts --workers=1
+```
+
+The handler and browser suites mock external services; they do not test live
+Open-Meteo availability.

@@ -59,16 +59,17 @@ export function geminiUnderstandingError(code, lang = 'bg') {
 
 export function validateChatInput(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null
-  if (Object.keys(body).some(key => !['message', 'city', 'latitude', 'longitude', 'lang', 'quickAction', 'context'].includes(key))) return null
-  if (Object.keys(body).length < 5 || Object.keys(body).length > 7) return null
+  if (Object.keys(body).some(key => !['message', 'city', 'latitude', 'longitude', 'lang', 'quickAction', 'context', 'pendingClarification'].includes(key))) return null
+  if (Object.keys(body).length < 5 || Object.keys(body).length > 8) return null
   if (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 400) return null
   if (typeof body.city !== 'string' || !body.city.trim() || body.city.length > 100) return null
   if (typeof body.latitude !== 'number' || !Number.isFinite(body.latitude) || body.latitude < -90 || body.latitude > 90) return null
   if (typeof body.longitude !== 'number' || !Number.isFinite(body.longitude) || body.longitude < -180 || body.longitude > 180) return null
   if (body.lang !== 'bg' && body.lang !== 'en') return null
   if (body.quickAction !== undefined && !QUICK_ACTIONS.includes(body.quickAction)) return null
+  if (body.pendingClarification !== undefined && !validatePendingClarification(body.pendingClarification)) return null
   if (body.context !== undefined && !validateConversationContext(body.context)) return null
-  return { ...(body.context ? { context: body.context } : {}), message: body.message.trim(), city: body.city.trim(), latitude: body.latitude, longitude: body.longitude, lang: body.lang, ...(body.quickAction ? { quickAction: body.quickAction } : {}) }
+  return { ...(body.pendingClarification ? { pendingClarification: body.pendingClarification } : {}), ...(body.context ? { context: body.context } : {}), message: body.message.trim(), city: body.city.trim(), latitude: body.latitude, longitude: body.longitude, lang: body.lang, ...(body.quickAction ? { quickAction: body.quickAction } : {}) }
 }
 
 const QUICK_QUESTIONS = new Map([
@@ -147,6 +148,8 @@ const weekdayOnly = value => new RegExp(`^(?:${WEEKDAY_MODIFIER}\\s+)?(?:${WEEKD
 
 export function extractRequestedDate(message, now = new Date(), timezone = 'UTC', _lang = 'bg') {
   const text = normalizeQuestion(message)
+  const calendarIso = text.match(/\b20\d{2}-\d{2}-\d{2}\b/u)?.[0]
+  if (calendarIso) return Number.isFinite(Date.parse(calendarIso)) && new Date(calendarIso).toISOString().slice(0, 10) === calendarIso ? calendarIso : null
   const englishRelative = text.match(/(?:^|\s)in\s+(\d{1,2})\s+days?(?=\s|$)/u)
   if (englishRelative) {
     const date = new Date(`${localIsoDate(now, timezone)}T12:00:00Z`)
@@ -224,6 +227,7 @@ export function extractRequestedCity(message, _lang = 'bg') {
   // Common free word order: a proper-name phrase immediately before the time word.
   const followup = cleaned.match(/^(?:а|and|what about)\s+([\p{Lu}][\p{L}'’.-]*(?:\s+[\p{Lu}][\p{L}'’.-]*){0,3})$/u)?.[1]
   if (followup && !weekdayOnly(followup) && !followup.split(/\s/u).some(word => PROTECTED_LOCATION.has(normalizeQuestion(word))) && !/^(?:tomorrow|today|wind|rain|temperature|yesterday)$/iu.test(followup)) return followup
+  if (/^(?:за|а|and|for|on)\s/iu.test(cleaned)) return null
   const bare = cleaned.match(/(?:^|\s)([\p{Lu}][\p{L}'’.-]*(?:[ ,]+[\p{Lu}][\p{L}'’.-]*){0,3})\s+(?:днес|утре|вдругиден)(?=\s|$)/u)?.[1]
   return bare && !weekdayOnly(bare) && !PROTECTED_LOCATION.has(normalizeQuestion(bare)) ? bare.trim() : null
 }
@@ -309,9 +313,12 @@ export function parseDeterministicQuestion(message, lang = 'bg', options = {}) {
   const requestedScope = extractTimeScope(normalizedMessage)
   // A relative-day construction we do not explicitly support is safer to
   // clarify than to silently answer with current conditions.
-  const unresolvedFuture = /(?:^|\s)(?:след\s+(?:\d+|един|едно|три|четири|пет)\s+дни?|в\s*друг(?:ия|и)\s+ден|(?:следващата|идната)\s+седмица|за\s+уикенда)(?=\s|$)/u.test(text) && !requestedScope && !requestedDate
-  if (unresolvedFuture) return { intent: 'unclear', requestedCity, timeScope: 'general', targetDate: null, needsClarification: true, clarificationQuestion: lang === 'bg' ? 'За кой точно ден питаш?' : 'Which exact day do you mean?', isQuick: false }
+  const unresolvedFuture = /(?:^|\s)(?:next\s+week|in\s+(?:a few|some)\s+days|sometime|след\s+(?:\d+|един|едно|три|четири|пет)\s+дни?|в\s*друг(?:ия|и)\s+ден|(?:следващата|идната)\s+седмица|за\s+уикенда)(?=\s|$)/u.test(text) && !requestedScope && !requestedDate
+  const conflictingDays = /(?:утре\s+или\s+вдругиден|tomorrow\s+or\s+(?:the\s+)?day after tomorrow)/iu.test(text)
   const explicitIso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1] ?? null
+  const validIso = explicitIso && Number.isFinite(Date.parse(explicitIso)) && new Date(explicitIso).toISOString().slice(0, 10) === explicitIso
+  const invalidDate = /\b\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?\b|\b20\d{2}-\d{2}-\d{2}\b/u.test(text) && !requestedDate && !validIso
+  if (unresolvedFuture || conflictingDays || invalidDate) return { intent, requestedCity, timeScope: 'general', targetDate: null, needsClarification: true, clarificationQuestion: lang === 'bg' ? 'За кой точно ден питаш?' : 'Which exact day do you mean?', isQuick: false }
   const targetDate = requestedDate ?? explicitIso
   const timeScope = targetDate ? 'specific_date' : requestedScope ?? (quickIntent ? 'next_12h' : 'general')
   return { intent, requestedCity: actionIntent ? null : requestedCity, timeScope, targetDate, needsClarification: false, clarificationQuestion: null, isQuick: Boolean(quickIntent) }
@@ -524,9 +531,82 @@ export function parseConversationQuestion(message, lang = 'bg', options = {}) {
   let parsed = parseDeterministicQuestion(message, lang, options)
   const fragment = /^(?:а\s+|and\s+|what about\s+)?(?:утре|днес|вдругиден|вчера|(?:the\s+)?day\s+(?:after|before)\s+(?:tomorrow|yesterday)|tomorrow|today|yesterday|tonight)(?:\s.*)?$/iu.test(text)
   if (parsed?.intent === 'unrelated' && (scope || date) && fragment) parsed = { ...parsed, intent: context?.intent ?? 'general_weather', timeScope: scope ?? 'specific_date', targetDate: date }
-  if (!context || options.quickAction || !parsed || ['unrelated', 'unclear'].includes(parsed.intent)) return parsed
+  if (!context || options.quickAction || !parsed || parsed.needsClarification || ['unrelated', 'unclear'].includes(parsed.intent)) return parsed
   const entityOnly = parsed.intent === 'general_weather' && (city || date || scope) && !/(време|прогноз|weather|forecast)/iu.test(text)
   return { ...parsed, intent: entityOnly ? context.intent : parsed.intent,
     timeScope: date || scope || parsed.targetDate ? parsed.timeScope : context.timeScope,
     targetDate: date || scope || parsed.targetDate ? parsed.targetDate : context.targetDate }
+}
+
+// No measurements, executable instructions or unbounded conversation history.
+export function validatePendingClarification(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (Object.keys(value).some(key => !['understanding', 'context', 'message', 'missing', 'attempts', 'locationMode'].includes(key))) return false
+  try {
+    return Boolean(['intent', 'date', 'location'].includes(value.missing) &&
+      (value.locationMode === undefined || ['qualifier', 'name'].includes(value.locationMode)) &&
+      Number.isInteger(value.attempts) && value.attempts >= 1 && value.attempts <= 3 &&
+      typeof value.message === 'string' && value.message.trim().length > 0 && value.message.length <= 400 &&
+      parseUnderstanding(value.understanding, 'en') &&
+      (value.context === undefined || validateConversationContext(value.context)))
+  } catch { return false }
+}
+
+export function clarificationTurn(message, lang = 'bg', options = {}) {
+  const pending = options.quickAction ? undefined : options.pendingClarification
+  const raw = parseDeterministicQuestion(message, lang, options)
+  const text = normalizeQuestion(message)
+  const city = extractRequestedCity(message, lang)
+  const scope = extractTimeScope(message)
+  const date = extractRequestedDate(message, options.now, options.timezone, lang)
+  // Only short answers complete a slot. A full question or explicit cancellation starts anew.
+  const newExplicitQuestion = city && raw && !['general_weather', 'unrelated', 'unclear'].includes(raw.intent)
+  const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|какво|колко|дали|ще |what |will |how |should |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
+  let understanding, sourceMessage = message, context = options.context, missing
+  if (pending && fragment) {
+    understanding = { ...pending.understanding, needsClarification: false, clarificationQuestion: null }
+    context = pending.context
+    sourceMessage = pending.message
+    if (raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)) understanding.intent = raw.intent
+    else if (/(общ|прогноз|general|forecast|weather)/iu.test(text)) understanding.intent = 'general_weather'
+    if (scope || date) {
+      understanding.timeScope = date ? 'specific_date' : scope
+      understanding.targetDate = date
+      sourceMessage = message // Keep yearless dates available for destination-timezone resolution.
+    }
+    if (city) understanding.requestedCity = city
+    if (pending.missing === 'location' && !city && !scope && !date && raw?.intent === 'unrelated' && message.length <= 100 && !/(не знам|не съм сигур|not sure|do not know|don't know)/iu.test(text)) {
+      understanding.requestedCity = pending.locationMode === 'name' ? message.trim() : `${understanding.requestedCity?.split(',')[0] ?? ''}, ${message.trim()}`.replace(/^, /, '').slice(0, 100)
+    }
+    const explicitMeasure = raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)
+    const generalForecast = /общ|general|forecast|прогноз|weather/iu.test(text)
+    const previousMeasure = context && /същ|предиш|same|previous/iu.test(text)
+    if (previousMeasure) understanding.intent = context.intent
+    const resolved = pending.missing === 'intent' ? Boolean(explicitMeasure || generalForecast || previousMeasure)
+      : pending.missing === 'date' ? Boolean(scope || date) : understanding.requestedCity !== pending.understanding.requestedCity
+    if (!resolved) missing = pending.missing
+  } else {
+    understanding = parseConversationQuestion(message, lang, options)
+    const cityOnly = city && raw?.intent === 'general_weather' && !/(време|прогноз|weather|forecast)/iu.test(text)
+    if (cityOnly) missing = 'intent'
+    else if (understanding?.needsClarification) {
+      missing = 'date'
+      if (understanding.intent === 'unclear') understanding = { ...understanding, intent: 'general_weather' }
+    }
+  }
+  if (!understanding) return { understanding: null, message, context }
+  if (missing) {
+    const place = understanding.requestedCity || context?.city || options.city || ''
+    const labels = lang === 'bg' ? { wind: 'вятъра', rain: 'валежите', temperature: 'температурата', uv: 'UV индекса', air_quality: 'въздуха', marine: 'морето', clothing: 'облеклото', walk: 'разходка', laundry: 'пране', car_wash: 'миене на колата', outdoor_activity: 'дейности навън', current: 'текущото време', later: 'времето по-късно' } : { wind: 'wind', rain: 'rain', temperature: 'temperature', uv: 'UV index', air_quality: 'air quality', marine: 'sea', clothing: 'clothing', walk: 'walking', laundry: 'laundry', car_wash: 'washing the car', outdoor_activity: 'outdoor activities', current: 'current weather', later: 'weather later' }
+    const measure = labels[context?.intent]
+    const question = missing === 'date' ? (lang === 'bg' ? `За кой точно ден${place ? ` в ${place}` : ''} питаш?` : `Which exact day${place ? ` in ${place}` : ''} do you mean?`)
+      : missing === 'location' ? (lang === 'bg' ? 'Кое населено място имаш предвид? Посочи област или държава.' : 'Which location do you mean? Please specify a region or country.')
+      : lang === 'bg' ? (measure ? `За ${place} — за ${measure} или общата прогноза?` : `Каква информация за времето в ${place} те интересува?`)
+      : measure ? `For ${place}, do you mean ${measure} or the general forecast?` : `What weather information would you like for ${place}?`
+    const attempts = pending && fragment ? pending.attempts + 1 : 1
+    const { isQuick: _isQuick, ...snapshot } = understanding
+    const next = { understanding: { ...snapshot, needsClarification: false, clarificationQuestion: null }, message: sourceMessage, missing, attempts, ...(pending?.locationMode && missing === 'location' ? { locationMode: pending.locationMode } : {}), ...(context ? { context } : {}) }
+    return { understanding, message: sourceMessage, context, answer: attempts > 3 ? (lang === 'bg' ? `За да продължа, е нужно уточнение: ${question}` : `To continue, I need this information: ${question}`) : question, pendingClarification: attempts <= 3 ? next : null }
+  }
+  return { understanding, message: sourceMessage, context, continuation: Boolean(pending && fragment), pendingClarification: null }
 }

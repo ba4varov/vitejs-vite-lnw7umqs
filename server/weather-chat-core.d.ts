@@ -10,7 +10,7 @@ export function parseUnderstanding(value: unknown, lang: 'bg' | 'en'): Understan
 export function findDailyForecast<T extends { date?: string }>(daily: readonly T[] | null | undefined, targetDate: string | null | undefined): T | null
 export function zipForecastHours(hourly: ForecastHourly | null | undefined, currentTime?: string): ForecastHour[]
 export function geminiUnderstandingError(code: string, lang?: 'bg' | 'en'): string
-export type ValidChatInput = { message: string; city: string; latitude: number; longitude: number; lang: 'bg' | 'en'; quickAction?: 'umbrella' | 'clothing' | 'walk'; context?: ConversationContext }
+export type ValidChatInput = { message: string; city: string; latitude: number; longitude: number; lang: 'bg' | 'en'; quickAction?: 'umbrella' | 'clothing' | 'walk'; context?: ConversationContext; pendingClarification?: PendingClarification }
 export function validateChatInput(body: unknown): ValidChatInput | null
 export type DeterministicUnderstanding = Understanding & { isQuick: boolean }
 export function normalizeQuestion(value: string): string
@@ -53,3 +53,7 @@ export type WeatherSummary = {
 export type ConversationContext = { city: string; latitude: number; longitude: number; intent: Intent; timeScope: TimeScope; targetDate: string | null; previousQuestion: string }
 export function validateConversationContext(value: unknown): boolean
 export function parseConversationQuestion(message: string, lang?: 'bg' | 'en', options?: { context?: ConversationContext; now?: Date; timezone?: string; quickAction?: 'umbrella' | 'clothing' | 'walk' }): DeterministicUnderstanding | null
+
+export type PendingClarification = { understanding: Understanding; context?: ConversationContext; message: string; missing: 'intent' | 'date' | 'location'; locationMode?: 'qualifier' | 'name'; attempts: number }
+export function validatePendingClarification(value: unknown): boolean
+export function clarificationTurn(message: string, lang: 'bg' | 'en', options: { context?: ConversationContext; pendingClarification?: PendingClarification; city?: string; quickAction?: 'umbrella' | 'clothing' | 'walk' }): { understanding: Understanding | null; message: string; context?: ConversationContext; answer?: string; continuation?: boolean; pendingClarification?: PendingClarification | null }
