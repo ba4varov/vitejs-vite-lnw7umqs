@@ -18,7 +18,7 @@ const forecast = {
   timezone: 'Europe/Sofia', current: { time: '2026-10-08T12:00', temperature_2m: 17, apparent_temperature: 16, wind_speed_10m: 8 }, daily: daily(dates),
   hourly: { time: times, temperature_2m: times.map(() => 17), apparent_temperature: times.map(() => 16), precipitation: times.map(() => 0), precipitation_probability: times.map(() => 0), wind_speed_10m: times.map(() => 8), uv_index: times.map(() => 3), weather_code: times.map(() => 0) }
 }
-async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, now = '2026-10-08T09:00:00Z') {
+async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, now = '2026-10-08T09:00:00Z', geoResults) {
   t.mock.timers.reset()
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) })
   const calls = []
@@ -26,8 +26,10 @@ async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, n
     const parsed = new URL(url); calls.push(parsed)
     let payload = weatherPayload
     if (parsed.hostname.startsWith('geocoding-')) {
-      const sofia = /^(София|Sofia)$/u.test(parsed.searchParams.get('name'))
-      payload = { results: [{ name: sofia ? (lang === 'bg' ? 'София' : 'Sofia') : (lang === 'bg' ? 'Варна' : 'Varna'), latitude: sofia ? 42.7 : 43.21, longitude: sofia ? 23.3 : 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
+      const query = parsed.searchParams.get('name')
+      const sofia = /^(София|Sofia)$/u.test(query)
+      const plovdiv = /Пловдив|Plovdiv/iu.test(query)
+      payload = { results: geoResults ?? [{ name: plovdiv ? (lang === 'bg' ? 'Пловдив' : 'Plovdiv') : sofia ? (lang === 'bg' ? 'София' : 'Sofia') : (lang === 'bg' ? 'Варна' : 'Varna'), latitude: plovdiv ? 42.14 : sofia ? 42.7 : 43.21, longitude: sofia ? 23.3 : 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
     }
     if (parsed.hostname.startsWith('archive-')) payload = { timezone: 'Europe/Sofia', daily: daily([parsed.searchParams.get('start_date')]) }
     if (parsed.hostname.startsWith('air-quality-')) payload = { current: { european_aqi: 12, pm10: 4, pm2_5: 2 } }
@@ -136,6 +138,68 @@ for (const lang of ['bg', 'en']) for (const missing of ['precipitation', 'precip
   assert.doesNotMatch(body.answer, /No umbrella|не е нужен чадър/)
 })
 
+for (const lang of ['bg', 'en']) {
+  for (const general of [false, true]) test(`clarification handler ${lang}: city then ${general ? 'general forecast' : 'wind'}`, async t => {
+    const first = await invoke(t, lang === 'bg' ? 'Какъв ще е вятърът утре във Варна?' : 'What will the wind be tomorrow in Varna?', lang)
+    const second = await invoke(t, lang === 'bg' ? 'А в Пловдив?' : 'And in Plovdiv?', lang, { context: first.body.context })
+    assert.equal(second.calls.length, 0)
+    assert.equal(second.body.pendingClarification.understanding.requestedCity, lang === 'bg' ? 'Пловдив' : 'Plovdiv')
+    const third = await invoke(t, general ? (lang === 'bg' ? 'Общата прогноза' : 'The general forecast') : (lang === 'bg' ? 'За вятъра' : 'For wind'), lang, { context: first.body.context, pendingClarification: second.body.pendingClarification })
+    assert.equal(third.body.intent, general ? 'general_weather' : 'wind')
+    assert.equal(third.body.targetDate, '2026-10-09')
+    assert.equal(third.body.context.city, lang === 'bg' ? 'Пловдив' : 'Plovdiv')
+    assert.equal(third.calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '42.14')
+    assert.equal(third.body.needsClarification, false)
+  })
+  test(`clarification handler ${lang}: no context, direct question, cancellation`, async t => {
+    const first = await invoke(t, lang === 'bg' ? 'А в Пловдив?' : 'And in Plovdiv?', lang)
+    assert.equal(first.calls.length, 0)
+    assert.ok(first.body.pendingClarification)
+    const direct = await invoke(t, lang === 'bg' ? 'Ще вали ли утре в Пловдив?' : 'Will it rain tomorrow in Plovdiv?', lang, { pendingClarification: first.body.pendingClarification })
+    assert.equal(direct.body.intent, 'rain')
+    assert.equal(direct.body.context.city, lang === 'bg' ? 'Пловдив' : 'Plovdiv')
+    assert.equal(direct.body.needsClarification, false)
+    const unrelated = await invoke(t, lang === 'bg' ? 'Напиши код' : 'Write code', lang, { pendingClarification: first.body.pendingClarification })
+    assert.equal(unrelated.body.intent, 'unrelated')
+    assert.equal(unrelated.body.pendingClarification, undefined)
+    assert.equal(unrelated.calls.length, 0)
+  })
+  test(`clarification handler ${lang}: date reply keeps city, wind and destination timezone`, async t => {
+    const first = await invoke(t, lang === 'bg' ? 'Вятърът следващата седмица в Пловдив?' : 'Wind next week in Plovdiv?', lang)
+    assert.equal(first.calls.length, 0)
+    const next = await invoke(t, lang === 'bg' ? 'За утре' : 'For tomorrow', lang, { pendingClarification: first.body.pendingClarification }, { ...forecast, timezone: 'Asia/Tokyo' }, '2026-10-08T23:30:00Z')
+    assert.equal(next.body.intent, 'wind')
+    assert.equal(next.body.context.city, lang === 'bg' ? 'Пловдив' : 'Plovdiv')
+    assert.equal(next.body.targetDate, '2026-10-10')
+  })
+  test(`clarification handler ${lang}: ambiguous city requires qualifier, never forecast until resolved`, async t => {
+    const results = [
+      { name: 'Springfield', latitude: 39.8, longitude: -89.6, admin1: 'Illinois', country: 'United States', population: 100000 },
+      { name: 'Springfield', latitude: 42.1, longitude: -72.6, admin1: 'Massachusetts', country: 'United States', population: 100000 }
+    ]
+    const first = await invoke(t, lang === 'bg' ? 'Вятърът утре в Springfield?' : 'Wind tomorrow in Springfield?', lang, {}, forecast, undefined, results)
+    assert.equal(first.body.pendingClarification.missing, 'location')
+    assert.equal(first.calls.length, 1)
+    const stillAmbiguous = await invoke(t, 'United States', lang, { pendingClarification: first.body.pendingClarification }, forecast, undefined, results)
+    assert.equal(stillAmbiguous.body.pendingClarification.missing, 'location')
+    assert.equal(stillAmbiguous.calls.length, 1)
+    const next = await invoke(t, 'Massachusetts', lang, { pendingClarification: stillAmbiguous.body.pendingClarification }, forecast, undefined, results)
+    assert.equal(next.body.intent, 'wind')
+    assert.equal(next.body.targetDate, '2026-10-09')
+    assert.equal(next.calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '42.1')
+  })
+}
+
+for (const lang of ['bg', 'en']) test(`clarification handler ${lang}: unknown city can be corrected without losing intent/date`, async t => {
+  const first = await invoke(t, lang === 'bg' ? 'Вятърът утре в Typocity?' : 'Wind tomorrow in Typocity?', lang, {}, forecast, undefined, [])
+  assert.equal(first.calls.length, 1)
+  assert.equal(first.body.pendingClarification.locationMode, 'name')
+  const next = await invoke(t, 'Plovdiv', lang, { pendingClarification: first.body.pendingClarification })
+  assert.equal(next.body.intent, 'wind')
+  assert.equal(next.body.targetDate, '2026-10-09')
+  assert.equal(next.calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '42.14')
+})
+
 for (const lang of ['bg', 'en']) for (const available of [true, false]) test(`next Sunday conversation ${lang}, available=${available}`, async t => {
   const now = '2026-10-18T12:00:00Z'
   const payload = { ...forecast, daily: daily(available ? [...dates, '2026-10-25'] : dates) }
@@ -149,7 +213,12 @@ for (const lang of ['bg', 'en']) for (const available of [true, false]) test(`ne
   ] : [
     ['Next Sunday?', 'rain'], ['And wind?', 'wind'], ['And in Sofia?', 'wind'], ['What should I wear?', 'clothing']
   ])) {
-    const { body, calls } = await ask(message, previous)
+    let { body, calls } = await ask(message, previous)
+    if (/София|Sofia/u.test(message)) {
+      assert.equal(body.needsClarification, true)
+      assert.equal(calls.length, 0)
+      ;({ body, calls } = await invoke(t, lang === 'bg' ? 'За вятъра' : 'For wind', lang, { context: previous, pendingClarification: body.pendingClarification }, payload, now))
+    }
     assert.equal(body.context.targetDate, '2026-10-25')
     assert.equal(body.intent, intent)
     if (/София|Sofia/u.test(message)) {
