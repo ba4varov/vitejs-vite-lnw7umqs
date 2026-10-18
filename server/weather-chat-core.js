@@ -561,7 +561,7 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
   const date = extractRequestedDate(message, options.now, options.timezone, lang)
   // Only short answers complete a slot. A full question or explicit cancellation starts anew.
   const newExplicitQuestion = city && raw && !['general_weather', 'unrelated', 'unclear'].includes(raw.intent)
-  const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|какво|колко|дали|what |how |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
+  const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|каква|какво|какви|колко|дали|what |how |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
   let understanding, sourceMessage = message, context = options.context, missing
   if (pending && fragment) {
     understanding = { ...pending.understanding, needsClarification: false, clarificationQuestion: null }
@@ -586,7 +586,9 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
       : pending.missing === 'date' ? Boolean(scope || date) : understanding.requestedCity !== pending.understanding.requestedCity
     if (!resolved) missing = pending.missing
   } else {
-    understanding = parseConversationQuestion(message, lang, options)
+    // A standalone question abandons pending slots, including their old context.
+    if (pending) context = undefined
+    understanding = parseConversationQuestion(message, lang, { ...options, context })
     const cityOnly = city && raw?.intent === 'general_weather' && !/(време|прогноз|weather|forecast)/iu.test(text)
     if (cityOnly) missing = 'intent'
     else if (understanding?.needsClarification) {

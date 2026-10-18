@@ -70,6 +70,11 @@ answers complete the pending request while preserving its other entities. A new
 question with an explicit new city, unrelated request, cancellation or quick action starts a fresh turn.
 A short complete measure question such as “Ще вали ли?” also completes the
 pending city clarification and retains the known period.
+On a resolved pending turn, the handler uses the locally resolved city, time scope
+and target date even when Gemini returns a default `now` or a stale city.
+Explicit city/date changes are applied locally before this merge. A standalone
+question abandons pending context in both the local fallback and the Gemini
+payload; the model remains the primary intent interpreter.
 Unresolved dates ask only for a day; geocoding ties ask for a region/country and
 keep the original measure and date. A qualifier that still leaves a tie cannot
 silently select a city. Missing place names can be corrected separately.

@@ -174,14 +174,21 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     else if (/\b(weather|rain|wind|temperature|tomorrow|today|and|what|wear|umbrella|forecast)\b/i.test(input.message)) input.lang = 'en'
 
     // The shared instance budget bounds spend; excess traffic uses the local parser.
-    const ai = !input.quickAction && takeGeminiBudget() ? await optionalGeminiUnderstanding(input) : null
     const turn = clarificationTurn(input.message, input.lang, input)
+    const aiInput = { ...input, context: turn.context, pendingClarification: turn.continuation || turn.answer ? input.pendingClarification : undefined }
+    const ai = !input.quickAction && takeGeminiBudget() ? await optionalGeminiUnderstanding(aiInput) : null
     if (turn.answer && (!ai || ai.needsClarification || ai.intent === 'unclear' || turn.pendingClarification?.missing === 'intent')) return response.status(200).json({ answer: turn.answer, pendingClarification: turn.pendingClarification, intent: 'unclear', needsClarification: true })
     input.context = turn.context
     input.message = turn.message
     let understood: Understanding | null = ai ?? turn.understanding
-    // Resolved pending slots have already inherited the explicit city/date locally.
-    if (turn.continuation && understood && turn.understanding) understood = { ...understood, requestedCity: understood.requestedCity ?? turn.understanding.requestedCity }
+    // Local slot resolution preserves confirmed entities even if Gemini defaults to now.
+    // Explicit city/date changes are already applied by clarificationTurn.
+    if (turn.continuation && understood && turn.understanding) understood = {
+      ...understood,
+      requestedCity: turn.understanding.requestedCity ?? understood.requestedCity,
+      timeScope: turn.understanding.timeScope,
+      targetDate: turn.understanding.targetDate
+    }
     if (understood?.needsClarification) {
       const missing = ['unclear', 'other_city', 'general_weather'].includes(understood.intent) ? 'intent' : 'date'
       const place = understood.requestedCity ?? input.context?.city ?? input.city
