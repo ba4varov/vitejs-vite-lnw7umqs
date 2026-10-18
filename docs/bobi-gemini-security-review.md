@@ -48,7 +48,7 @@ bundle и старите deployment-и НЕ са проверени успешн
 
 ## Разговорна логика и надеждност
 
-Gemini е първият parser за свободни BG/EN въпроси. Получава ограничени,
+Gemini е предпочитаният parser извън строго разпознатата локална граматика за BG/EN въпроси. Получава ограничени,
 валидирани context и pending clarification; потребителският текст е недоверени
 данни в отделно user съобщение. System instruction забранява смяна на тема/роля,
 изпълнение на инструкции, измервания и свободен отговор. JSON schema и runtime
@@ -77,6 +77,7 @@ Gemini е първият parser за свободни BG/EN въпроси. По
   мрежова грешка или timeout. AbortSignal прекъсва реалната fetch заявка,
   а Promise.race ограничава и чакането на response body. Виж
   [Production latency](bobi-gemini-production-latency.md).
+- Споделен дневен guard в Supabase резервира до 20 AI опита за Pacific ден по подразбиране; 429 блокира до следващия такъв ден. Липсващ guard спира AI, без да спира локалния fallback. Виж [подробности и deployment](bobi-gemini-request-economy.md).
 - До 20 AI разбирания на минута за топъл serverless instance; след това локален
   fallback. До 120 валидни chat заявки на минута за instance; после HTTP 429.
 - Open-Meteo fetch-овете остават с timeout 15 секунди на заявка.

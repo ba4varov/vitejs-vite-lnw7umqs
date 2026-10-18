@@ -1,3 +1,4 @@
+import { createGeminiQuota } from './gemini-quota.js'
 const API_ROOT = 'https://generativelanguage.googleapis.com/v1beta'
 // Per understanding, including HTTP bodies and the single 404 recovery.
 export const GEMINI_BUDGET_MS = Object.freeze({ total: 8000, discovery: 1500, generation: 6500 })
@@ -62,7 +63,10 @@ async function upstreamDetails(response, apiKey) {
   } catch { return {} }
 }
 
-export function createGeminiClient({ fetchImpl = fetch, env = process.env, logger = (prefix, data) => (data.code === 'ok' ? console.info : console.error)(prefix, data), now = () => performance.now() } = {}) {
+export function createGeminiClient({ fetchImpl = fetch, env = process.env, logger = (prefix, data) => (data.code === 'ok' || prefix.endsWith(':gemini-usage]') ? console.info : console.error)(prefix, data), now = () => performance.now(), quota } = {}) {
+  const quotaGuard = quota ?? createGeminiQuota({ env, fetchImpl })
+  let cooldownDay
+  const quotaDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
   let cachedModel
 
   function log(endpoint, error, requestId) {
@@ -108,6 +112,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
     return timedStage({ endpoint, stage, phase: 'discovery', signal, requestId }, async stageSignal => {
       const apiKey = env.GEMINI_API_KEY
       const response = await fetchImpl(`${API_ROOT}/models`, { signal: stageSignal, method: 'GET', headers: { 'x-goog-api-key': apiKey } })
+      if (response.status === 429) throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: 429 })
       if (!response.ok) {
         throw new GeminiServiceError(stage, 'models-list-failed', { httpStatus: response.status, ...await upstreamDetails(response, apiKey) })
       }
@@ -142,18 +147,36 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
       const error = new GeminiServiceError(stage, 'missing-configuration', { safeMessage: 'Gemini is not configured' })
       log(endpoint, error, requestId); throw error
     }
+    if (env.GEMINI_DISABLED === 'true' || cooldownDay === quotaDay()) {
+      const error = new GeminiServiceError(stage, env.GEMINI_DISABLED === 'true' ? 'ai_disabled' : 'cooldown')
+      logger(`[${endpoint}:gemini-usage]`, { requestId, reason: error.code, savedGeminiCalls: 1, geminiCalls: 0 })
+      log(endpoint, error, requestId); throw error
+    }
     const deadline = new AbortController()
     const timer = setTimeout(() => deadline.abort(), GEMINI_BUDGET_MS.total)
     const signal = deadline.signal
     let model
     try {
+      const reserve = async stageSignal => {
+        const reservation = await quotaGuard.reserve(stageSignal)
+        if (!reservation.allowed) {
+          logger(`[${endpoint}:gemini-usage]`, { requestId, reason: reservation.reason, savedGeminiCalls: 1, geminiCalls: 0 })
+          throw new GeminiServiceError(stage, reservation.reason)
+        }
+      }
+      // Gate discovery too, so a cold instance cannot repeatedly probe Google
+      // after another instance has exhausted the shared daily allowance.
+      await reserve(signal)
       model = await resolveModel(stage, { signal, endpoint, requestId })
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const payload = await timedStage({ endpoint, stage, phase: 'generation', signal, requestId }, async stageSignal => {
+            if (attempt > 0) await reserve(stageSignal)
+            logger(`[${endpoint}:gemini-usage]`, { requestId, reason: 'generation', savedGeminiCalls: 0, geminiCalls: 1 })
             const response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
               signal: stageSignal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
             })
+            if (response.status === 429) throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: 429 })
             if (!response.ok) {
               throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: response.status, model, ...await upstreamDetails(response, env.GEMINI_API_KEY) })
             }
@@ -175,6 +198,12 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
       }
     } catch (error) {
       const serviceError = error instanceof GeminiServiceError ? error : new GeminiServiceError(stage, 'unexpected-error')
+      if (serviceError.httpStatus === 429) {
+        // Local fast path also protects this warm instance if shared storage
+        // fails. The shared breaker is authoritative across instances.
+        cooldownDay = quotaDay()
+        await quotaGuard.block(signal).catch(() => {})
+      }
       log(endpoint, serviceError, requestId)
       throw serviceError
     } finally { clearTimeout(timer) }

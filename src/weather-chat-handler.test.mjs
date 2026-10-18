@@ -207,7 +207,7 @@ for (const lang of ['bg', 'en']) test(`city clarification followed by a full rai
   assert.equal(rain.body.targetDate, '2026-10-09')
 })
 
-test('Gemini is primary, receives context, and invalid/unavailable output falls back', async t => {
+test('Gemini remains primary for complex language, receives context, and invalid/unavailable output falls back', async t => {
   const { geminiClient } = await import('../server/gemini-client.js')
   const original = process.env.GEMINI_API_KEY
   process.env.GEMINI_API_KEY = 'unit-test-only'
@@ -222,10 +222,10 @@ test('Gemini is primary, receives context, and invalid/unavailable output falls 
     const value = mode === 'invalid' ? { temperature: 999 } : { intent: 'wind', requestedCity: null, timeScope: 'now', targetDate: null, needsClarification: false, clarificationQuestion: null, turnType: 'new_question', citySource: 'selected', timeSource: 'default', missing: 'none' }
     return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
   })
-  const ai = await invoke(t, 'Каква е температурата?', 'bg')
+  const ai = await invoke(t, 'Можеш ли да ми разкажеш за температурата?', 'bg')
   assert.equal(ai.body.intent, 'wind') // Model interpretation wins over local temperature matching.
   for (mode of ['invalid', 'unavailable']) {
-    const fallback = await invoke(t, 'Каква е температурата?', 'bg')
+    const fallback = await invoke(t, 'Можеш ли да ми разкажеш за температурата?', 'bg')
     assert.equal(fallback.body.intent, 'temperature')
     assert.doesNotMatch(fallback.body.answer, /999/)
   }
@@ -256,7 +256,7 @@ test('instance budget falls back after 20 Gemini turns and rejects request 121',
   t.mock.method(globalThis, 'fetch', async () => Response.json(forecast))
   for (let i = 1; i <= 121; i++) {
     let status, body
-    await handler({ method: 'POST', body: { message: 'Will it rain?', city: 'Sofia', latitude: 42.7, longitude: 23.3, lang: 'en' } }, { status(code) { status = code; return this }, json(value) { body = value } })
+    await handler({ method: 'POST', body: { message: 'Could you tell me if it will rain?', city: 'Sofia', latitude: 42.7, longitude: 23.3, lang: 'en' } }, { status(code) { status = code; return this }, json(value) { body = value } })
     assert.equal(status, i <= 120 ? 200 : 429)
     if (i <= 120) assert.equal(body.intent, 'rain')
   }
@@ -293,7 +293,7 @@ for (const lang of ['bg', 'en']) for (const change of ['none', 'stale_city', 'da
       }
       return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
     })
-    const first = await ask(bg ? 'Какъв ще е вятърът утре във Варна?' : 'What will the wind be like tomorrow in Varna?')
+    const first = await ask(bg ? 'Моля кажи какъв ще е вятърът утре във Варна?' : 'Please tell me what will the wind be like tomorrow in Varna?')
     assert.equal(first.body.targetDate, '2026-10-09')
     const city = await ask(bg ? 'А в Пловдив?' : 'And in Plovdiv?', { context: first.body.context })
     assert.equal(city.body.pendingClarification.missing, 'intent')
@@ -343,7 +343,7 @@ async function thunderGemini(t, mode) {
     return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
   }
   if (mode === 'wire') {
-    const client = createGeminiClient({ env: { GEMINI_API_KEY: 'thunder-unit-key' }, logger: (...args) => diagnostics.push(args), fetchImpl: async (url, init) => {
+    const client = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} }, env: { GEMINI_API_KEY: 'thunder-unit-key' }, logger: (...args) => diagnostics.push(args), fetchImpl: async (url, init) => {
       if (init.method === 'GET') return Response.json({ models: [{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }] })
       assert.match(url, /:generateContent$/)
       assert.equal(init.headers['x-goog-api-key'], 'thunder-unit-key')
@@ -376,7 +376,7 @@ for (const lang of ['bg', 'en']) for (const mode of ['absent', 'unavailable', 'w
   assert.match(result.body.answer, bg ? /показват гръмотевична буря/ : /data indicate a thunderstorm/)
   assert.match(result.body.answer, /2026-10-09/)
   assert.equal(result.calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '42.14')
-  assert.equal(requests.length, mode === 'wire' ? 3 : 0)
+  assert.equal(requests.length, mode === 'wire' ? 2 : 0) // The first clear wind question is local.
   assert.ok(diagnostics.some(([, data]) => data.reason === (mode === 'wire' ? 'gemini_valid' : mode === 'absent' ? 'missing_configuration' : 'quota')))
   assert.doesNotMatch(JSON.stringify(diagnostics), /thunder-unit-key|Пловдив|Plovdiv|Варна|Varna|42\.14|private upstream prose|message|latitude|longitude/)
 })
@@ -426,7 +426,7 @@ for (const lang of ['bg', 'en']) test(`standalone Gemini thunderstorm question k
   const { requests } = await thunderGemini(t, 'wire')
   const bg = lang === 'bg'
   const weather = { ...forecast, daily: { ...forecast.daily, weather_code: dates.map(() => 95) } }
-  const { body } = await invoke(t, bg ? 'Ще има ли гръмотевици утре във Варна?' : 'Will there be thunderstorms in Plovdiv tomorrow?', lang, {}, weather, bg ? '2026-10-08T18:00:00Z' : '2026-10-08T18:01:00Z')
+  const { body } = await invoke(t, bg ? 'Моля кажи ще има ли гръмотевици утре във Варна?' : 'Please tell me will there be thunderstorms in Plovdiv tomorrow?', lang, {}, weather, bg ? '2026-10-08T18:00:00Z' : '2026-10-08T18:01:00Z')
   assert.equal(body.intent, 'thunderstorm')
   assert.equal(body.needsClarification, false)
   assert.equal(body.context.city, bg ? 'Варна' : 'Plovdiv')

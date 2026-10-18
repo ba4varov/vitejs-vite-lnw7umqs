@@ -202,6 +202,9 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
   return iso(year, month, day)
 }
 
+const TRAVEL_BG = String.raw`(?:отивам|отиваш|отиваме|отида|отидем|ходя|ходим|пътувам|пътуваш|пътуваме|заминавам|заминаваме|тръгвам|тръгваме)\s+(?:до|към|за)`
+const TRAVEL_EN = String.raw`(?:(?:on my way|go(?:ing)?|travel(?:l?ing)?|head(?:ing|ed)?|driv(?:e|ing)|fly(?:ing)?|leav(?:e|ing))\s+(?:to|towards?)|(?:head(?:ing|ed)?|leav(?:e|ing))\s+for)`
+
 export function extractRequestedCity(message, _lang = 'bg') {
   // Remove a weekday phrase before another location preposition, so the first
   // Bulgarian "в" cannot swallow both the date and the actual city as one name.
@@ -218,7 +221,11 @@ export function extractRequestedCity(message, _lang = 'bg') {
     new RegExp(String.raw`(?:^|\s)(?:във|в)\s+([\p{L}][\p{L}'’.,-]*(?:\s+[\p{L}][\p{L}'’.,-]*){0,4}?)${stop}`, 'giu'),
     new RegExp(String.raw`(?:времето|прогнозата|прогноза)\s+за\s+([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}?)${stop}`, 'giu'),
     new RegExp(String.raw`(?:^|\s)(?:in|at|near)\s+([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}?)${stop}`, 'giu'),
-    new RegExp(String.raw`(?:weather|forecast)\s+(?:for|in)\s+([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}?)${stop}`, 'giu')
+    new RegExp(String.raw`(?:weather|forecast)\s+(?:for|in)\s+([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}?)${stop}`, 'giu'),
+    // Destinations require a travel construction; bare "to/до/за" is not
+    // geographic evidence (it can describe time, temperature or an activity).
+    new RegExp(String.raw`(?:^|\s)${TRAVEL_BG}\s+([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}?)${stop}`, 'giu'),
+    new RegExp(String.raw`(?:^|\s)${TRAVEL_EN}\s+([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}?)${stop}`, 'giu')
   ]
   const candidates = patterns.flatMap(pattern => [...cleaned.matchAll(pattern)].map(match => match[1]
     .replace(/,\s*(?:докато|когато|а|но|when|while)(?=\s|$).*$/iu, '')
@@ -661,6 +668,12 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
     }
   }
   if (!understanding) return { understanding: null, message, context }
+  // A negated travel clause is not a confirmed destination. Without semantic
+  // interpretation ask for the place instead of forecasting the negated city.
+  if (understanding.requestedCity && new RegExp(String.raw`(?:^|\s)(?:${TRAVEL_BG}|${TRAVEL_EN})\s`, 'iu').test(text) && /(?:^|\s)(?:не|няма|not|never|don't|won't)(?=\s|$)/u.test(text)) {
+    missing = 'location'
+    understanding = { ...understanding, requestedCity: null }
+  }
   if (missing) {
     const place = understanding.requestedCity || context?.city || options.city || ''
     const labels = lang === 'bg' ? { thunderstorm: 'гръмотевичните бури', wind: 'вятъра', rain: 'валежите', temperature: 'температурата', uv: 'UV индекса', air_quality: 'въздуха', marine: 'морето', clothing: 'облеклото', walk: 'разходка', laundry: 'пране', car_wash: 'миене на колата', outdoor_activity: 'дейности навън', current: 'текущото време', later: 'времето по-късно' } : { thunderstorm: 'thunderstorms', wind: 'wind', rain: 'rain', temperature: 'temperature', uv: 'UV index', air_quality: 'air quality', marine: 'sea', clothing: 'clothing', walk: 'walking', laundry: 'laundry', car_wash: 'washing the car', outdoor_activity: 'outdoor activities', current: 'current weather', later: 'weather later' }

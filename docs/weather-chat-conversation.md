@@ -1,9 +1,9 @@
 # Weather chat conversation
 
 `src/App.tsx` sends messages to `api/weather-chat.ts`. The API validates input,
-classifies free questions with server-side Gemini (`server/weather-chat-semantics.js`), resolves explicit
+routes fully consumed, high-confidence grammar locally and classifies other free questions with server-side Gemini (`server/weather-chat-semantics.js`), resolves explicit
 locations with Open-Meteo geocoding, fetches forecast/archive data, and renders a
-deterministic answer. The local parser is the fallback when Gemini is unconfigured, unavailable, over budget or invalid;
+deterministic answer. The local parser also handles confident grammar directly and is the fallback when Gemini is unconfigured, unavailable, over budget or invalid;
 weather values and advice never come from generated model text.
 
 The client keeps the last successful response's `context` in a React ref. It
@@ -84,7 +84,7 @@ are resolved in the destination timezone, and Open-Meteo geocoding still verifie
 places/qualifiers and asks about ties. An AI intent alone does not fill an already
 unresolved date or location slot. No weather numbers or free-form answers are
 accepted from Gemini. The existing `clarificationTurn` phrase-based parser runs
-only for unconfigured/unavailable/invalid/over-budget Gemini or a quick action;
+for high-confidence grammar, unconfigured/unavailable/invalid/over-budget Gemini or a quick action;
 its vocabulary is unchanged and has no AI-specific hooks or typo dictionary.
 
 Both languages use the same transitions. Up to three clarification prompts are
@@ -95,7 +95,7 @@ clarification text over 180 and attempt counts outside 1–3. Pending context ne
 contains measurements and cannot nest another pending state.
 
 Intent/date clarification returns before geocoding, forecasts, AQI or marine calls.
-Gemini understanding runs first for free questions within the instance budget. Location ambiguity needs geocoding only; weather retrieval waits
+Gemini understanding is preferred for questions outside the conservative local grammar, within the instance throttle and shared project quota. Location ambiguity needs geocoding only; weather retrieval waits
 until the location resolves. Relative scopes retain destination timezone behavior;
 yearless calendar expressions remain available for local date resolution. Missing
 weather measurements still use the existing deterministic availability rules.
@@ -246,3 +246,9 @@ ambiguity, explicit country qualifiers, mismatched/invalid geocoding, provider
 failure, unrelated requests and safe correlated diagnostics. These are simulated
 upstream tests; production/live Gemini or geocoding behavior is not inferred from
 them.
+
+## Gemini request economy
+
+See [Gemini request economy](bobi-gemini-request-economy.md) for the confidence gate,
+shared daily reservation and 429 breaker, required SQL migration, privacy constraints
+and the reproducible synthetic before/after comparison.

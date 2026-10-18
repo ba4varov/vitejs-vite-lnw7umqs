@@ -40,17 +40,18 @@ for (const fixture of languageCorpus()) test(`handler generated ${fixture.lang}/
   const value = semanticFixture({ intent: fixture.intent, requestedCity: fixture.requestedCity, citySource: 'explicit', timeSource: 'explicit', timeScope: 'tomorrow' })
   const { logs, requests } = await interpreter(t, value)
   const { body, calls } = await invoke(t, fixture.message, fixture.lang, {}, forecast, now())
-  assert.equal(requests.length, 1)
-  assert.equal(requests[0].message, fixture.message.trim())
+  const local = logs.some(([name, entry]) => name === '[weather-chat:routing]' && entry.route === 'local')
+  assert.equal(requests.length, local ? 0 : 1)
+  if (!local) assert.equal(requests[0].message, fixture.message.trim())
   assert.equal(body.intent, fixture.intent)
   assert.equal(body.needsClarification, false)
   assert.equal(body.context.city, fixture.requestedCity)
   assert.equal(body.targetDate, '2026-10-09')
   assert.equal(calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '42.14')
   assert.ok(calls.every(url => url.hostname.endsWith('open-meteo.com')))
-  assert.ok(logs.some(([, data]) => data.phase === 'invocation' && data.reason === 'gemini_invoked'))
-  assert.ok(logs.some(([, data]) => data.phase === 'result' && data.reason === 'gemini_valid'))
-  decision(logs, 'gemini', 'answer', 'semantic')
+  if (!local) assert.ok(logs.some(([, data]) => data.phase === 'invocation' && data.reason === 'gemini_invoked'))
+  if (!local) assert.ok(logs.some(([, data]) => data.phase === 'result' && data.reason === 'gemini_valid'))
+  decision(logs, local ? 'local' : 'gemini', 'answer', local ? 'fallback' : 'semantic')
   privateLogs(logs)
 })
 
@@ -63,7 +64,8 @@ for (const lang of ['bg', 'en']) for (const [i, message] of variants([lang === '
   assert.equal(body.timeScope, 'next_12h')
   assert.equal(body.needsClarification, false)
   assert.match(body.answer, lang === 'bg' ? /следващите 12 часа/ : /next 12 hours/)
-  decision(logs, 'gemini', 'answer', 'semantic')
+  const local = logs.some(([name, entry]) => name === '[weather-chat:routing]' && entry.route === 'local')
+  decision(logs, local ? 'local' : 'gemini', 'answer', local ? 'fallback' : 'semantic')
 })
 
 for (const lang of ['bg', 'en']) test(`real context sequence honors AI turn/slot metadata, ${lang}`, async t => {
@@ -134,7 +136,7 @@ for (const [lang, message] of [['bg', 'Напиши код за кражба н�
 
 for (const mode of ['absent', 'error', 'invalid']) for (const lang of ['bg', 'en']) test(`bounded local fallback ${lang}/${mode} is the recorded final source`, async t => {
   const { logs, requests } = await interpreter(t, { ...semanticFixture(), answer: 'fabricated weather and private instructions' }, mode)
-  const { body } = await invoke(t, lang === 'bg' ? 'Вятърът утре във Варна?' : 'Wind tomorrow in Varna?', lang, {}, forecast, now())
+  const { body } = await invoke(t, lang === 'bg' ? 'Кажи ми за вятъра утре във Варна?' : 'Tell me about wind tomorrow in Varna?', lang, {}, forecast, now())
   assert.equal(body.intent, 'wind')
   assert.equal(body.targetDate, '2026-10-09')
   assert.equal(requests.length, mode === 'absent' ? 0 : 1)

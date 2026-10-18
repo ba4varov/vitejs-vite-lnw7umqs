@@ -17,7 +17,7 @@ function setup(t, fetchImpl, configured = true) {
   t.after(() => { if (previous === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = previous })
   const logs = [], calls = [], weatherCalls = []
   t.mock.method(console, 'info', (...args) => logs.push(args))
-  const client = createGeminiClient({
+  const client = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} },
     env: { GEMINI_API_KEY: 'private-test-key', ...(configured ? { GEMINI_MODEL: 'gemini-2.5-flash' } : {}) },
     now: () => Date.now(), logger: (...args) => logs.push(args),
     fetchImpl: async (url, init) => { calls.push({ url, init }); return fetchImpl(url, init) }
@@ -26,7 +26,7 @@ function setup(t, fetchImpl, configured = true) {
   t.mock.method(globalThis, 'fetch', async url => { weatherCalls.push(new URL(url)); return Response.json(forecast) })
   let body
   const response = { status(code) { assert.equal(code, 200); return this }, json(value) { body = value } }
-  const run = () => handler({ method: 'POST', body: { message: 'Ще вали ли утре?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' } }, response)
+  const run = () => handler({ method: 'POST', body: { message: 'Можеш ли да ми кажеш дали ще вали утре?', city: 'София', latitude: 42.7, longitude: 23.3, lang: 'bg' } }, response)
   const check = (source, reason) => {
     assert.equal(body.intent, 'rain')
     assert.equal(body.targetDate, '2026-10-09')

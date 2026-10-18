@@ -58,8 +58,8 @@ for (const item of locationCorpus()) for (const mode of ['explicit', 'context', 
   const location = logs.find(([name]) => name === '[weather-chat:location]')?.[1]
   assert.equal(location.evidence, 'verified')
   assert.equal(location.resolution, 'verified_place')
-  assert.equal(location.interpreter, ['fallback', 'error'].includes(mode) ? 'local' : 'gemini')
-  if (['context', 'selected'].includes(mode)) assert.equal(location.preventedInheritance, true)
+  assert.equal(location.interpreter, ['fallback', 'error'].includes(mode) || logs.some(([name, entry]) => name === '[weather-chat:routing]' && entry.route === 'local') ? 'local' : 'gemini')
+  if (['context', 'selected'].includes(mode) && location.interpreter === 'gemini') assert.equal(location.preventedInheritance, true)
   privateDiagnostics(logs)
 })
 

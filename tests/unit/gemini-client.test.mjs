@@ -9,10 +9,10 @@ const response = (status, payload) => ({ ok: status >= 200 && status < 300, stat
 
 function fakeClient(sequence, extraEnv = {}) {
   const calls = []; const logs = []
-  const client = createGeminiClient({
+  const client = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} },
     env: { GEMINI_API_KEY: key, ...extraEnv },
     fetchImpl: async (url, init) => { calls.push({ url, init }); const next = sequence.shift(); return typeof next === 'function' ? next(url, init) : next },
-    logger: (...args) => logs.push(args)
+    logger: (...args) => { if (!args[0].endsWith(':gemini-usage]')) logs.push(args) }
   })
   return { client, calls, logs }
 }
@@ -115,8 +115,8 @@ const delayed = (ms, value) => (_url, { signal }) => new Promise((resolve, rejec
 function timedClient(t, sequence, extraEnv = {}) {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 })
   const calls = []; const logs = []
-  const client = createGeminiClient({
-    env: { GEMINI_API_KEY: key, ...extraEnv }, now: () => Date.now(), logger: (...args) => logs.push(args),
+  const client = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} },
+    env: { GEMINI_API_KEY: key, ...extraEnv }, now: () => Date.now(), logger: (...args) => { if (!args[0].endsWith(':gemini-usage]')) logs.push(args) },
     fetchImpl: async (url, init) => { calls.push({ url, init }); const next = sequence.shift(); return typeof next === 'function' ? next(url, init) : next }
   })
   return { client, calls, logs }
@@ -172,7 +172,7 @@ for (const status of [200, 401]) test(`deadline includes hanging HTTP ${status} 
   const { calls } = timedClient(t, [response(status, {})], { GEMINI_MODEL: 'gemini-2.5-flash' })
   // Even a faulty transport/body that never settles cannot hang the handler.
   const hanging = new Promise(() => {})
-  const custom = createGeminiClient({ env: { GEMINI_API_KEY: key, GEMINI_MODEL: 'gemini-2.5-flash' }, logger: () => {}, fetchImpl: async (url, init) => { calls.push({ url, init }); return { ...response(status, {}), json: () => hanging } } })
+  const custom = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} }, env: { GEMINI_API_KEY: key, GEMINI_MODEL: 'gemini-2.5-flash' }, logger: () => {}, fetchImpl: async (url, init) => { calls.push({ url, init }); return { ...response(status, {}), json: () => hanging } } })
   const result = assert.rejects(generate(custom), error => error.code === 'timeout' && !error.httpStatus)
   await flush(); await advance(t, 6500); await result
   assert.ok(calls[0].init.signal.aborted)
@@ -196,7 +196,7 @@ test('second generation 404 ends recovery without further calls', async () => {
 for (const phase of ['discovery', 'generation']) for (const status of [400, 401, 403, 429, 500]) {
   test(`${phase} HTTP ${status} preserves status and never retries`, async () => {
     const { client, calls, logs } = fakeClient([response(status, { error: { status: 'PRIVATE', message: key } })], phase === 'generation' ? { GEMINI_MODEL: 'gemini-2.5-flash' } : {})
-    await assert.rejects(generate(client), error => error.code === (phase === 'generation' ? 'upstream-http' : 'models-list-failed') && error.httpStatus === status)
+    await assert.rejects(generate(client), error => error.code === (phase === 'generation' || status === 429 ? 'upstream-http' : 'models-list-failed') && error.httpStatus === status)
     assert.equal(calls.length, 1)
     assert.equal(logs[0][1].phase, phase)
     assert.equal(logs[0][1].status, status)

@@ -1,6 +1,7 @@
 type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
+import { localRoute } from '../server/weather-local-routing.js'
 import { randomUUID } from 'node:crypto'
 import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent, PendingClarification } from '../server/weather-chat-core.js'
 import { deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, clarificationTurn, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
@@ -150,7 +151,7 @@ async function optionalGeminiUnderstanding(input: ChatInput, requestId: string):
   } catch (error) {
     const details = record(error)
     const code = details?.code
-    const reason = details?.httpStatus === 429 ? 'quota'
+    const reason = ['daily_limit', 'cooldown', 'quota_unavailable', 'ai_disabled'].includes(String(code)) ? String(code) as 'daily_limit' | 'cooldown' | 'quota_unavailable' | 'ai_disabled' : details?.httpStatus === 429 ? 'quota'
       : details?.httpStatus === 401 ? 'authentication' : details?.httpStatus === 403 ? 'permission'
       : details?.httpStatus === 404 ? 'model_unavailable' : code === 'invalid-json' ? 'invalid_json'
       : code === 'timeout' ? 'timeout' : code === 'network-error' ? 'network_error'
@@ -163,7 +164,7 @@ async function optionalGeminiUnderstanding(input: ChatInput, requestId: string):
 }
 
 // Fixed enums only: no message, city, coordinates, model prose or error text.
-function logUnderstanding(reason: 'gemini_invoked' | 'gemini_valid' | 'missing_configuration' | 'quick_action' | 'budget_exhausted' | 'invalid_structure' | 'invalid_json' | 'quota' | 'authentication' | 'permission' | 'timeout' | 'network_error' | 'discovery_failed' | 'model_unavailable' | 'upstream_http' | 'unexpected_error', attempted: boolean, requestId: string) {
+function logUnderstanding(reason: 'daily_limit' | 'cooldown' | 'quota_unavailable' | 'ai_disabled' | 'gemini_invoked' | 'gemini_valid' | 'missing_configuration' | 'quick_action' | 'budget_exhausted' | 'invalid_structure' | 'invalid_json' | 'quota' | 'authentication' | 'permission' | 'timeout' | 'network_error' | 'discovery_failed' | 'model_unavailable' | 'upstream_http' | 'unexpected_error', attempted: boolean, requestId: string) {
   console.info('[weather-chat:understanding]', { requestId, provider: 'gemini', phase: reason === 'gemini_invoked' ? 'invocation' : 'result', reason, attempted })
 }
 
@@ -196,10 +197,24 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (/[а-я]/iu.test(input.message)) input.lang = 'bg'
     else if (/\b(weather|rain|wind|thunder|thunderstorms?|lightning|temperature|tomorrow|today|and|what|wear|umbrella|forecast)\b/i.test(input.message)) input.lang = 'en'
 
-    // The shared instance budget bounds spend; excess traffic uses the local parser.
-    const withinBudget = !input.quickAction && takeGeminiBudget()
+    let placeInput = input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input
+    const cache = new Map<string, Promise<Place | AmbiguousPlace | null>>()
+    const resolve = (name: string) => {
+      const key = name.toLocaleLowerCase()
+      if (!cache.has(key)) cache.set(key, resolvePlace(placeInput, name))
+      return cache.get(key)!
+    }
+    let route = localRoute(input)
+    const localCity = route.useLocal && !input.quickAction ? clarificationTurn(input.message, input.lang, input).understanding?.requestedCity : null
+    if (localCity) {
+      const verified = await resolve(localCity)
+      if (!verified || 'ambiguous' in verified) route = { useLocal: false, reason: 'unverified_location' }
+    }
+    // This minute throttle is only instance-local, never the project quota.
+    const withinBudget = !route.useLocal && takeGeminiBudget()
+    console.info('[weather-chat:routing]', { requestId, route: route.useLocal ? 'local' : 'ai_preferred', reason: route.reason, savedGeminiCalls: route.useLocal && !input.quickAction && Boolean(process.env.GEMINI_API_KEY) ? 1 : 0 })
     if (input.quickAction) logUnderstanding('quick_action', false, requestId)
-    else if (!withinBudget) logUnderstanding('budget_exhausted', false, requestId)
+    else if (!withinBudget && !route.useLocal) logUnderstanding('budget_exhausted', false, requestId)
     const ai = withinBudget ? await optionalGeminiUnderstanding(input, requestId) : null
     decisionSource = ai ? 'gemini' : 'local'
     const userMessage = input.message
@@ -210,6 +225,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     input.context = turn.context
     input.message = turn.message
     let understood: Understanding | null = turn.understanding
+    if (route.useLocal && understood?.timeScope === 'general') understood = { ...understood, timeScope: 'next_12h' }
     if (understood?.needsClarification) {
       const missing = ['unclear', 'other_city', 'general_weather'].includes(understood.intent) ? 'intent' : 'date'
       const place = understood.requestedCity ?? input.context?.city ?? input.city
@@ -225,13 +241,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
     if (understood.intent === 'unrelated') return reply(200, { answer: unrelatedWeatherAnswer(input.lang), intent: understood.intent, needsClarification: false }, 'unrelated', decisionReason)
 
-    const placeInput = input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input
-    const cache = new Map<string, Promise<Place | AmbiguousPlace | null>>()
-    const resolve = (name: string) => {
-      const key = name.toLocaleLowerCase()
-      if (!cache.has(key)) cache.set(key, resolvePlace(placeInput, name))
-      return cache.get(key)!
-    }
+    placeInput = input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input
     const qualifiedReply = turn.continuation && input.pendingClarification?.missing === 'location' && understood.requestedCity?.includes(',')
     const evidence = input.quickAction ? [] : collectLocationCandidates(userMessage, input.lang).filter(candidate => !qualifiedReply || candidate.strength !== 'name')
     const grounded = await groundLocation(evidence, understood.requestedCity, ai?.citySource === 'explicit', resolve).catch(error => {
