@@ -71,9 +71,12 @@ Gemini е първият parser за свободни BG/EN въпроси. По
 
 - До 400 знака на съобщение; ограничени и валидирани context/pending полета.
 - 320 output tokens на Gemini разбиране; няма генериране на финален отговор.
-- Общ AbortSignal deadline 5 секунди за discovery, generation и евентуален
-  еднократен retry при 404; няма retry при 429. За разлика от Promise.race,
-  реалната fetch заявка се прекъсва.
+- Общ deadline 8 секунди за Gemini, включително еднократен retry при 404;
+  discovery до 1,5 секунди, generation до 6,5 секунди на опит. Конфигуриран
+  стабилен текстов модел се използва директно. Няма retry при 401/403/429,
+  мрежова грешка или timeout. AbortSignal прекъсва реалната fetch заявка,
+  а Promise.race ограничава и чакането на response body. Виж
+  [Production latency](bobi-gemini-production-latency.md).
 - До 20 AI разбирания на минута за топъл serverless instance; след това локален
   fallback. До 120 валидни chat заявки на минута за instance; после HTTP 429.
 - Open-Meteo fetch-овете остават с timeout 15 секунди на заявка.

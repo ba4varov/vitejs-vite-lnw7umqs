@@ -57,8 +57,8 @@ function logFailure(error: ServiceError) {
   console.error('[weather-chat]', { stage: error.stage, status: error.httpStatus ?? null, code: error.code })
 }
 
-async function callGemini(system: string, user: string, maxOutputTokens: number, stage: string, responseSchema?: Record<string, unknown>) {
-  const { payload, model } = await geminiClient.generate({ endpoint: 'weather-chat', stage, body: {
+async function callGemini(system: string, user: string, maxOutputTokens: number, stage: string, responseSchema?: Record<string, unknown>, requestId?: string) {
+  const { payload, model } = await geminiClient.generate({ endpoint: 'weather-chat', stage, requestId, body: {
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: user }] }],
         generationConfig: { temperature: 0.2, maxOutputTokens, responseMimeType: 'application/json', ...(responseSchema ? { responseSchema } : {}) }
@@ -143,14 +143,16 @@ async function optionalGeminiUnderstanding(input: ChatInput, requestId: string):
   if (!process.env.GEMINI_API_KEY) { logUnderstanding('missing_configuration', false, requestId); return null }
   try {
     logUnderstanding('gemini_invoked', true, requestId)
-    const result = await callGemini(semanticSystem, JSON.stringify({ currentDate: localIsoDate(new Date(), 'Europe/Sofia'), selectedCity: input.city, language: input.lang, message: input.message, context: input.context ?? null, pendingClarification: input.pendingClarification ?? null }), 320, 'gemini-understanding', semanticSchema)
+    const result = await callGemini(semanticSystem, JSON.stringify({ currentDate: localIsoDate(new Date(), 'Europe/Sofia'), selectedCity: input.city, language: input.lang, message: input.message, context: input.context ?? null, pendingClarification: input.pendingClarification ?? null }), 320, 'gemini-understanding', semanticSchema, requestId)
     const parsed = parseSemanticUnderstanding(result, input.lang)
     logUnderstanding(parsed ? 'gemini_valid' : 'invalid_structure', true, requestId)
     return parsed
   } catch (error) {
     const details = record(error)
     const code = details?.code
-    const reason = details?.httpStatus === 429 ? 'quota' : code === 'invalid-json' ? 'invalid_json'
+    const reason = details?.httpStatus === 429 ? 'quota'
+      : details?.httpStatus === 401 ? 'authentication' : details?.httpStatus === 403 ? 'permission'
+      : details?.httpStatus === 404 ? 'model_unavailable' : code === 'invalid-json' ? 'invalid_json'
       : code === 'timeout' ? 'timeout' : code === 'network-error' ? 'network_error'
       : code === 'models-list-failed' ? 'discovery_failed'
       : code === 'configured-model-unavailable' || code === 'no-compatible-model' ? 'model_unavailable'
@@ -161,7 +163,7 @@ async function optionalGeminiUnderstanding(input: ChatInput, requestId: string):
 }
 
 // Fixed enums only: no message, city, coordinates, model prose or error text.
-function logUnderstanding(reason: 'gemini_invoked' | 'gemini_valid' | 'missing_configuration' | 'quick_action' | 'budget_exhausted' | 'invalid_structure' | 'invalid_json' | 'quota' | 'timeout' | 'network_error' | 'discovery_failed' | 'model_unavailable' | 'upstream_http' | 'unexpected_error', attempted: boolean, requestId: string) {
+function logUnderstanding(reason: 'gemini_invoked' | 'gemini_valid' | 'missing_configuration' | 'quick_action' | 'budget_exhausted' | 'invalid_structure' | 'invalid_json' | 'quota' | 'authentication' | 'permission' | 'timeout' | 'network_error' | 'discovery_failed' | 'model_unavailable' | 'upstream_http' | 'unexpected_error', attempted: boolean, requestId: string) {
   console.info('[weather-chat:understanding]', { requestId, provider: 'gemini', phase: reason === 'gemini_invoked' ? 'invocation' : 'result', reason, attempted })
 }
 
