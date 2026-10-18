@@ -67,7 +67,7 @@ test('Gemini remains optional and weather advice is deterministic', async () => 
   const [chat, advice] = await Promise.all([readFile(new URL('../../api/weather-chat.ts', import.meta.url), 'utf8'), readFile(new URL('../../api/weather-advice.ts', import.meta.url), 'utf8')])
   assert.match(chat, /import \{ geminiClient \} from '\.\.\/server\/gemini-client\.js'/)
   assert.doesNotMatch(advice, /gemini|generativelanguage/i)
-  assert.match(chat, /clarificationTurn\(input\.message.*\)[\s\S]+if \(!understood\) understood = await optionalGeminiUnderstanding/)
+  assert.match(chat, /await optionalGeminiUnderstanding\(input\)[\s\S]+clarificationTurn\(input\.message/)
   assert.doesNotMatch(`${chat}\n${advice}`, /models\/gemini-[^'"`]+:generateContent/)
 })
 
@@ -81,4 +81,27 @@ test('secrets never appear in diagnostics or thrown errors', async () => {
   assert.equal(thrown.code, 'upstream-http')
   assert.doesNotMatch(JSON.stringify(logs), new RegExp(key))
   assert.doesNotMatch(JSON.stringify({ error: 'AI service is unavailable' }), new RegExp(key))
+})
+
+test('discovery and generation share one abort deadline', async () => {
+  const { client, calls } = fakeClient([
+    response(200, { models: [model('gemini-2.5-flash')] }),
+    response(200, { candidates: [] })
+  ])
+  await client.generate({ endpoint: 'weather-chat', stage: 'test', body: {} })
+  assert.ok(calls[0].init.signal instanceof AbortSignal)
+  assert.equal(calls[0].init.signal, calls[1].init.signal)
+})
+
+test('aborted discovery fails safely instead of attempting generation', async t => {
+  const controller = new AbortController()
+  t.mock.method(AbortSignal, 'timeout', ms => { assert.equal(ms, 5000); return controller.signal })
+  let calls = 0
+  const client = createGeminiClient({ env: { GEMINI_API_KEY: key }, logger: () => {}, fetchImpl: async (_url, { signal }) => {
+    calls++
+    controller.abort()
+    signal.throwIfAborted()
+  } })
+  await assert.rejects(client.generate({ endpoint: 'weather-chat', stage: 'test', body: {} }), error => error.code === 'models-list-failed')
+  assert.equal(calls, 1)
 })

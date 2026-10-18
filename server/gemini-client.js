@@ -60,6 +60,7 @@ async function upstreamDetails(response, apiKey) {
 }
 
 export function createGeminiClient({ fetchImpl = fetch, env = process.env, logger = console.error } = {}) {
+  // One deadline covers discovery, generation and a possible stale-model retry.
   let cachedModel
 
   function log(endpoint, error) {
@@ -70,11 +71,11 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
     })
   }
 
-  async function listModels(stage) {
+  async function listModels(stage, signal) {
     const apiKey = env.GEMINI_API_KEY
     let response
     try {
-      response = await fetchImpl(`${API_ROOT}/models`, { method: 'GET', headers: { 'x-goog-api-key': apiKey } })
+      response = await fetchImpl(`${API_ROOT}/models`, { signal, method: 'GET', headers: { 'x-goog-api-key': apiKey } })
     } catch {
       throw new GeminiServiceError(stage, 'models-list-failed', { safeMessage: 'Model discovery network failure' })
     }
@@ -88,9 +89,9 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
     return Array.isArray(payload?.models) ? payload.models : []
   }
 
-  async function resolveModel(stage, { exclude, ignoreConfigured = false } = {}) {
+  async function resolveModel(stage, { exclude, ignoreConfigured = false, signal } = {}) {
     if (cachedModel && cachedModel !== exclude) return cachedModel
-    const models = await listModels(stage)
+    const models = await listModels(stage, signal)
     const configured = !ignoreConfigured ? normalizeName(env.GEMINI_MODEL) : ''
     if (configured) {
       const found = models.find(model => normalizeName(model.name) === configured)
@@ -111,14 +112,15 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
       const error = new GeminiServiceError(stage, 'missing-configuration', { safeMessage: 'Gemini is not configured' })
       log(endpoint, error); throw error
     }
+    const signal = AbortSignal.timeout(5000)
     let model
     try {
-      model = await resolveModel(stage)
+      model = await resolveModel(stage, { signal })
       for (let attempt = 0; attempt < 2; attempt++) {
         let response
         try {
           response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
+            signal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
           })
         } catch { throw new GeminiServiceError(stage, 'network-error', { model, safeMessage: 'Gemini network failure' }) }
         if (response.ok) return { payload: await response.json(), model }
@@ -126,7 +128,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
         if (response.status === 404 && attempt === 0) {
           const previous = model
           cachedModel = undefined
-          model = await resolveModel(stage, { exclude: previous, ignoreConfigured: true })
+          model = await resolveModel(stage, { exclude: previous, ignoreConfigured: true, signal })
           continue
         }
         throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: response.status, model, ...details })

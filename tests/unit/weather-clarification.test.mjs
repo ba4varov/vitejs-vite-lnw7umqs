@@ -8,7 +8,7 @@ for (const lang of ['bg', 'en']) {
     test(`${lang}: city clarification resolves ${intent} without losing tomorrow`, () => {
       const first = clarificationTurn(cityMessage, lang, { context })
       assert.equal(first.pendingClarification.missing, 'intent')
-      assert.match(first.answer, lang === 'bg' ? /вятъра.*общата/ : /wind.*general/)
+      assert.match(first.answer, lang === 'bg' ? /Какво Ви интересува за Пловдив/ : /wind.*general/)
       assert.ok(validatePendingClarification(first.pendingClarification))
       const next = clarificationTurn(reply, lang, { context, pendingClarification: first.pendingClarification })
       assert.equal(next.understanding.intent, intent)
