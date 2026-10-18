@@ -8,6 +8,7 @@ const source = readFileSync(filename, 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
   .replaceAll("'../server/weather-chat-core.js'", JSON.stringify(new URL('../../server/weather-chat-core.js', import.meta.url).href))
   .replaceAll("'../server/weather-chat-semantics.js'", JSON.stringify(new URL('../../server/weather-chat-semantics.js', import.meta.url).href))
+  .replaceAll("'../server/weather-location-evidence.js'", JSON.stringify(new URL('../../server/weather-location-evidence.js', import.meta.url).href))
   .replaceAll("'../server/gemini-client.js'", JSON.stringify(new URL('../../server/gemini-client.js', import.meta.url).href))
 const { default: handler } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
 const dates = Array.from({ length: 16 }, (_, i) => `2026-10-${String(8 + i).padStart(2, '0')}`)
@@ -26,9 +27,10 @@ async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, n
     let payload = weatherPayload
     if (parsed.hostname.startsWith('geocoding-')) {
       const query = parsed.searchParams.get('name')
+      const geoLang = parsed.searchParams.get('language') ?? lang
       const sofia = /^(София|Sofia)$/u.test(query)
       const plovdiv = /Пловдив|Plovdiv/iu.test(query)
-      payload = { results: geoResults ?? [{ name: plovdiv ? (lang === 'bg' ? 'Пловдив' : 'Plovdiv') : sofia ? (lang === 'bg' ? 'София' : 'Sofia') : (lang === 'bg' ? 'Варна' : 'Varna'), latitude: plovdiv ? 42.14 : sofia ? 42.7 : 43.21, longitude: sofia ? 23.3 : 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
+      payload = { results: geoResults ?? [{ name: plovdiv ? (geoLang === 'bg' ? 'Пловдив' : 'Plovdiv') : sofia ? (geoLang === 'bg' ? 'София' : 'Sofia') : (geoLang === 'bg' ? 'Варна' : 'Varna'), latitude: plovdiv ? 42.14 : sofia ? 42.7 : 43.21, longitude: sofia ? 23.3 : 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
     }
     if (parsed.hostname.startsWith('archive-')) payload = { timezone: 'Europe/Sofia', daily: daily([parsed.searchParams.get('start_date')]) }
     if (parsed.hostname.startsWith('air-quality-')) payload = { current: { european_aqi: 12, pm10: 4, pm2_5: 2 } }

@@ -6,6 +6,7 @@ import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, 
 import { deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, clarificationTurn, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
 import { geminiClient } from '../server/gemini-client.js'
 import { semanticSchema, semanticSystem, parseSemanticUnderstanding, resolveSemanticTurn } from '../server/weather-chat-semantics.js'
+import { collectLocationCandidates, groundLocation } from '../server/weather-location-evidence.js'
 import type { SemanticUnderstanding } from '../server/weather-chat-semantics.js'
 
 type ChatInput = ValidChatInput
@@ -74,7 +75,8 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null): Pro
   if (requestedCity.trim().toLocaleLowerCase() === input.city.split(',')[0].trim().toLocaleLowerCase()) {
     return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
   }
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(requestedCity.split(',')[0].replace(/^(?:село|град)\s+/iu, '').trim())}&count=10&language=${input.lang}&format=json`
+  const queryName = requestedCity.split(',')[0].replace(/^(?:село|град)\s+/iu, '').trim()
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(queryName)}&count=10&language=${/\p{Script=Cyrillic}/u.test(queryName) ? 'bg' : 'en'}&format=json`
   let response: Response
   try { response = await fetchWithTimeout(url) } catch { throw new ServiceError('geocoding', 'network-error') }
   if (!response.ok) throw new ServiceError('geocoding', 'upstream-http', response.status)
@@ -84,13 +86,13 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null): Pro
   const normalized = (value: unknown) => typeof value === 'string' ? value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() : ''
   const requestedName = normalized(namePart.replace(/^(?:село|град)\s+/iu, ''))
   const requestedQualifier = normalized(qualifier)
-  const ranked = results.filter(place => typeof place.latitude === 'number' && typeof place.longitude === 'number').map(place => ({ place, score:
+  const ranked = results.filter(place => Number.isFinite(place.latitude) && Math.abs(place.latitude) <= 90 && Number.isFinite(place.longitude) && Math.abs(place.longitude) <= 180).map(place => ({ place, score:
     (normalized(place.name) === requestedName ? 100 : 0) +
     (requestedQualifier && [place.country, place.country_code, place.admin1, place.admin2].some(value => normalized(value).includes(requestedQualifier)) ? 50 : 0) +
     (['P', 'place', 'city', 'town', 'village'].some(value => String(place.feature_code ?? place.feature_class ?? '').toLocaleLowerCase().includes(value.toLocaleLowerCase())) ? 10 : 0) +
     Math.log10(Math.max(1, Number(place.population) || 1))
   })).sort((a, b) => b.score - a.score)
-  if (!ranked.length) return null
+  if (!ranked.length || normalized(ranked[0].place.name) !== requestedName) return null
   if ((requestedQualifier && ![ranked[0].place.country, ranked[0].place.country_code, ranked[0].place.admin1, ranked[0].place.admin2].some(value => normalized(value).includes(requestedQualifier))) || (ranked.length > 1 && ranked[0].score - ranked[1].score < 1)) {
     return { ambiguous: true, name: namePart, options: ranked.slice(0, 3).map(({ place }) => [place.admin1, place.country].filter(Boolean).join(', ')).filter((value): value is string => Boolean(value)) }
   }
@@ -175,7 +177,7 @@ function takeGeminiBudget() {
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   const requestId = randomUUID()
   let decisionSource: 'gemini' | 'local' | 'none' = 'none'
-  const reply = (status: number, body: Record<string, unknown>, outcome: 'answer' | 'clarification' | 'unrelated' | 'unavailable' | 'rejected' | 'error', reason: 'semantic' | 'fallback' | 'semantic_clarification' | 'invalid_date' | 'geocoding' | 'weather_data' | 'invalid_request' | 'request_limit' | 'upstream_error') => {
+  const reply = (status: number, body: Record<string, unknown>, outcome: 'answer' | 'clarification' | 'unrelated' | 'unavailable' | 'rejected' | 'error', reason: 'semantic' | 'fallback' | 'semantic_clarification' | 'invalid_date' | 'geocoding' | 'weather_data' | 'invalid_request' | 'request_limit' | 'upstream_error' | 'location_evidence') => {
     console.info('[weather-chat:decision]', { requestId, source: decisionSource, outcome, reason })
     return response.status(status).json(body)
   }
@@ -198,6 +200,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     else if (!withinBudget) logUnderstanding('budget_exhausted', false, requestId)
     const ai = withinBudget ? await optionalGeminiUnderstanding(input, requestId) : null
     decisionSource = ai ? 'gemini' : 'local'
+    const userMessage = input.message
     const semanticTurn = ai ? resolveSemanticTurn(input.message, input.lang, input, ai) : null
     const turn = semanticTurn ?? clarificationTurn(input.message, input.lang, input)
     const decisionReason = ai ? 'semantic' : 'fallback'
@@ -220,7 +223,31 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
     if (understood.intent === 'unrelated') return reply(200, { answer: unrelatedWeatherAnswer(input.lang), intent: understood.intent, needsClarification: false }, 'unrelated', decisionReason)
 
-    const place = await resolvePlace(input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input, understood.requestedCity)
+    const placeInput = input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input
+    const cache = new Map<string, Promise<Place | AmbiguousPlace | null>>()
+    const resolve = (name: string) => {
+      const key = name.toLocaleLowerCase()
+      if (!cache.has(key)) cache.set(key, resolvePlace(placeInput, name))
+      return cache.get(key)!
+    }
+    const qualifiedReply = turn.continuation && input.pendingClarification?.missing === 'location' && understood.requestedCity?.includes(',')
+    const evidence = input.quickAction ? [] : collectLocationCandidates(userMessage, input.lang).filter(candidate => !qualifiedReply || candidate.strength !== 'name')
+    const grounded = await groundLocation(evidence, understood.requestedCity, ai?.citySource === 'explicit', resolve).catch(error => {
+      console.info('[weather-chat:location]', { requestId, interpreter: decisionSource, evidence: 'unavailable', candidates: evidence.length, resolution: 'blocked' })
+      throw error
+    })
+    if (grounded.status === 'ambiguous' || grounded.status === 'unverified') {
+      console.info('[weather-chat:location]', { requestId, interpreter: decisionSource, evidence: grounded.status, candidates: grounded.candidates, resolution: 'clarification' })
+      const snapshot = parseUnderstanding({ intent: understood.intent, requestedCity: grounded.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false, clarificationQuestion: null }, input.lang)!
+      const attempts = (input.pendingClarification?.missing === 'location' ? input.pendingClarification.attempts : 0) + 1
+      const pendingClarification: PendingClarification | null = attempts <= 3 ? { understanding: snapshot, message: userMessage, missing: 'location', locationMode: grounded.status === 'ambiguous' && grounded.requestedCity ? 'qualifier' : 'name', attempts } : null
+      const answer = input.lang === 'bg' ? 'За кое населено място питате? Посочете името и област или държава, за да не използвам погрешно място.' : 'Which location do you mean? Please give its name and region or country so I can use the right place.'
+      return reply(200, { answer, pendingClarification, intent: understood.intent, needsClarification: true }, 'clarification', 'location_evidence')
+    }
+    const place = grounded.status === 'verified' ? grounded.place : understood.requestedCity ? await resolve(understood.requestedCity) : await resolvePlace(placeInput, null)
+    const preventedInheritance = grounded.status === 'verified' && (!understood.requestedCity || understood.requestedCity.toLocaleLowerCase() === placeInput.city.toLocaleLowerCase()) && (grounded.place.latitude !== placeInput.latitude || grounded.place.longitude !== placeInput.longitude)
+    console.info('[weather-chat:location]', { requestId, interpreter: decisionSource, evidence: grounded.status, candidates: grounded.candidates, resolution: grounded.status === 'verified' ? 'verified_place' : understood.requestedCity ? 'geocoding' : input.context ? 'inherited' : 'selected', preventedInheritance })
+    if (grounded.status === 'verified') understood = { ...understood, requestedCity: grounded.place.name }
     if (!place || 'ambiguous' in place) {
       const attempts = (turn.continuation && input.pendingClarification?.missing === 'location' ? input.pendingClarification.attempts : 0) + 1
       const snapshot = parseUnderstanding({ intent: understood.intent, requestedCity: understood.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false, clarificationQuestion: null }, input.lang)!
