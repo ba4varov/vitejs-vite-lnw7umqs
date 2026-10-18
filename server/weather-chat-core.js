@@ -140,7 +140,10 @@ const WEEKDAYS = new Map([
   ...'sunday monday tuesday wednesday thursday friday saturday'.split(' ').map((name, day) => [name, day])
 ])
 const WEEKDAY_NAMES = [...WEEKDAYS.keys()].join('|')
-const weekdayOnly = value => WEEKDAYS.has(normalizeQuestion(value))
+const NEXT_WEEKDAY = 'следващия|следващият|следващата|идния|идният|идната|next'
+const THIS_WEEKDAY = 'този|тази|текущия|текущият|текущата|настоящия|настоящият|настоящата|this'
+const WEEKDAY_MODIFIER = `(?:${NEXT_WEEKDAY}|${THIS_WEEKDAY})`
+const weekdayOnly = value => new RegExp(`^(?:${WEEKDAY_MODIFIER}\\s+)?(?:${WEEKDAY_NAMES})$`, 'u').test(normalizeQuestion(value))
 
 export function extractRequestedDate(message, now = new Date(), timezone = 'UTC', _lang = 'bg') {
   const text = normalizeQuestion(message)
@@ -170,10 +173,15 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
       if (!match) {
         const city = extractRequestedCity(message)
         const dateText = city ? text.replace(normalizeQuestion(city), '') : text
-        const weekday = dateText.match(new RegExp(`(?:^|\\s)(?:${WEEKDAY_NAMES})(?=\\s|$)`, 'u'))?.[0].trim()
+        const weekday = dateText.match(new RegExp(`(?:^|\\s)(?:(${WEEKDAY_MODIFIER})\\s+)?(${WEEKDAY_NAMES})(?=\\s|$)`, 'u'))
         if (!weekday) return null
         const date = new Date(`${localIsoDate(now, timezone)}T12:00:00Z`)
-        date.setUTCDate(date.getUTCDate() + (WEEKDAYS.get(weekday) - date.getUTCDay() + 7) % 7)
+        const targetDay = (WEEKDAYS.get(weekday[2]) + 6) % 7
+        const localDay = (date.getUTCDay() + 6) % 7
+        // Calendar weeks start on Monday. Bare names retain nearest-occurrence semantics.
+        const offset = !weekday[1] ? (targetDay - localDay + 7) % 7
+          : targetDay - localDay + (new RegExp(`^(?:${NEXT_WEEKDAY})$`, 'u').test(weekday[1]) ? 7 : 0)
+        date.setUTCDate(date.getUTCDate() + offset)
         return date.toISOString().slice(0, 10)
       }
       day = match[2]; month = englishMonths.get(match[1]); year = match[3]
@@ -192,9 +200,13 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
 }
 
 export function extractRequestedCity(message, _lang = 'bg') {
+  // Remove a weekday phrase before another location preposition, so the first
+  // Bulgarian "в" cannot swallow both the date and the actual city as one name.
   const cleaned = normalizeBulgarianTimeExpressions(message).replace(/[?!]+$/u, '').trim()
-  const weekdayBoundary = String.raw`\s+(?:във|в|на|on|for)\s+(?:${WEEKDAY_NAMES})(?:\s|$)`
-  const stop = String.raw`(?=${weekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
+    .replace(new RegExp(String.raw`(?:^|\s)(?:във|в|на|on|for)\s+(?:${WEEKDAY_MODIFIER}\s+)?(?:${WEEKDAY_NAMES})(?=\s+(?:във|в|in|at|near)\s)`, 'giu'), ' ')
+  const weekdayBoundary = String.raw`\s+(?:във|в|на|on|for)\s+(?:${WEEKDAY_MODIFIER}\s+)?(?:${WEEKDAY_NAMES})(?:\s|$)`
+  const qualifiedWeekdayBoundary = String.raw`\s+${WEEKDAY_MODIFIER}\s+(?:${WEEKDAY_NAMES})(?:\s|$)`
+  const stop = String.raw`(?=${weekdayBoundary}|${qualifiedWeekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
   // "за" denotes a place only when attached to an explicit weather construction.
   const patterns = [
     new RegExp(String.raw`(?:^|\s)(?:във|в)\s+([\p{L}][\p{L}'’.,-]*(?:\s+[\p{L}][\p{L}'’.,-]*){0,4}?)${stop}`, 'giu'),
