@@ -209,7 +209,10 @@ export function extractRequestedCity(message, _lang = 'bg') {
     .replace(new RegExp(String.raw`(?:^|\s)(?:във|в|на|on|for)\s+(?:${WEEKDAY_MODIFIER}\s+)?(?:${WEEKDAY_NAMES})(?=\s+(?:във|в|in|at|near)\s)`, 'giu'), ' ')
   const weekdayBoundary = String.raw`\s+(?:във|в|на|on|for)\s+(?:${WEEKDAY_MODIFIER}\s+)?(?:${WEEKDAY_NAMES})(?:\s|$)`
   const qualifiedWeekdayBoundary = String.raw`\s+${WEEKDAY_MODIFIER}\s+(?:${WEEKDAY_NAMES})(?:\s|$)`
-  const stop = String.raw`(?=${weekdayBoundary}|${qualifiedWeekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
+  // Clause starters delimit a name regardless of the weather topic or word
+  // order. Keep multiword geographical names intact; do not enumerate places.
+  const clauseBoundary = String.raw`\s+(?:как|какво|каква|какъв|колко|дали|кога|къде|подходящо|става|може|ще|what|how|when|where|whether|will|would|should|can|could|is|are)(?=\s|$)`
+  const stop = String.raw`(?=${clauseBoundary}|${weekdayBoundary}|${qualifiedWeekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
   // "за" denotes a place only when attached to an explicit weather construction.
   const patterns = [
     new RegExp(String.raw`(?:^|\s)(?:във|в)\s+([\p{L}][\p{L}'’.,-]*(?:\s+[\p{L}][\p{L}'’.,-]*){0,4}?)${stop}`, 'giu'),
