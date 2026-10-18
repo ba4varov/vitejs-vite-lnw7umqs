@@ -2,7 +2,7 @@ type ApiRequest = { method?: string; body?: unknown }
 type ApiResponse = { status: (code: number) => ApiResponse; json: (body: Record<string, unknown>) => void }
 
 import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent } from '../server/weather-chat-core.js'
-import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseDeterministicQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
+import { ALLOWED_INTENTS, deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, parseConversationQuestion, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
 import { geminiClient } from '../server/gemini-client.js'
 
 type ChatInput = ValidChatInput
@@ -158,19 +158,24 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const input = validateChatInput(request.body)
     if (!input) return response.status(400).json({ error: requestIsEnglish(request.body) ? 'Invalid request.' : 'Невалидна заявка.' })
 
-    let understood: Understanding | null = parseDeterministicQuestion(input.message, input.lang, { quickAction: input.quickAction })
+    // Infer the message language without changing the interface preference.
+    if (/[а-я]/iu.test(input.message)) input.lang = 'bg'
+    else if (/\b(weather|rain|wind|temperature|tomorrow|today|and|what|wear|umbrella|forecast)\b/i.test(input.message)) input.lang = 'en'
+
+    let understood: Understanding | null = parseConversationQuestion(input.message, input.lang, { quickAction: input.quickAction, context: input.context })
     if (!understood) understood = await optionalGeminiUnderstanding(input)
     if (!understood || understood.needsClarification || understood.intent === 'unclear') {
       return response.status(200).json({ answer: understood?.clarificationQuestion ?? clarification(input.lang), intent: 'unclear', needsClarification: true })
     }
     if (understood.intent === 'unrelated') return response.status(200).json({ answer: unrelatedWeatherAnswer(input.lang), intent: understood.intent, needsClarification: false })
 
-    const place = await resolvePlace(input, understood.requestedCity)
+    const place = await resolvePlace(input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input, understood.requestedCity)
     if (!place) return response.status(200).json({ answer: input.lang === 'bg' ? `Не намирам място „${understood.requestedCity}“. Как се изписва?` : `I cannot find “${understood.requestedCity}”. How is it spelled?`, intent: understood.intent, needsClarification: true })
     if ('ambiguous' in place) return response.status(200).json({ answer: input.lang === 'bg' ? `Кой ${place.name} имаш предвид — ${place.options.join(', ')}?` : `Which ${place.name} do you mean—${place.options.join(', ')}?`, intent: understood.intent, needsClarification: true })
     // Re-resolve yearless dates using the explicitly requested location's local date.
     const localTargetDate = extractRequestedDate(input.message, new Date(), place.timezone ?? 'UTC', input.lang)
     if (localTargetDate) understood = { ...understood, targetDate: localTargetDate, timeScope: 'specific_date' }
+    if (understood.timeScope !== 'specific_date') understood = { ...understood, targetDate: null }
     let summary: WeatherSummary = await getWeather(place, understood.targetDate)
     if (understood.timeScope === 'this_weekend' || understood.timeScope === 'next_weekend') {
       const requestedDates = weekendForecastDates(understood.timeScope, new Date(), summary.timezone || place.timezone || 'UTC')
@@ -182,11 +187,18 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       understood = { ...understood, targetDate: relativeForecastDate(relativeScope, new Date(), summary.timezone || place.timezone || 'UTC') ?? addIsoDays(today, 1) }
       summary = { ...summary, requestedDate: understood.targetDate, targetDay: findDailyForecast(summary.daily, understood.targetDate) }
     }
+    // Recompute yearless/relative expressions only after Open-Meteo supplies the location timezone.
+    const resolvedDate = extractRequestedDate(input.message, new Date(), summary.timezone || place.timezone || 'UTC', input.lang)
+    if (resolvedDate) {
+      understood = { ...understood, targetDate: resolvedDate, timeScope: 'specific_date' }
+      summary = { ...summary, targetDay: findDailyForecast(summary.daily, resolvedDate) }
+    }
+    const context = { city: place.name, latitude: place.latitude, longitude: place.longitude, intent: understood.intent, timeScope: understood.timeScope, targetDate: understood.targetDate, previousQuestion: input.message }
     const localToday = localIsoDate(new Date(), summary.timezone || place.timezone || 'UTC')
     if (understood.targetDate && understood.targetDate < localToday) summary = await getHistoricalWeather({ ...place, timezone: summary.timezone || place.timezone }, understood.targetDate)
-    if (understood.targetDate && !summary.targetDay) return response.status(200).json({ answer: input.lang === 'bg' ? `За ${understood.targetDate} все още няма надеждна прогноза в наличния прогнозен период.` : `A reliable forecast for ${understood.targetDate} is not available yet.`, intent: understood.intent, needsClarification: false })
+    if (understood.targetDate && !summary.targetDay) return response.status(200).json({ context, answer: input.lang === 'bg' ? `За ${understood.targetDate} все още няма надеждна прогноза в наличния прогнозен период.` : `A reliable forecast for ${understood.targetDate} is not available yet.`, intent: understood.intent, needsClarification: false })
     const answer = deterministicWeatherAnswer(summary, understood, input.lang)
-    return response.status(200).json({ answer, intent: understood.intent, requestedCity: understood.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false })
+    return response.status(200).json({ answer, context, intent: understood.intent, requestedCity: understood.requestedCity, timeScope: understood.timeScope, targetDate: understood.targetDate, needsClarification: false })
   } catch (error) {
     const serviceError = error instanceof ServiceError ? error : new ServiceError('open-meteo', 'unexpected-error')
     logFailure(serviceError)

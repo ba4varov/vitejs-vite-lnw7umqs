@@ -18,12 +18,13 @@ const forecast = {
   timezone: 'Europe/Sofia', current: { time: '2026-10-08T12:00', temperature_2m: 17, apparent_temperature: 16, wind_speed_10m: 8 }, daily: daily(dates),
   hourly: { time: times, temperature_2m: times.map(() => 17), apparent_temperature: times.map(() => 16), precipitation: times.map(() => 0), precipitation_probability: times.map(() => 0), wind_speed_10m: times.map(() => 8), uv_index: times.map(() => 3), weather_code: times.map(() => 0) }
 }
-async function invoke(t, message, lang, extra = {}) {
-  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-08T09:00:00Z') })
+async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, now = '2026-10-08T09:00:00Z') {
+  t.mock.timers.reset()
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) })
   const calls = []
   t.mock.method(globalThis, 'fetch', async url => {
     const parsed = new URL(url); calls.push(parsed)
-    let payload = forecast
+    let payload = weatherPayload
     if (parsed.hostname.startsWith('geocoding-')) payload = { results: [{ name: lang === 'bg' ? 'Варна' : 'Varna', latitude: 43.21, longitude: 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
     if (parsed.hostname.startsWith('archive-')) payload = { timezone: 'Europe/Sofia', daily: daily([parsed.searchParams.get('start_date')]) }
     if (parsed.hostname.startsWith('air-quality-')) payload = { current: { european_aqi: 12, pm10: 4, pm2_5: 2 } }
@@ -84,4 +85,30 @@ test('serverless quick action remains valid', async t => {
   const { body } = await invoke(t, 'Should I take an umbrella?', 'en', { quickAction: 'umbrella' })
   assert.equal(body.intent, 'rain')
   assert.equal(body.needsClarification, false)
+})
+
+for (const lang of ['bg', 'en']) test(`conversation ${lang}: city, date and measure survive actual requests`, async t => {
+  const first = await invoke(t, lang === 'bg' ? 'Ще вали ли утре във Варна?' : 'Will it rain tomorrow in Varna?', lang)
+  assert.equal(first.body.context.city, lang === 'bg' ? 'Варна' : 'Varna')
+  const second = await invoke(t, lang === 'bg' ? 'А вятърът?' : 'And wind?', lang, { context: first.body.context })
+  assert.equal(second.body.context.city, first.body.context.city)
+  assert.equal(second.body.intent, 'wind')
+  assert.equal(second.body.targetDate, '2026-10-09')
+  const third = await invoke(t, lang === 'bg' ? 'А вдругиден?' : 'And the day after tomorrow?', lang, { context: second.body.context })
+  assert.equal(third.body.intent, 'wind')
+  assert.equal(third.body.targetDate, '2026-10-10')
+})
+
+for (const lang of ['bg', 'en']) test(`conversation ${lang}: absent upstream measurements are explained`, async t => {
+  const { body } = await invoke(t, lang === 'bg' ? 'Ще вали ли?' : 'Will it rain?', lang, {}, { timezone: 'Europe/Sofia' })
+  assert.match(body.answer, lang === 'bg' ? /Нямам достатъчно/ : /don't have enough/)
+  assert.doesNotMatch(body.answer, /0%|No umbrella|не е нужен/)
+})
+test('relative days follow the selected location timezone rather than UTC', async t => {
+  const { body } = await invoke(t, 'And tomorrow?', 'en', {}, { ...forecast, timezone: 'Asia/Tokyo' }, '2026-10-08T23:30:00Z')
+  assert.equal(body.targetDate, '2026-10-10')
+})
+test('message language changes the answer without changing interface settings', async t => {
+  const { body } = await invoke(t, 'Каква е температурата утре?', 'en')
+  assert.match(body.answer, /температурата/)
 })
