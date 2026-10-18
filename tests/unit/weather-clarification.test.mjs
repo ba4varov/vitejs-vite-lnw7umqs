@@ -8,7 +8,7 @@ for (const lang of ['bg', 'en']) {
     test(`${lang}: city clarification resolves ${intent} without losing tomorrow`, () => {
       const first = clarificationTurn(cityMessage, lang, { context })
       assert.equal(first.pendingClarification.missing, 'intent')
-      assert.match(first.answer, lang === 'bg' ? /вятъра.*общата/ : /wind.*general/)
+      assert.match(first.answer, lang === 'bg' ? /Какво Ви интересува за Пловдив/ : /wind.*general/)
       assert.ok(validatePendingClarification(first.pendingClarification))
       const next = clarificationTurn(reply, lang, { context, pendingClarification: first.pendingClarification })
       assert.equal(next.understanding.intent, intent)
@@ -64,4 +64,16 @@ for (const lang of ['bg', 'en']) test(`${lang}: explicit calendar date resolves 
   assert.equal(next.understanding.targetDate, '2026-10-20')
   assert.equal(next.understanding.intent, 'wind')
   assert.equal(next.pendingClarification, null)
+})
+
+for (const lang of ['bg', 'en']) test(`${lang}: standalone question drops pending city and period without Gemini`, () => {
+  const pendingClarification = clarificationTurn(lang === 'bg' ? 'А в Пловдив?' : 'And in Plovdiv?', lang, { context }).pendingClarification
+  const next = clarificationTurn(lang === 'bg' ? 'Каква е температурата?' : 'What is the temperature?', lang, { context, pendingClarification })
+  assert.equal(next.context, undefined)
+  assert.equal(next.continuation, false)
+  assert.equal(next.pendingClarification, null)
+  assert.equal(next.understanding.intent, 'temperature')
+  assert.equal(next.understanding.requestedCity, null)
+  assert.equal(next.understanding.timeScope, 'general')
+  assert.equal(next.understanding.targetDate, null)
 })

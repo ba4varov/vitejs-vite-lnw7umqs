@@ -26,7 +26,7 @@ export function parseUnderstanding(value, lang) {
   if (!ALLOWED_INTENTS.includes(value.intent) || !ALLOWED_TIME_SCOPES.includes(value.timeScope) || typeof value.needsClarification !== 'boolean') return null
   if (requestedCity !== null && (typeof requestedCity !== 'string' || !requestedCity.trim() || requestedCity.length > 100)) return null
   if (clarificationQuestion !== null && (typeof clarificationQuestion !== 'string' || !clarificationQuestion.trim() || clarificationQuestion.length > 180)) return null
-  if (value.targetDate !== null && (typeof value.targetDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.targetDate) || new Date(`${value.targetDate}T00:00:00Z`).toISOString().slice(0, 10) !== value.targetDate)) return null
+  if (value.targetDate !== null && (typeof value.targetDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.targetDate) || !Number.isFinite(Date.parse(`${value.targetDate}T00:00:00Z`)) || new Date(`${value.targetDate}T00:00:00Z`).toISOString().slice(0, 10) !== value.targetDate)) return null
   if (value.timeScope === 'specific_date' && value.targetDate === null) return null
   const normalizedQuestion = value.needsClarification && !clarificationQuestion
     ? (lang === 'bg' ? 'За кое място и период питаш?' : 'Which place and time period do you mean?')
@@ -561,7 +561,7 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
   const date = extractRequestedDate(message, options.now, options.timezone, lang)
   // Only short answers complete a slot. A full question or explicit cancellation starts anew.
   const newExplicitQuestion = city && raw && !['general_weather', 'unrelated', 'unclear'].includes(raw.intent)
-  const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|какво|колко|дали|ще |what |will |how |should |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
+  const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|каква|какво|какви|колко|дали|what |how |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
   let understanding, sourceMessage = message, context = options.context, missing
   if (pending && fragment) {
     understanding = { ...pending.understanding, needsClarification: false, clarificationQuestion: null }
@@ -586,7 +586,9 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
       : pending.missing === 'date' ? Boolean(scope || date) : understanding.requestedCity !== pending.understanding.requestedCity
     if (!resolved) missing = pending.missing
   } else {
-    understanding = parseConversationQuestion(message, lang, options)
+    // A standalone question abandons pending slots, including their old context.
+    if (pending) context = undefined
+    understanding = parseConversationQuestion(message, lang, { ...options, context })
     const cityOnly = city && raw?.intent === 'general_weather' && !/(време|прогноз|weather|forecast)/iu.test(text)
     if (cityOnly) missing = 'intent'
     else if (understanding?.needsClarification) {
@@ -601,7 +603,7 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
     const measure = labels[context?.intent]
     const question = missing === 'date' ? (lang === 'bg' ? `За кой точно ден${place ? ` в ${place}` : ''} питаш?` : `Which exact day${place ? ` in ${place}` : ''} do you mean?`)
       : missing === 'location' ? (lang === 'bg' ? 'Кое населено място имаш предвид? Посочи област или държава.' : 'Which location do you mean? Please specify a region or country.')
-      : lang === 'bg' ? (measure ? `За ${place} — за ${measure} или общата прогноза?` : `Каква информация за времето в ${place} те интересува?`)
+      : lang === 'bg' ? `Какво Ви интересува за ${place}?`
       : measure ? `For ${place}, do you mean ${measure} or the general forecast?` : `What weather information would you like for ${place}?`
     const attempts = pending && fragment ? pending.attempts + 1 : 1
     const { isQuick: _isQuick, ...snapshot } = understanding

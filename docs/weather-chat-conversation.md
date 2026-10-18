@@ -1,9 +1,9 @@
 # Weather chat conversation
 
 `src/App.tsx` sends messages to `api/weather-chat.ts`. The API validates input,
-classifies the question with `server/weather-chat-core.js`, resolves explicit
+classifies free questions with server-side Gemini (validated against `server/weather-chat-core.js`), resolves explicit
 locations with Open-Meteo geocoding, fetches forecast/archive data, and renders a
-deterministic answer. The existing optional Gemini understanding fallback remains;
+deterministic answer. The local parser is the fallback when Gemini is unconfigured, unavailable, over budget or invalid;
 weather values and advice never come from generated model text.
 
 The client keeps the last successful response's `context` in a React ref. It
@@ -64,11 +64,17 @@ changes; stale/aborted responses cannot restore it. Older API clients still work
 without this optional field. No UI or dependencies changed.
 
 `clarificationTurn` wraps the existing deterministic conversation parser. A new
-city without a measure asks whether to reuse the previous measure or provide the
-general forecast. Without context it asks what weather information is wanted for
+city without a measure asks “Какво Ви интересува за Пловдив?” (using the requested city). Without context it asks what weather information is wanted for
 that city. Explicit questions proceed directly. Short measure, date and region
 answers complete the pending request while preserving its other entities. A new
-question, unrelated request, cancellation or quick action starts a fresh turn.
+question with an explicit new city, unrelated request, cancellation or quick action starts a fresh turn.
+A short complete measure question such as “Ще вали ли?” also completes the
+pending city clarification and retains the known period.
+On a resolved pending turn, the handler uses the locally resolved city, time scope
+and target date even when Gemini returns a default `now` or a stale city.
+Explicit city/date changes are applied locally before this merge. A standalone
+question abandons pending context in both the local fallback and the Gemini
+payload; the model remains the primary intent interpreter.
 Unresolved dates ask only for a day; geocoding ties ask for a region/country and
 keep the original measure and date. A qualifier that still leaves a tie cannot
 silently select a city. Missing place names can be corrected separately.
@@ -80,8 +86,8 @@ invalid calendar dates, questions over 400 characters, city names over 100,
 clarification text over 180 and attempt counts outside 1–3. Pending context never
 contains measurements and cannot nest another pending state.
 
-Intent/date clarification returns before geocoding, forecasts, AQI, marine or
-Gemini calls. Location ambiguity needs geocoding only; weather retrieval waits
+Intent/date clarification returns before geocoding, forecasts, AQI or marine calls.
+Gemini understanding runs first for free questions within the instance budget. Location ambiguity needs geocoding only; weather retrieval waits
 until the location resolves. Relative scopes retain destination timezone behavior;
 yearless calendar expressions remain available for local date resolution. Missing
 weather measurements still use the existing deterministic availability rules.
