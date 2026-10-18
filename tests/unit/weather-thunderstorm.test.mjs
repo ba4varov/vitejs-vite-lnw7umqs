@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { resolveSemanticTurn } from '../../server/weather-chat-semantics.js'
 import { parseDeterministicQuestion, deterministicWeatherAnswer, parseUnderstanding, clarificationTurn } from '../../server/weather-chat-core.js'
 
 for (const [message, city, scope] of [
@@ -92,14 +93,14 @@ test('archive evidence is labelled historical rather than forecast', () => {
 test('validated AI resolves an unknown long weather formulation while date/location guards remain', () => {
   const context = { city: 'Varna', latitude: 43, longitude: 27, intent: 'wind', timeScope: 'tomorrow', targetDate: dates[1], previousQuestion: 'Wind tomorrow?' }
   const pendingClarification = clarificationTurn('And in Plovdiv?', 'en', { context }).pendingClarification
-  const aiUnderstanding = understood('now')
-  const next = clarificationTurn('Could the sky start rumbling over us while we are outside?', 'en', { pendingClarification, aiUnderstanding })
+  const aiUnderstanding = { ...understood('now'), turnType: 'clarification', citySource: 'context', timeSource: 'context', missing: 'none' }
+  const next = resolveSemanticTurn('Could the sky start rumbling over us while we are outside?', 'en', { pendingClarification }, aiUnderstanding)
   assert.equal(next.answer, undefined)
   assert.equal(next.understanding.intent, 'thunderstorm')
   assert.equal(next.understanding.requestedCity, 'Plovdiv')
   assert.equal(next.understanding.timeScope, 'tomorrow')
   for (const missing of ['date', 'location']) {
-    const guarded = clarificationTurn('Could the sky start rumbling over us?', 'en', { pendingClarification: { ...pendingClarification, missing }, aiUnderstanding })
+    const guarded = resolveSemanticTurn('Could the sky start rumbling over us?', 'en', { pendingClarification: { ...pendingClarification, missing } }, aiUnderstanding)
     assert.equal(guarded.pendingClarification?.missing, missing)
     assert.ok(guarded.answer)
   }
@@ -107,7 +108,7 @@ test('validated AI resolves an unknown long weather formulation while date/locat
 
 for (const intent of ['wind', 'rain', 'uv', 'general_weather']) test(`pending intent resolution accepts AI ${intent} without local phrase matching`, () => {
   const pendingClarification = clarificationTurn('А в Пловдив?', 'bg').pendingClarification
-  const next = clarificationTurn('Може ли да ми дадете още подробности по този въпрос?', 'bg', { pendingClarification, aiUnderstanding: { ...understood('now'), intent } })
+  const next = resolveSemanticTurn('Може ли да ми дадете още подробности по този въпрос?', 'bg', { pendingClarification }, { ...understood('now'), intent, turnType: 'clarification', citySource: 'context', timeSource: 'context', missing: 'none' })
   assert.equal(next.answer, undefined)
   assert.equal(next.understanding.intent, intent)
   assert.equal(next.understanding.requestedCity, 'Пловдив')
@@ -116,7 +117,7 @@ for (const intent of ['wind', 'rain', 'uv', 'general_weather']) test(`pending in
 test('AI intent cannot hide an explicitly unresolved date in the clarification reply', () => {
   const pendingClarification = clarificationTurn('А в Пловдив?', 'bg').pendingClarification
   for (const message of ['Ще гърми ли следващата седмица?', 'Ще гърми ли утре или вдругиден?', 'Ще гърми ли на 31.02.2026?']) {
-    const next = clarificationTurn(message, 'bg', { pendingClarification, aiUnderstanding: understood('now') })
+    const next = resolveSemanticTurn(message, 'bg', { pendingClarification }, { ...understood('now'), turnType: 'clarification', citySource: 'context', timeSource: 'explicit', missing: 'date', needsClarification: true })
     assert.equal(next.pendingClarification.missing, 'date')
     assert.equal(next.pendingClarification.understanding.requestedCity, 'Пловдив')
   }
