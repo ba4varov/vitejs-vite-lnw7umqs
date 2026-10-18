@@ -1,5 +1,5 @@
 export const ALLOWED_INTENTS = [
-  'current', 'later', 'rain', 'clothing', 'walk', 'laundry', 'car_wash',
+  'current', 'later', 'rain', 'thunderstorm', 'clothing', 'walk', 'laundry', 'car_wash',
   'outdoor_activity', 'wind', 'temperature', 'uv', 'air_quality', 'marine',
   'other_city', 'general_weather', 'unrelated', 'unclear'
 ]
@@ -281,6 +281,7 @@ export function parseDeterministicQuestion(message, lang = 'bg', options = {}) {
   const actionIntent = { umbrella: 'rain', clothing: 'clothing', walk: 'walk' }[options.quickAction]
   const quickIntent = actionIntent ?? QUICK_QUESTIONS.get(text)
   let intent = quickIntent
+  if (!intent && /(?:гръмотев|гръм|гърм|мълни|светкавиц|\bthunder(?:(?:storm|shower)s?|ing|s)?\b|\blightning\b)/iu.test(text)) intent = 'thunderstorm'
   if (!intent && /(чадър|вали|превал|дъжд|валеж|сняг|снег)/i.test(text)) intent = 'rain'
   else if (!intent && /\b(rain|raining|precipitation|snow|umbrella|shower)s?\b/i.test(text)) intent = 'rain'
   else if (!intent && /(облека|дрех|яке|палто)/i.test(text)) intent = 'clothing'
@@ -354,7 +355,62 @@ function selectedHours(summary, scope) {
   })
 }
 
+// WMO interpretation, never precipitation probability or a lightning-strike forecast.
+const THUNDER_CODES = new Set([95, 96, 99])
+const WMO_CODES = new Set([0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99])
+
+function thunderstormAnswer(summary, understood, lang) {
+  const scope = understood.timeScope
+  if (scope === 'this_weekend' || scope === 'next_weekend') {
+    const dates = summary.requestedDates ?? []
+    if (dates.length) return dates.map(date => thunderstormAnswer({ ...summary, targetDay: findDailyForecast(summary.targetDays, date) }, { ...understood, timeScope: 'specific_date', targetDate: date }, lang)).join('\n')
+    return lang === 'bg' ? `Нямам достатъчно данни за гръмотевични бури за ${summary.location} за избрания уикенд.` : `I don't have enough thunderstorm data for ${summary.location} for the selected weekend.`
+  }
+  const date = understood.targetDate
+  const dayScope = ['today', 'tomorrow', 'day_after_tomorrow', 'yesterday', 'day_before_yesterday', 'specific_date'].includes(scope)
+  const period = dayScope && date ? date : scope === 'general' ? periodLabel('next_12h', lang) : periodLabel(scope, lang)
+  let codes = [], complete = false
+  const hours = summary.nextHours ?? []
+  if (scope === 'now') {
+    codes = [summary.current?.weather_code]
+    complete = WMO_CODES.has(codes[0])
+  } else if (dayScope && date) {
+    // Daily WMO is the day's most severe condition. Hourly evidence may also
+    // reveal a storm even if the daily summary is missing or disagrees.
+    const dailyCode = summary.targetDay?.date === date ? summary.targetDay.code : null
+    const dayHours = hours.filter(hour => hour.time.slice(0, 10) === date)
+    codes = [dailyCode, ...dayHours.map(hour => hour.code)]
+    const byTime = new Map(dayHours.map(hour => [hour.time.slice(0, 13), hour.code]))
+    complete = WMO_CODES.has(dailyCode) || Array.from({ length: 24 }, (_, i) => `${date}T${String(i).padStart(2, '0')}`).every(time => WMO_CODES.has(byTime.get(time)))
+  } else {
+    const effectiveScope = scope === 'general' ? 'next_12h' : scope
+    const selected = selectedHours(summary, effectiveScope)
+    codes = selected.map(hour => hour.code)
+    // Generate the expected window independently of the supplied rows. Gaps,
+    // duplicate timestamps and null/unknown codes cannot justify a negative.
+    const start = summary.current?.time?.slice(0, 13)
+    if (start && Number.isFinite(Date.parse(`${start}:00:00Z`))) {
+      const base = Date.parse(`${start}:00:00Z`)
+      const expectedHours = Array.from({ length: 72 }, (_, i) => ({ time: new Date(base + i * 3600000).toISOString().slice(0, 16) }))
+      const expected = selectedHours({ ...summary, nextHours: expectedHours }, effectiveScope)
+      const byTime = new Map(selected.map(hour => [hour.time.slice(0, 13), hour.code]))
+      complete = expected.length > 0 && expected.every(hour => WMO_CODES.has(byTime.get(hour.time.slice(0, 13))))
+    }
+  }
+  const placePeriod = `${summary.location} (${period})`
+  if (codes.some(code => THUNDER_CODES.has(code))) return lang === 'bg'
+    ? `За ${placePeriod} ${summary.historical ? 'архивните данни' : 'прогнозните данни'} от Open-Meteo показват гръмотевична буря. Това не определя точни места или моменти на попадения на мълнии.`
+    : `For ${placePeriod}, Open-Meteo ${summary.historical ? 'historical data indicate' : 'forecast data indicate'} a thunderstorm. This does not predict exact lightning-strike locations or times.`
+  if (!complete) return lang === 'bg'
+    ? `Нямам достатъчно данни за гръмотевични бури за ${placePeriod}. Не мога надеждно да преценя дали ще гърми.`
+    : `I don't have enough thunderstorm data for ${placePeriod}. I cannot reliably tell whether there will be thunder.`
+  return lang === 'bg'
+    ? `Наличните ${summary.historical ? 'архивни' : 'прогнозни'} данни от Open-Meteo за ${placePeriod} не показват гръмотевични бури. Това не е гаранция за липса на гръмотевици.`
+    : `Available Open-Meteo ${summary.historical ? 'historical' : 'forecast'} data for ${placePeriod} do not indicate thunderstorms. This is not a guarantee of no thunder.`
+}
+
 export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
+  if (understood.intent === 'thunderstorm') return thunderstormAnswer(summary, understood, lang)
   if (understood.timeScope === 'this_weekend' || understood.timeScope === 'next_weekend') {
     return weekendForecastAnswer(summary, understood, lang)
   }
@@ -561,13 +617,20 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
   const date = extractRequestedDate(message, options.now, options.timezone, lang)
   // Only short answers complete a slot. A full question or explicit cancellation starts anew.
   const newExplicitQuestion = city && raw && !['general_weather', 'unrelated', 'unclear'].includes(raw.intent)
+  const ai = parseUnderstanding(options.aiUnderstanding, lang)
+  const cityOnly = city && raw?.intent === 'general_weather' && !/(време|прогноз|weather|forecast)/iu.test(text)
+  const aiWeatherIntent = ai && !ai.needsClarification && !cityOnly && !['unrelated', 'unclear', 'other_city'].includes(ai.intent)
+  const pendingCandidate = pending?.missing === 'intent' && raw?.intent === 'unrelated' && !city && !/(?:cancel|отказ|забрави|напиши|write|ignore)/iu.test(text)
+  const aiFollowUp = pendingCandidate && aiWeatherIntent
   const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|каква|какво|какви|колко|дали|what |how |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
+  const continuation = pending && (fragment || aiFollowUp)
   let understanding, sourceMessage = message, context = options.context, missing
-  if (pending && fragment) {
+  if (continuation) {
     understanding = { ...pending.understanding, needsClarification: false, clarificationQuestion: null }
     context = pending.context
     sourceMessage = pending.message
-    if (raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)) understanding.intent = raw.intent
+    if (aiWeatherIntent && pending.missing === 'intent') understanding.intent = ai.intent
+    else if (raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)) understanding.intent = raw.intent
     else if (/(общ|прогноз|general|forecast|weather)/iu.test(text)) understanding.intent = 'general_weather'
     if (scope || date) {
       understanding.timeScope = date ? 'specific_date' : scope
@@ -575,21 +638,25 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
       sourceMessage = message // Keep yearless dates available for destination-timezone resolution.
     }
     if (city) understanding.requestedCity = city
-    if (pending.missing === 'location' && !city && !scope && !date && raw?.intent === 'unrelated' && message.length <= 100 && !/(не знам|не съм сигур|not sure|do not know|don't know)/iu.test(text)) {
+    if (pending.missing === 'location' && !aiWeatherIntent && !city && !scope && !date && raw?.intent === 'unrelated' && message.length <= 100 && !/(не знам|не съм сигур|not sure|do not know|don't know)/iu.test(text)) {
       understanding.requestedCity = pending.locationMode === 'name' ? message.trim() : `${understanding.requestedCity?.split(',')[0] ?? ''}, ${message.trim()}`.replace(/^, /, '').slice(0, 100)
     }
     const explicitMeasure = raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)
     const generalForecast = /общ|general|forecast|прогноз|weather/iu.test(text)
     const previousMeasure = context && /същ|предиш|same|previous/iu.test(text)
     if (previousMeasure) understanding.intent = context.intent
-    const resolved = pending.missing === 'intent' ? Boolean(explicitMeasure || generalForecast || previousMeasure)
+    const resolved = pending.missing === 'intent' ? Boolean(aiWeatherIntent || explicitMeasure || generalForecast || previousMeasure)
       : pending.missing === 'date' ? Boolean(scope || date) : understanding.requestedCity !== pending.understanding.requestedCity
     if (!resolved) missing = pending.missing
+    if (raw?.needsClarification && raw.intent !== 'unclear') {
+      missing = 'date'
+      understanding = { ...understanding, timeScope: 'general', targetDate: null }
+      sourceMessage = message
+    }
   } else {
     // A standalone question abandons pending slots, including their old context.
     if (pending) context = undefined
     understanding = parseConversationQuestion(message, lang, { ...options, context })
-    const cityOnly = city && raw?.intent === 'general_weather' && !/(време|прогноз|weather|forecast)/iu.test(text)
     if (cityOnly) missing = 'intent'
     else if (understanding?.needsClarification) {
       missing = 'date'
@@ -599,16 +666,16 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
   if (!understanding) return { understanding: null, message, context }
   if (missing) {
     const place = understanding.requestedCity || context?.city || options.city || ''
-    const labels = lang === 'bg' ? { wind: 'вятъра', rain: 'валежите', temperature: 'температурата', uv: 'UV индекса', air_quality: 'въздуха', marine: 'морето', clothing: 'облеклото', walk: 'разходка', laundry: 'пране', car_wash: 'миене на колата', outdoor_activity: 'дейности навън', current: 'текущото време', later: 'времето по-късно' } : { wind: 'wind', rain: 'rain', temperature: 'temperature', uv: 'UV index', air_quality: 'air quality', marine: 'sea', clothing: 'clothing', walk: 'walking', laundry: 'laundry', car_wash: 'washing the car', outdoor_activity: 'outdoor activities', current: 'current weather', later: 'weather later' }
+    const labels = lang === 'bg' ? { thunderstorm: 'гръмотевичните бури', wind: 'вятъра', rain: 'валежите', temperature: 'температурата', uv: 'UV индекса', air_quality: 'въздуха', marine: 'морето', clothing: 'облеклото', walk: 'разходка', laundry: 'пране', car_wash: 'миене на колата', outdoor_activity: 'дейности навън', current: 'текущото време', later: 'времето по-късно' } : { thunderstorm: 'thunderstorms', wind: 'wind', rain: 'rain', temperature: 'temperature', uv: 'UV index', air_quality: 'air quality', marine: 'sea', clothing: 'clothing', walk: 'walking', laundry: 'laundry', car_wash: 'washing the car', outdoor_activity: 'outdoor activities', current: 'current weather', later: 'weather later' }
     const measure = labels[context?.intent]
     const question = missing === 'date' ? (lang === 'bg' ? `За кой точно ден${place ? ` в ${place}` : ''} питаш?` : `Which exact day${place ? ` in ${place}` : ''} do you mean?`)
       : missing === 'location' ? (lang === 'bg' ? 'Кое населено място имаш предвид? Посочи област или държава.' : 'Which location do you mean? Please specify a region or country.')
       : lang === 'bg' ? `Какво Ви интересува за ${place}?`
       : measure ? `For ${place}, do you mean ${measure} or the general forecast?` : `What weather information would you like for ${place}?`
-    const attempts = pending && fragment ? pending.attempts + 1 : 1
+    const attempts = continuation ? pending.attempts + 1 : 1
     const { isQuick: _isQuick, ...snapshot } = understanding
     const next = { understanding: { ...snapshot, needsClarification: false, clarificationQuestion: null }, message: sourceMessage, missing, attempts, ...(pending?.locationMode && missing === 'location' ? { locationMode: pending.locationMode } : {}), ...(context ? { context } : {}) }
     return { understanding, message: sourceMessage, context, answer: attempts > 3 ? (lang === 'bg' ? `За да продължа, е нужно уточнение: ${question}` : `To continue, I need this information: ${question}`) : question, pendingClarification: attempts <= 3 ? next : null }
   }
-  return { understanding, message: sourceMessage, context, continuation: Boolean(pending && fragment), pendingClarification: null }
+  return { understanding, message: sourceMessage, context, continuation: Boolean(continuation), pendingCandidate: Boolean(pendingCandidate), pendingClarification: null }
 }

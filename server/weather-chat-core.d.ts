@@ -1,4 +1,4 @@
-export const ALLOWED_INTENTS: readonly ['current', 'later', 'rain', 'clothing', 'walk', 'laundry', 'car_wash', 'outdoor_activity', 'wind', 'temperature', 'uv', 'air_quality', 'marine', 'other_city', 'general_weather', 'unrelated', 'unclear']
+export const ALLOWED_INTENTS: readonly ['current', 'later', 'rain', 'thunderstorm', 'clothing', 'walk', 'laundry', 'car_wash', 'outdoor_activity', 'wind', 'temperature', 'uv', 'air_quality', 'marine', 'other_city', 'general_weather', 'unrelated', 'unclear']
 export const ALLOWED_TIME_SCOPES: readonly ['now', 'next_12h', 'next_24h', 'evening', 'night', 'afternoon', 'tomorrow', 'today', 'day_after_tomorrow', 'tomorrow_morning', 'tomorrow_afternoon', 'tomorrow_evening', 'tomorrow_night', 'morning', 'general', 'specific_date', 'this_weekend', 'next_weekend', 'yesterday', 'day_before_yesterday']
 export const QUICK_ACTIONS: readonly ['umbrella', 'clothing', 'walk']
 export type Intent = typeof ALLOWED_INTENTS[number]
@@ -56,4 +56,4 @@ export function parseConversationQuestion(message: string, lang?: 'bg' | 'en', o
 
 export type PendingClarification = { understanding: Understanding; context?: ConversationContext; message: string; missing: 'intent' | 'date' | 'location'; locationMode?: 'qualifier' | 'name'; attempts: number }
 export function validatePendingClarification(value: unknown): boolean
-export function clarificationTurn(message: string, lang: 'bg' | 'en', options: { context?: ConversationContext; pendingClarification?: PendingClarification; city?: string; quickAction?: 'umbrella' | 'clothing' | 'walk' }): { understanding: Understanding | null; message: string; context?: ConversationContext; answer?: string; continuation?: boolean; pendingClarification?: PendingClarification | null }
+export function clarificationTurn(message: string, lang: 'bg' | 'en', options: { context?: ConversationContext; pendingClarification?: PendingClarification; aiUnderstanding?: Understanding | null; city?: string; quickAction?: 'umbrella' | 'clothing' | 'walk' }): { understanding: Understanding | null; message: string; context?: ConversationContext; answer?: string; continuation?: boolean; pendingCandidate?: boolean; pendingClarification?: PendingClarification | null }
