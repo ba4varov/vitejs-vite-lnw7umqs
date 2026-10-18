@@ -59,15 +59,16 @@ export function geminiUnderstandingError(code, lang = 'bg') {
 
 export function validateChatInput(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null
-  if (Object.keys(body).some(key => !['message', 'city', 'latitude', 'longitude', 'lang', 'quickAction'].includes(key))) return null
-  if (Object.keys(body).length < 5 || Object.keys(body).length > 6) return null
+  if (Object.keys(body).some(key => !['message', 'city', 'latitude', 'longitude', 'lang', 'quickAction', 'context'].includes(key))) return null
+  if (Object.keys(body).length < 5 || Object.keys(body).length > 7) return null
   if (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 400) return null
   if (typeof body.city !== 'string' || !body.city.trim() || body.city.length > 100) return null
   if (typeof body.latitude !== 'number' || !Number.isFinite(body.latitude) || body.latitude < -90 || body.latitude > 90) return null
   if (typeof body.longitude !== 'number' || !Number.isFinite(body.longitude) || body.longitude < -180 || body.longitude > 180) return null
   if (body.lang !== 'bg' && body.lang !== 'en') return null
   if (body.quickAction !== undefined && !QUICK_ACTIONS.includes(body.quickAction)) return null
-  return { message: body.message.trim(), city: body.city.trim(), latitude: body.latitude, longitude: body.longitude, lang: body.lang, ...(body.quickAction ? { quickAction: body.quickAction } : {}) }
+  if (body.context !== undefined && !validateConversationContext(body.context)) return null
+  return { ...(body.context ? { context: body.context } : {}), message: body.message.trim(), city: body.city.trim(), latitude: body.latitude, longitude: body.longitude, lang: body.lang, ...(body.quickAction ? { quickAction: body.quickAction } : {}) }
 }
 
 const QUICK_QUESTIONS = new Map([
@@ -133,8 +134,22 @@ export function weekendForecastDates(scope, now = new Date(), timezone = 'UTC') 
   return [saturday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)]
 }
 
+// Bare weekdays mean the nearest occurrence, including today in the selected city.
+const WEEKDAYS = new Map([
+  ...'неделя понеделник вторник сряда четвъртък петък събота'.split(' ').map((name, day) => [name, day]),
+  ...'sunday monday tuesday wednesday thursday friday saturday'.split(' ').map((name, day) => [name, day])
+])
+const WEEKDAY_NAMES = [...WEEKDAYS.keys()].join('|')
+const weekdayOnly = value => WEEKDAYS.has(normalizeQuestion(value))
+
 export function extractRequestedDate(message, now = new Date(), timezone = 'UTC', _lang = 'bg') {
   const text = normalizeQuestion(message)
+  const englishRelative = text.match(/(?:^|\s)in\s+(\d{1,2})\s+days?(?=\s|$)/u)
+  if (englishRelative) {
+    const date = new Date(`${localIsoDate(now, timezone)}T12:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + Number(englishRelative[1]))
+    return date.toISOString().slice(0, 10)
+  }
   const relative = text.match(/(?:^|\s)(?:след\s+(\d{1,2}|един|едно|два|две|три|четири|пет)\s+дни?|следващ(?:ия|ият)\s+ден)(?=\s|$)/u)
   if (relative) {
     const words = { един: 1, едно: 1, два: 2, две: 2, три: 3, четири: 4, пет: 5 }
@@ -152,7 +167,15 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
     if (!match) {
       const englishMonths = new Map('january february march april may june july august september october november december'.split(' ').map((name, i) => [name, i + 1]))
       match = text.match(/(?:^|\s)(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?(?=\s|$)/u)
-      if (!match) return null
+      if (!match) {
+        const city = extractRequestedCity(message)
+        const dateText = city ? text.replace(normalizeQuestion(city), '') : text
+        const weekday = dateText.match(new RegExp(`(?:^|\\s)(?:${WEEKDAY_NAMES})(?=\\s|$)`, 'u'))?.[0].trim()
+        if (!weekday) return null
+        const date = new Date(`${localIsoDate(now, timezone)}T12:00:00Z`)
+        date.setUTCDate(date.getUTCDate() + (WEEKDAYS.get(weekday) - date.getUTCDay() + 7) % 7)
+        return date.toISOString().slice(0, 10)
+      }
       day = match[2]; month = englishMonths.get(match[1]); year = match[3]
     } else {
       day = match[1]; month = MONTHS_BG.get(match[2]); year = match[3]
@@ -170,7 +193,8 @@ export function extractRequestedDate(message, now = new Date(), timezone = 'UTC'
 
 export function extractRequestedCity(message, _lang = 'bg') {
   const cleaned = normalizeBulgarianTimeExpressions(message).replace(/[?!]+$/u, '').trim()
-  const stop = String.raw`(?=[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
+  const weekdayBoundary = String.raw`\s+(?:във|в|на|on|for)\s+(?:${WEEKDAY_NAMES})(?:\s|$)`
+  const stop = String.raw`(?=${weekdayBoundary}|[,;.!?]|\s+(?:на|за|on|for)\s+\d|\s+(?:днес|утре|вдругиден|вчера|завчера|сега|в момента|тази|този|следващия|сутрин|следобед|вечер|нощ|довечера|през|след|за колко|today|tomorrow|yesterday|this|next|when|while|morning|afternoon|evening|night|during|over)(?:\s|$)|$)`
   // "за" denotes a place only when attached to an explicit weather construction.
   const patterns = [
     new RegExp(String.raw`(?:^|\s)(?:във|в)\s+([\p{L}][\p{L}'’.,-]*(?:\s+[\p{L}][\p{L}'’.,-]*){0,4}?)${stop}`, 'giu'),
@@ -180,14 +204,16 @@ export function extractRequestedCity(message, _lang = 'bg') {
   ]
   const candidates = patterns.flatMap(pattern => [...cleaned.matchAll(pattern)].map(match => match[1]
     .replace(/,\s*(?:докато|когато|а|но|when|while)(?=\s|$).*$/iu, '')
-    .replace(/\s+(?:какво|каква|какъв|ще|е|бъде|времето|прогнозата).*$/iu, '').trim()))
+    .replace(/\s+(?:какво|каква|какъв|ще|е|бъде|времето|прогнозата).*$/iu, '').trim())).filter(candidate => !weekdayOnly(candidate))
   if (candidates.length) {
     const candidate = candidates.at(-1)
     if (!candidate.split(/\s+/u).every(word => PROTECTED_LOCATION.has(normalizeQuestion(word).replace(/[.,]/g, '')))) return candidate
   }
   // Common free word order: a proper-name phrase immediately before the time word.
+  const followup = cleaned.match(/^(?:а|and|what about)\s+([\p{Lu}][\p{L}'’.-]*(?:\s+[\p{Lu}][\p{L}'’.-]*){0,3})$/u)?.[1]
+  if (followup && !weekdayOnly(followup) && !followup.split(/\s/u).some(word => PROTECTED_LOCATION.has(normalizeQuestion(word))) && !/^(?:tomorrow|today|wind|rain|temperature|yesterday)$/iu.test(followup)) return followup
   const bare = cleaned.match(/(?:^|\s)([\p{Lu}][\p{L}'’.-]*(?:[ ,]+[\p{Lu}][\p{L}'’.-]*){0,3})\s+(?:днес|утре|вдругиден)(?=\s|$)/u)?.[1]
-  return bare && !PROTECTED_LOCATION.has(normalizeQuestion(bare)) ? bare.trim() : null
+  return bare && !weekdayOnly(bare) && !PROTECTED_LOCATION.has(normalizeQuestion(bare)) ? bare.trim() : null
 }
 
 export function extractTimeScope(message) {
@@ -314,8 +340,19 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
     return weekendForecastAnswer(summary, understood, lang)
   }
   const period = periodLabel(understood.timeScope, lang)
-  const day = ['day_before_yesterday', 'yesterday', 'today', 'tomorrow', 'day_after_tomorrow'].includes(understood.timeScope) ? summary.targetDay : understood.targetDate ? summary.targetDay : null
+  const day = PERIOD_HOURS[understood.timeScope.replace(/^tomorrow_/, '')] ? null : ['day_before_yesterday', 'yesterday', 'today', 'tomorrow', 'day_after_tomorrow'].includes(understood.timeScope) ? summary.targetDay : understood.targetDate ? summary.targetDay : null
   const hours = selectedHours(summary, understood.timeScope)
+  const missing = () => lang === 'bg' ? `Нямам достатъчно данни за ${summary.location} за избрания показател и период.` : `I don't have enough data for ${summary.location} for the selected measure and period.`
+  if (understood.targetDate && !day && !PERIOD_HOURS[understood.timeScope.replace(/^tomorrow_/, '')]) return missing()
+  if (!['general', 'now'].includes(understood.timeScope) && ['air_quality', 'marine'].includes(understood.intent)) return missing()
+  if (day && understood.intent === 'uv') return number(day.maxUv) === null ? missing() : (lang === 'bg' ? `UV индексът за ${summary.location} на ${day.date} е до ${day.maxUv}.` : `UV index for ${summary.location} on ${day.date} reaches ${day.maxUv}.`)
+  const fields = day ? { temperature: [day.minC, day.maxC], wind: [day.maxWindKmh], rain: [day.rainMm, day.rainChancePct] } : {
+    temperature: [summary.current?.temperature_2m, ...hours.map(h => h.tempC)], wind: hours.length ? hours.map(h => h.windKmh) : [summary.current?.wind_speed_10m],
+    rain: hours.flatMap(h => [h.rainMm, h.rainChancePct]), uv: hours.length ? hours.map(h => h.uv) : [summary.current?.uv_index] }
+  if (fields[understood.intent]?.every(v => number(v) === null)) return missing()
+  if (['clothing', 'walk', 'laundry', 'car_wash', 'outdoor_activity', 'general_weather', 'current', 'later', 'other_city'].includes(understood.intent) &&
+      ['temperature', 'wind', 'rain'].some(key => !fields[key]?.some(v => number(v) !== null))) return missing()
+
   const hourlyPeriod = Boolean(PERIOD_HOURS[understood.timeScope.replace(/^tomorrow_/, '')])
   if (hourlyPeriod && !hours.length) return lang === 'bg'
     ? `Нямам налична почасова прогноза за ${summary.location} ${period}. Не искам да ти дам данни за друг период.`
@@ -327,12 +364,12 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
   const max = (key, fallback = null) => { const data = values(key); return data.length ? Math.max(...data) : fallback }
   const min = (key, fallback = null) => { const data = values(key); return data.length ? Math.min(...data) : fallback }
   const rainChance = max('rainChancePct', hourlyPeriod ? null : number(day?.rainChancePct))
-  const rainMm = hours.length ? values('rainMm').reduce((sum, value) => sum + value, 0) : number(day?.rainMm) ?? 0
+  const rainMm = hours.length ? (values('rainMm').length ? values('rainMm').reduce((sum, value) => sum + value, 0) : null) : number(day?.rainMm)
   const codes = hours.map(hour => number(hour.code)).filter(code => code !== null)
   const wetCode = codes.some(code => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95)
   const dangerous = codes.some(code => code >= 95 || code === 66 || code === 67)
   const temp = hourlyPeriod ? min('tempC') : number(summary.current?.temperature_2m) ?? min('tempC', number(day?.minC))
-  const feels = hourlyPeriod ? min('feelsC') : number(summary.current?.apparent_temperature) ?? min('feelsC', temp)
+  const feels = hourlyPeriod ? min('feelsC') : number(summary.current?.apparent_temperature) ?? min('feelsC')
   const wind = max('windKmh', hourlyPeriod ? null : number(day?.maxWindKmh) ?? number(summary.current?.wind_speed_10m))
   const uv = max('uv', hourlyPeriod ? null : number(day?.maxUv) ?? number(summary.current?.uv_index))
 
@@ -343,14 +380,18 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
     const temperatures = values('tempC'); const apparent = values('feelsC')
     const practical = (rainChance ?? 0) >= 35 || rainMm > 0.1 ? 'Предвиди защита от дъжд.' : (wind ?? 0) >= 30 ? 'Предвиди защита от вятър.' : 'Условията изглеждат подходящи за обичайни дейности.'
     return lang === 'bg'
-      ? `Прогнозата за ${summary.location} ${period} е ${Math.min(...temperatures)}–${Math.max(...temperatures)}°C${apparent.length ? `, усеща се като ${Math.min(...apparent)}–${Math.max(...apparent)}°C` : ''}. Валежи: до ${rainChance ?? 0}% и около ${rainMm.toFixed(1)} мм; вятър до ${wind ?? '?'} км/ч. ${practical}`
-      : `The forecast for ${summary.location} ${period} is ${Math.min(...temperatures)}–${Math.max(...temperatures)}°C, precipitation up to ${rainChance ?? 0}% (${rainMm.toFixed(1)} mm), and wind up to ${wind ?? '?'} km/h.`
+      ? `Прогнозата за ${summary.location} ${period} е ${Math.min(...temperatures)}–${Math.max(...temperatures)}°C${apparent.length ? `, усеща се като ${Math.min(...apparent)}–${Math.max(...apparent)}°C` : ''}. Валежи: до ${rainChance ?? '?'}% и около ${(rainMm === null ? '?' : rainMm.toFixed(1))} мм; вятър до ${wind ?? '?'} км/ч. ${practical}`
+      : `The forecast for ${summary.location} ${period} is ${Math.min(...temperatures)}–${Math.max(...temperatures)}°C, precipitation up to ${rainChance ?? '?'}% (${(rainMm === null ? '?' : rainMm.toFixed(1))} mm), and wind up to ${wind ?? '?'} km/h.`
   }
 
   if (understood.intent === 'rain') {
     const needed = wetCode || rainMm > 0.1 || (rainChance ?? 0) >= 35
-    if (lang === 'en') return `${needed ? 'Yes, take an umbrella' : 'No umbrella is needed'} ${period}: precipitation probability is up to ${rainChance ?? 0}% and about ${rainMm.toFixed(1)} mm is expected.`
-    return `${needed ? 'Да, вземи чадър' : 'Не, не е нужен чадър'} ${period}: вероятността за валеж е до ${rainChance ?? 0}%, очакват се около ${rainMm.toFixed(1)} мм.`
+    const complete = hours.length > 0 && hours.every(hour => number(hour.rainMm) !== null && number(hour.rainChancePct) !== null)
+    if (!needed && !complete) return lang === 'bg'
+      ? `Данните за валежите ${period} са непълни. Не мога надеждно да преценя дали ще ти трябва чадър; вземи го за всеки случай.`
+      : `Precipitation data ${period} are incomplete. I cannot reliably tell whether you will need an umbrella; take one just in case.`
+    if (lang === 'en') return `${needed ? 'Yes, take an umbrella' : 'No umbrella is needed'} ${period}: precipitation probability is up to ${rainChance ?? '?'}% and about ${(rainMm === null ? '?' : rainMm.toFixed(1))} mm is expected.`
+    return `${needed ? 'Да, вземи чадър' : 'Не, не е нужен чадър'} ${period}: вероятността за валеж е до ${rainChance ?? '?'}%, очакват се около ${(rainMm === null ? '?' : rainMm.toFixed(1))} мм.`
   }
   if (understood.intent === 'clothing') {
     const advice = (feels ?? temp ?? 15) <= 8 ? 'облечи по-топли дрехи' : (feels ?? temp ?? 15) <= 17 ? 'вземи леко яке' : 'избери леки дрехи'
@@ -361,7 +402,7 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
     const bad = dangerous || (wind ?? 0) >= 45 || rainMm >= 5
     const conditional = !bad && ((rainChance ?? 0) >= 35 || (wind ?? 0) >= 25 || (temp ?? 15) < 2 || (temp ?? 15) > 32 || (uv ?? 0) >= 6)
     const verdict = bad ? 'Не, не е подходящо за разходка' : conditional ? 'Да, но с повишено внимание е подходящо за разходка' : 'Да, подходящо е за разходка'
-    return lang === 'en' ? `${bad ? 'No' : conditional ? 'Yes, with precautions' : 'Yes'}, a walk is suitable ${period}. Rain chance is ${rainChance ?? 0}%, wind up to ${wind ?? '?'} km/h, temperature about ${temp ?? '?'}°C and UV up to ${uv ?? '?'}${dangerous ? '; dangerous weather is possible' : ''}.` : `${verdict} ${period}. Валежи: до ${rainChance ?? 0}%, вятър: до ${wind ?? '?'} км/ч, температура: около ${temp ?? '?'}°C, UV: до ${uv ?? '?'}${dangerous ? '; възможно е опасно време' : ''}.`
+    return lang === 'en' ? `${bad ? 'No' : conditional ? 'Yes, with precautions' : 'Yes'}, a walk is suitable ${period}. Rain chance is ${rainChance ?? '?'}%, wind up to ${wind ?? '?'} km/h, temperature about ${temp ?? '?'}°C and UV up to ${uv ?? '?'}${dangerous ? '; dangerous weather is possible' : ''}.` : `${verdict} ${period}. Валежи: до ${rainChance ?? '?'}%, вятър: до ${wind ?? '?'} км/ч, температура: около ${temp ?? '?'}°C, UV: до ${uv ?? '?'}${dangerous ? '; възможно е опасно време' : ''}.`
   }
   if (understood.intent === 'temperature') return lang === 'bg'
     ? `В ${summary.location} ${period} температурата е ${hours.length > 1 ? `${min('tempC') ?? '?'}–${max('tempC') ?? '?'}°C` : `${temp ?? '?'}°C`}, усеща се като ${feels ?? '?'}°C.`
@@ -378,10 +419,10 @@ export function deterministicWeatherAnswer(summary, understood, lang = 'bg') {
     ? `Край ${summary.location} текущата температура на морската повърхност е ${summary.marine?.seaTemperatureC != null ? `${summary.marine.seaTemperatureC}°C` : 'няма налични данни'}.` : `Sea surface temperature near ${summary.location} is ${summary.marine?.seaTemperatureC != null ? `${summary.marine.seaTemperatureC}°C` : 'unavailable'}.`
   if (understood.intent === 'laundry' || understood.intent === 'car_wash') {
     const wet = rainMm > 0.1 || (rainChance ?? 0) >= 35
-    return lang === 'bg' ? `${wet ? 'По-добре изчакай' : 'Условията изглеждат подходящи'} за ${understood.intent === 'laundry' ? 'простиране' : 'миене на колата'} ${period}. Валежи: до ${rainChance ?? '?'}% и около ${rainMm.toFixed(1)} мм.` : `${wet ? 'Better wait' : 'Conditions look suitable'} ${period}. Rain chance up to ${rainChance ?? '?'}%, about ${rainMm.toFixed(1)} mm.`
+    return lang === 'bg' ? `${wet ? 'По-добре изчакай' : 'Условията изглеждат подходящи'} за ${understood.intent === 'laundry' ? 'простиране' : 'миене на колата'} ${period}. Валежи: до ${rainChance ?? '?'}% и около ${(rainMm === null ? '?' : rainMm.toFixed(1))} мм.` : `${wet ? 'Better wait' : 'Conditions look suitable'} ${period}. Rain chance up to ${rainChance ?? '?'}%, about ${(rainMm === null ? '?' : rainMm.toFixed(1))} mm.`
   }
   if (day) return dailyForecastAnswer(summary, day, lang, understood.timeScope)
-  return lang === 'bg' ? `В момента в ${summary.location} е ${temp ?? '?'}°C, усеща се като ${feels ?? '?'}°C, с вятър ${wind ?? '?'} км/ч и вероятност за валеж до ${rainChance ?? 0}%.` : `It is ${temp ?? '?'}°C in ${summary.location}, feels like ${feels ?? '?'}°C, with wind at ${wind ?? '?'} km/h and precipitation probability up to ${rainChance ?? 0}%.`
+  return lang === 'bg' ? `В момента в ${summary.location} е ${temp ?? '?'}°C, усеща се като ${feels ?? '?'}°C, с вятър ${wind ?? '?'} км/ч и вероятност за валеж до ${rainChance ?? '?'}%.` : `It is ${temp ?? '?'}°C in ${summary.location}, feels like ${feels ?? '?'}°C, with wind at ${wind ?? '?'} km/h and precipitation probability up to ${rainChance ?? '?'}%.`
 }
 
 function weekendForecastAnswer(summary, understood, lang) {
@@ -413,6 +454,7 @@ function dailyIntentAnswer(summary, day, understood, lang) {
     ? new Intl.DateTimeFormat(lang === 'bg' ? 'bg-BG' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${day.date}T00:00:00Z`))
     : period
   const placePeriod = `${summary.location} ${dateLabel}`
+  if (['clothing', 'walk'].includes(understood.intent) && [day.minC, day.maxC, day.maxWindKmh, day.rainMm].some(v => number(v) === null)) return lang === 'bg' ? `Нямам достатъчно данни за ${summary.location} на ${day.date}.` : `I don't have enough data for ${summary.location} on ${day.date}.`
   const rain = number(day.rainMm); const chance = number(day.rainChancePct); const wind = number(day.maxWindKmh)
   const minC = number(day.minC); const maxC = number(day.maxC)
   const historical = Boolean(summary.historical)
@@ -444,8 +486,35 @@ function dailyForecastAnswer(summary, day, lang, scope) {
   const formattedDate = lang === 'bg'
     ? new Intl.DateTimeFormat('bg-BG', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${day.date}T00:00:00Z`))
     : day.date
-  const practical = (number(day.rainChancePct) ?? 0) >= 35 || (number(day.rainMm) ?? 0) > 0.1 ? 'Предвиди защита от дъжд.' : (number(day.maxWindKmh) ?? 0) >= 30 ? 'Предвиди защита от силен вятър.' : 'Условията изглеждат подходящи за обичайни дейности.'
+  if ([day.minC, day.maxC, day.rainMm, day.maxWindKmh].every(v => number(v) === null)) return lang === 'bg' ? `Нямам достатъчно данни за ${summary.location} на ${day.date}.` : `I don't have enough data for ${summary.location} on ${day.date}.`
+  const practical = (number(day.rainChancePct) ?? 0) >= 35 || (number(day.rainMm) ?? 0) > 0.1 ? 'Предвиди защита от дъжд.' : (number(day.maxWindKmh) ?? 0) >= 30 ? 'Предвиди защита от силен вятър.' : [day.rainMm, day.maxWindKmh].every(v => number(v) !== null) ? 'Условията изглеждат подходящи за обичайни дейности.' : ''
   const condition = ({ 0: 'ясно', 1: 'предимно ясно', 2: 'частично облачно', 3: 'облачно', 45: 'мъгливо', 48: 'мъгливо', 61: 'слаб дъжд', 63: 'дъжд', 65: 'силен дъжд', 71: 'слаб сняг', 73: 'сняг', 75: 'силен сняг', 95: 'гръмотевична буря' })[day.code] ?? 'променливи условия'
   const relativeLabel = lang === 'bg' ? ({ day_after_tomorrow: ' (вдругиден)', yesterday: ' (вчера)', day_before_yesterday: ' (завчера)' }[scope] ?? '') : ''
   return lang === 'bg' ? `Прогнозата за ${summary.location} на ${formattedDate}${relativeLabel} е: ${condition}, с минимална температура ${day.minC ?? '?'}°C и максимална ${day.maxC ?? '?'}°C. Вероятност за валеж: ${day.rainChancePct ?? '?'}%, количество: ${day.rainMm ?? '?'} мм; вятър до ${day.maxWindKmh ?? '?'} км/ч. ${practical}` : `The forecast for ${summary.location} on ${formattedDate} is ${day.minC ?? '?'}°C to ${day.maxC ?? '?'}°C, precipitation ${day.rainChancePct ?? '?'}% (${day.rainMm ?? '?'} mm), and wind up to ${day.maxWindKmh ?? '?'} km/h.`
+}
+
+// A bounded, data-only conversation snapshot. Never accepted as weather evidence.
+export function validateConversationContext(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (Object.keys(value).some(key => !['city', 'latitude', 'longitude', 'intent', 'timeScope', 'targetDate', 'previousQuestion'].includes(key))) return false
+  return Boolean(validateChatInput({ message: value.previousQuestion, city: value.city, latitude: value.latitude, longitude: value.longitude, lang: 'en' }) &&
+    ALLOWED_INTENTS.includes(value.intent) && !['unrelated', 'unclear'].includes(value.intent) &&
+    ALLOWED_TIME_SCOPES.includes(value.timeScope) &&
+    (value.targetDate === null || (typeof value.targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.targetDate) && Number.isFinite(Date.parse(value.targetDate)))))
+}
+
+export function parseConversationQuestion(message, lang = 'bg', options = {}) {
+  const context = options.context
+  const text = normalizeQuestion(message)
+  const date = extractRequestedDate(message, options.now, options.timezone, lang)
+  const scope = extractTimeScope(message)
+  const city = extractRequestedCity(message, lang)
+  let parsed = parseDeterministicQuestion(message, lang, options)
+  const fragment = /^(?:а\s+|and\s+|what about\s+)?(?:утре|днес|вдругиден|вчера|(?:the\s+)?day\s+(?:after|before)\s+(?:tomorrow|yesterday)|tomorrow|today|yesterday|tonight)(?:\s.*)?$/iu.test(text)
+  if (parsed?.intent === 'unrelated' && (scope || date) && fragment) parsed = { ...parsed, intent: context?.intent ?? 'general_weather', timeScope: scope ?? 'specific_date', targetDate: date }
+  if (!context || options.quickAction || !parsed || ['unrelated', 'unclear'].includes(parsed.intent)) return parsed
+  const entityOnly = parsed.intent === 'general_weather' && (city || date || scope) && !/(време|прогноз|weather|forecast)/iu.test(text)
+  return { ...parsed, intent: entityOnly ? context.intent : parsed.intent,
+    timeScope: date || scope || parsed.targetDate ? parsed.timeScope : context.timeScope,
+    targetDate: date || scope || parsed.targetDate ? parsed.targetDate : context.targetDate }
 }

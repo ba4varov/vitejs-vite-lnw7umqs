@@ -1,3 +1,4 @@
+import type { ConversationContext } from '../server/weather-chat-core.js'
 import { startupTiming } from './startup-timing.js'
 import { createInitialLocation } from './initial-location.js'
 import { createForecastRequests, enrichForecast } from './forecast-sources.js'
@@ -322,6 +323,7 @@ const WeatherApp = () => {
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const forecastDashboardRef = useRef<HTMLElement>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
+  const chatContextRef = useRef<ConversationContext | undefined>(undefined)
   const chatRequestIdRef = useRef(0)
   const placesGuardRef = useRef(createPlacesSessionGuard())
   const localizationGuardRef = useRef(createLocalizationGuard())
@@ -472,6 +474,7 @@ const WeatherApp = () => {
     chatRequestIdRef.current += 1
     chatAbortRef.current?.abort()
     setChatLoading(false)
+    chatContextRef.current = undefined
     setChatMessages([{ role: 'bot', text: t.chatGreeting }])
     return () => chatAbortRef.current?.abort()
   }, [lang, city])
@@ -520,11 +523,12 @@ const WeatherApp = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ message: clean, city, latitude: coords.lat, longitude: coords.lon, lang, ...(quickAction ? { quickAction } : {}) })
+        body: JSON.stringify({ context: chatContextRef.current, message: clean, city, latitude: coords.lat, longitude: coords.lon, lang, ...(quickAction ? { quickAction } : {}) })
       })
       const data = await result.json()
       if (!result.ok || typeof data.answer !== 'string') throw new Error('chat failed')
       if (requestId !== chatRequestIdRef.current || controller.signal.aborted) return
+      if (data.context) chatContextRef.current = data.context
       trackActivity('chat_use')
       setChatMessages(previous => [...previous, { role: 'bot', text: data.answer }])
     } catch {
