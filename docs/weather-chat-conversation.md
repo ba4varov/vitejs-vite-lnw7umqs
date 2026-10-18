@@ -179,3 +179,62 @@ prints aggregate counters only and skips explicitly if the key is absent. It
 is not part of `npm test`, does not create a service, and is not automatically run
 against a configured account. The current development environment has no Gemini
 key, so live Google API/production recognition has not been confirmed.
+
+## Explicit-place evidence before weather retrieval
+
+A post-#101 regression was reproduced with a selected/prior Sofia and an explicit
+Varna after a damaged locative connector. The existing request diagnostics showed
+two independent paths: local fallback returned an answer using old coordinates,
+and a valid Gemini interpretation incorrectly marking the place as context did
+the same. Correct explicit Gemini metadata used the new coordinates. These are
+controlled handler reproductions; no production logs or live model credentials
+were available to identify which path occurred in a particular deployed request.
+
+The root gap was reliance on a single city extractor/metadata decision, followed
+by automatic inheritance, without checking the current utterance for conflicting
+place evidence. The fix is shared validation after semantic/fallback interpretation
+and before any weather fetch, in `server/weather-location-evidence.js`:
+
+- Collect at most three candidate names using existing locative grammar,
+  generic one-character edit/transposition comparison with that grammar's
+  connectors, and bounded proper-name spans. There is no typo/city dictionary.
+  Existing temporal/measure recognition filters candidate fragments only; it
+  does not reclassify the full weather question or overwrite its intent/time.
+- Verify candidates against Open-Meteo geocoding. Matching requires normalized
+  name agreement and finite, in-range coordinates. A geocoder result for another
+  place cannot stand in for the requested name. The query's name script selects
+  the geocoding language independently of answer language. Region/country
+  qualifiers are checked as part of the full requested place.
+- One verified locative mention is bound to the actual `Place` object used for forecast,
+  air-quality, marine and archive requests. It takes precedence over inherited or
+  selected coordinates, including stale explicit AI city metadata. Canonical AI
+  corrections/qualifiers remain supported when anchored to name evidence.
+- Unanchored proper-name conflicts and several verified places require clarification unless explicit Gemini semantics
+  selects a verified one. Strong unsupported place evidence also asks for a name
+  and region/country. Geocoding failure blocks retrieval instead of issuing a
+  forecast for the old place. Unverified weak capitalization alone is not proof
+  of a new location. No-place follow-ups retain confirmed context normally.
+
+Candidate lookups and any anchored canonical AI lookup run in parallel (at most
+four queries), using the existing geocoding timeout and a per-request cache.
+Qualified-region replies use their full resolved name rather than interpreting
+the region/country as a replacement city. No weather data is fetched until a
+place decision succeeds. The mechanism is bounded evidence validation, not a
+complete gazetteer or a guarantee of arbitrary natural-language recognition.
+
+`[weather-chat:location]` uses the same random request ID as understanding/decision
+logs. It records only interpreter, evidence status, bounded candidate count,
+resolution and whether old-coordinate inheritance was prevented. Statuses expose
+verified, ambiguous, unverified and unavailable evidence; final clarifications
+are recorded with reason `location_evidence`. No names, user text, coordinates,
+keys or upstream prose are written to these diagnostics.
+
+The generated location suite covers 12 BG/EN city fixtures, multiword names,
+connector deletions/insertions/substitutions/transpositions, case changes and
+phrase reordering. Each variant runs with correct Gemini, wrong context/selected
+Gemini metadata, absent Gemini and failed Gemini. Tests assert both latitude and
+longitude in every weather request, plus successive conversation changes, real
+ambiguity, explicit country qualifiers, mismatched/invalid geocoding, provider
+failure, unrelated requests and safe correlated diagnostics. These are simulated
+upstream tests; production/live Gemini or geocoding behavior is not inferred from
+them.

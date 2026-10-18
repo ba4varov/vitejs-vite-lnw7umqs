@@ -112,7 +112,7 @@ for (const lang of ['bg', 'en']) test(`ambiguous real geocoding still asks, then
   assert.equal(first.body.pendingClarification.missing, 'location')
   assert.equal(first.calls.length, 1)
   assert.ok(logs.some(([, data]) => data.reason === 'gemini_valid'))
-  decision(logs, 'gemini', 'clarification', 'geocoding')
+  decision(logs, 'gemini', 'clarification', 'location_evidence')
   logs.length = 0
   value = semanticFixture({ intent: 'rain', requestedCity: 'Springfield, Massachusetts', citySource: 'explicit', turnType: 'clarification', timeSource: 'context' })
   const resolved = await invoke(t, 'Massachusetts', lang, { pendingClarification: first.body.pendingClarification }, forecast, dateNow, places)
