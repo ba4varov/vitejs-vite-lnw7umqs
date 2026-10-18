@@ -1,7 +1,7 @@
 # Weather chat conversation
 
 `src/App.tsx` sends messages to `api/weather-chat.ts`. The API validates input,
-classifies free questions with server-side Gemini (validated against `server/weather-chat-core.js`), resolves explicit
+classifies free questions with server-side Gemini (`server/weather-chat-semantics.js`), resolves explicit
 locations with Open-Meteo geocoding, fetches forecast/archive data, and renders a
 deterministic answer. The local parser is the fallback when Gemini is unconfigured, unavailable, over budget or invalid;
 weather values and advice never come from generated model text.
@@ -63,21 +63,29 @@ on a completed/new turn or together with conversation reset on city/language
 changes; stale/aborted responses cannot restore it. Older API clients still work
 without this optional field. No UI or dependencies changed.
 
-`clarificationTurn` wraps the existing deterministic conversation parser. A new
-city without a measure asks “Какво Ви интересува за Пловдив?” (using the requested city). Without context it asks what weather information is wanted for
-that city. Explicit questions proceed directly. Short measure, date and region
-answers complete the pending request while preserving its other entities. A new
-question with an explicit new city, unrelated request, cancellation or quick action starts a fresh turn.
-A short complete measure question such as “Ще вали ли?” also completes the
-pending city clarification and retains the known period.
-On a resolved pending turn, the handler uses the locally resolved city, time scope
-and target date even when Gemini returns a default `now` or a stale city.
-Explicit city/date changes are applied locally before this merge. A standalone
-question abandons pending context in both the local fallback and the Gemini
-payload; the model remains the primary intent interpreter.
-Unresolved dates ask only for a day; geocoding ties ask for a region/country and
-keep the original measure and date. A qualifier that still leaves a tie cannot
-silently select a city. Missing place names can be corrected separately.
+`resolveSemanticTurn` consumes a validated Gemini interpretation without calling
+any local intent, city-phrase or time-phrase parser. Its structured `turnType`
+separates new questions, follow-ups, clarification replies and cancellation.
+`citySource` selects an explicit canonical place, confirmed context, the selected
+city or a genuinely missing location. `timeSource` selects an explicit period,
+confirmed context or the default. `missing` identifies the actual missing slot;
+it must agree with `needsClarification`.
+
+The original validated input/context/pending state is supplied to Gemini.
+Standalone questions discard old slots according to the validated turn metadata;
+continuations retain confirmed slots when context is requested or the slot is
+omitted (selected/default). Explicit new city, date and topic win. An old `timeScope: now` cannot erase a period whose source is
+context. A clear general weather question about a city uses a labelled next-12-
+hours forecast by default, with no intent clarification. Explicit current-condition
+questions can use now. City-only fragments can still request the missing intent.
+
+Numeric calendar literals are checked independently of semantics, explicit dates
+are resolved in the destination timezone, and Open-Meteo geocoding still verifies
+places/qualifiers and asks about ties. An AI intent alone does not fill an already
+unresolved date or location slot. No weather numbers or free-form answers are
+accepted from Gemini. The existing `clarificationTurn` phrase-based parser runs
+only for unconfigured/unavailable/invalid/over-budget Gemini or a quick action;
+its vocabulary is unchanged and has no AI-specific hooks or typo dictionary.
 
 Both languages use the same transitions. Up to three clarification prompts are
 retained; the next unresolved answer explains the missing information and drops
@@ -110,9 +118,9 @@ BG/EN parser (thunder, lightning, thunderstorms, гръмотевици, гър�
 On a pending intent question, a valid Gemini weather intent can resolve the slot
 even when local vocabulary/fragment rules do not recognize the wording. This
 also applies to other weather intents; it is not a phrase-specific exception.
-The local slot resolver still controls confirmed city/period inheritance,
-explicit changes, cancellation, date ambiguity and location clarification. A
-standalone question continues to clear pending context.
+The semantic slot resolver handles confirmed city/period inheritance, explicit
+changes and cancellation independently of fallback phrase recognition. Calendar
+validation and geocoding remain local. A standalone question clears old slots.
 
 The deterministic thunderstorm renderer uses only Open-Meteo WMO codes 95, 96
 and 99. Current questions use current codes; calendar days use the daily code
@@ -129,21 +137,45 @@ is labelled accordingly.
 
 ## Safe server diagnostics
 
-Each eligible turn emits `[weather-chat:understanding]` with fixed `source`,
-`reason` and `attempted` fields. `gemini_used` means `generate` returned a valid
-structured interpretation. `attempted: true` means the client was invoked; it
-does not prove that a failed discovery reached the generation endpoint.
-Fallback reasons distinguish `missing_configuration`, `quick_action`,
-`budget_exhausted`, `invalid_json`, `invalid_structure`, `quota`, `timeout`,
-`network_error`, `discovery_failed`, `model_unavailable`, `upstream_http` and
-`unexpected_error`. No messages, cities, coordinates, keys, model prose or raw
-errors are logged. The Gemini client's error log also omits upstream prose,
-upstream status strings and model names, which can contain untrusted data.
+Diagnostics distinguish three events, joined by a random per-request `requestId`
+that is neither persisted nor a user/session identifier:
 
-Handler tests exercise the real Gemini client through a simulated HTTP
-transport, checking model discovery and `:generateContent`, response validation,
-context and fallback diagnostics. They use dummy keys. This verifies the
-invocation path without implying a successful live Google API/deployment test;
-the development environment has no configured Gemini key. Deployment operators
-can distinguish configuration/fallback from successful Gemini use with the
-fixed server events above, without logging user input or credentials.
+- `[weather-chat:understanding]`, phase `invocation`, reason `gemini_invoked`:
+  the client is about to be invoked. A failed discovery may not reach generation.
+- The same prefix, phase `result`: `gemini_valid` means the entire semantic
+  contract validated. Fallback reasons distinguish `missing_configuration`,
+  `quick_action`, `budget_exhausted`, `invalid_json`, `invalid_structure`, `quota`,
+  `timeout`, `network_error`, `discovery_failed`, `model_unavailable`,
+  `upstream_http` and `unexpected_error`.
+- `[weather-chat:decision]` is emitted at the response boundary. `source` is the
+  interpreter actually used (`gemini`/`local`, or `none` for a rejected request),
+  `outcome` distinguishes an answer, clarification, unrelated request,
+  unavailable data, rejection or error, and `reason` identifies the fixed
+  decision category. A valid AI result followed by a geocoding/calendar
+  clarification is visible as such; it is not logged as a local fallback.
+
+Only fixed enums, status codes and random request IDs are logged. No messages,
+cities, coordinates, keys, model prose, raw errors or stable personal identifiers
+are included. The Gemini client's error log also omits upstream prose, upstream
+status strings and model names, which can contain untrusted data.
+
+## Generated language checks and their limits
+
+`tests/helpers/bobi-language-corpus.mjs` generates BG/EN variants for six intent
+families using seeded character deletion, insertion, repetition, transposition,
+phrase reordering, informal wrappers, punctuation and case changes. The expected
+interpretation comes from a semantic fixture, never from parsing the mutated
+text. Unit/real-handler tests assert that valid mock semantics reach the final
+answer and the matching decision log. Other tests cover context transitions,
+explicit overrides, the default period, genuinely missing slots, geocoding ties,
+invalid calendar dates, unrelated/instruction requests and fallback. No typo
+variants enter production dictionaries or decision rules.
+
+These mock tests prove the semantic pipeline's invariance; they do not establish
+the live model's recognition accuracy. The real Gemini-client transport tests
+also simulate HTTP. For an opt-in live check with the existing server key, run
+`node scripts/test-bobi-semantics-live.mjs`. It samples at most 12 generated cases,
+prints aggregate counters only and skips explicitly if the key is absent. It
+is not part of `npm test`, does not create a service, and is not automatically run
+against a configured account. The current development environment has no Gemini
+key, so live Google API/production recognition has not been confirmed.

@@ -574,8 +574,7 @@ export function validateConversationContext(value) {
   if (Object.keys(value).some(key => !['city', 'latitude', 'longitude', 'intent', 'timeScope', 'targetDate', 'previousQuestion'].includes(key))) return false
   return Boolean(validateChatInput({ message: value.previousQuestion, city: value.city, latitude: value.latitude, longitude: value.longitude, lang: 'en' }) &&
     ALLOWED_INTENTS.includes(value.intent) && !['unrelated', 'unclear'].includes(value.intent) &&
-    ALLOWED_TIME_SCOPES.includes(value.timeScope) &&
-    (value.targetDate === null || (typeof value.targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.targetDate) && Number.isFinite(Date.parse(value.targetDate)))))
+    parseUnderstanding({ intent: value.intent, requestedCity: null, timeScope: value.timeScope, targetDate: value.targetDate, needsClarification: false, clarificationQuestion: null }, 'en'))
 }
 
 export function parseConversationQuestion(message, lang = 'bg', options = {}) {
@@ -617,20 +616,15 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
   const date = extractRequestedDate(message, options.now, options.timezone, lang)
   // Only short answers complete a slot. A full question or explicit cancellation starts anew.
   const newExplicitQuestion = city && raw && !['general_weather', 'unrelated', 'unclear'].includes(raw.intent)
-  const ai = parseUnderstanding(options.aiUnderstanding, lang)
   const cityOnly = city && raw?.intent === 'general_weather' && !/(време|прогноз|weather|forecast)/iu.test(text)
-  const aiWeatherIntent = ai && !ai.needsClarification && !cityOnly && !['unrelated', 'unclear', 'other_city'].includes(ai.intent)
-  const pendingCandidate = pending?.missing === 'intent' && raw?.intent === 'unrelated' && !city && !/(?:cancel|отказ|забрави|напиши|write|ignore)/iu.test(text)
-  const aiFollowUp = pendingCandidate && aiWeatherIntent
   const fragment = !newExplicitQuestion && text.split(/\s+/u).length <= 8 && !/(?:какъв|каква|какво|какви|колко|дали|what |how |write|напиши|разкажи|tell |cancel|отказ|забрави)/iu.test(text)
-  const continuation = pending && (fragment || aiFollowUp)
+  const continuation = pending && fragment
   let understanding, sourceMessage = message, context = options.context, missing
   if (continuation) {
     understanding = { ...pending.understanding, needsClarification: false, clarificationQuestion: null }
     context = pending.context
     sourceMessage = pending.message
-    if (aiWeatherIntent && pending.missing === 'intent') understanding.intent = ai.intent
-    else if (raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)) understanding.intent = raw.intent
+    if (raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)) understanding.intent = raw.intent
     else if (/(общ|прогноз|general|forecast|weather)/iu.test(text)) understanding.intent = 'general_weather'
     if (scope || date) {
       understanding.timeScope = date ? 'specific_date' : scope
@@ -638,14 +632,14 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
       sourceMessage = message // Keep yearless dates available for destination-timezone resolution.
     }
     if (city) understanding.requestedCity = city
-    if (pending.missing === 'location' && !aiWeatherIntent && !city && !scope && !date && raw?.intent === 'unrelated' && message.length <= 100 && !/(не знам|не съм сигур|not sure|do not know|don't know)/iu.test(text)) {
+    if (pending.missing === 'location' && !city && !scope && !date && raw?.intent === 'unrelated' && message.length <= 100 && !/(не знам|не съм сигур|not sure|do not know|don't know)/iu.test(text)) {
       understanding.requestedCity = pending.locationMode === 'name' ? message.trim() : `${understanding.requestedCity?.split(',')[0] ?? ''}, ${message.trim()}`.replace(/^, /, '').slice(0, 100)
     }
     const explicitMeasure = raw && !['unrelated', 'unclear', 'general_weather'].includes(raw.intent)
     const generalForecast = /общ|general|forecast|прогноз|weather/iu.test(text)
     const previousMeasure = context && /същ|предиш|same|previous/iu.test(text)
     if (previousMeasure) understanding.intent = context.intent
-    const resolved = pending.missing === 'intent' ? Boolean(aiWeatherIntent || explicitMeasure || generalForecast || previousMeasure)
+    const resolved = pending.missing === 'intent' ? Boolean(explicitMeasure || generalForecast || previousMeasure)
       : pending.missing === 'date' ? Boolean(scope || date) : understanding.requestedCity !== pending.understanding.requestedCity
     if (!resolved) missing = pending.missing
     if (raw?.needsClarification && raw.intent !== 'unclear') {
@@ -677,5 +671,5 @@ export function clarificationTurn(message, lang = 'bg', options = {}) {
     const next = { understanding: { ...snapshot, needsClarification: false, clarificationQuestion: null }, message: sourceMessage, missing, attempts, ...(pending?.locationMode && missing === 'location' ? { locationMode: pending.locationMode } : {}), ...(context ? { context } : {}) }
     return { understanding, message: sourceMessage, context, answer: attempts > 3 ? (lang === 'bg' ? `За да продължа, е нужно уточнение: ${question}` : `To continue, I need this information: ${question}`) : question, pendingClarification: attempts <= 3 ? next : null }
   }
-  return { understanding, message: sourceMessage, context, continuation: Boolean(continuation), pendingCandidate: Boolean(pendingCandidate), pendingClarification: null }
+  return { understanding, message: sourceMessage, context, continuation: Boolean(continuation), pendingClarification: null }
 }

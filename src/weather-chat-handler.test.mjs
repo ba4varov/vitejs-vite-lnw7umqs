@@ -1,47 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import ts from 'typescript'
 import { parseUnderstanding, deterministicWeatherAnswer } from '../server/weather-chat-core.js'
 
-// Execute the actual serverless handler; compilation is separately gated by tsc -b.
-const filename = new URL('../api/weather-chat.ts', import.meta.url)
-const source = readFileSync(filename, 'utf8')
-const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
-  .replaceAll("'../server/weather-chat-core.js'", JSON.stringify(new URL('../server/weather-chat-core.js', import.meta.url).href))
-  .replaceAll("'../server/gemini-client.js'", JSON.stringify(new URL('../server/gemini-client.js', import.meta.url).href))
-const { default: handler } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
-const dates = Array.from({ length: 16 }, (_, i) => `2026-10-${String(8 + i).padStart(2, '0')}`)
-const daily = time => ({ time, weather_code: time.map(() => 0), temperature_2m_min: time.map(() => 11), temperature_2m_max: time.map(() => 21), precipitation_sum: time.map(() => 0), precipitation_probability_max: time.map(() => 0), wind_speed_10m_max: time.map(() => 8), uv_index_max: time.map(() => 3) })
-const times = dates.flatMap(date => Array.from({ length: 24 }, (_, i) => `${date}T${String(i).padStart(2, '0')}:00`))
-const forecast = {
-  timezone: 'Europe/Sofia', current: { time: '2026-10-08T12:00', temperature_2m: 17, apparent_temperature: 16, wind_speed_10m: 8 }, daily: daily(dates),
-  hourly: { time: times, temperature_2m: times.map(() => 17), apparent_temperature: times.map(() => 16), precipitation: times.map(() => 0), precipitation_probability: times.map(() => 0), wind_speed_10m: times.map(() => 8), uv_index: times.map(() => 3), weather_code: times.map(() => 0) }
-}
-async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, now = '2026-10-08T09:00:00Z', geoResults) {
-  t.mock.timers.reset()
-  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) })
-  const calls = []
-  t.mock.method(globalThis, 'fetch', async url => {
-    const parsed = new URL(url); calls.push(parsed)
-    let payload = weatherPayload
-    if (parsed.hostname.startsWith('geocoding-')) {
-      const query = parsed.searchParams.get('name')
-      const sofia = /^(София|Sofia)$/u.test(query)
-      const plovdiv = /Пловдив|Plovdiv/iu.test(query)
-      payload = { results: geoResults ?? [{ name: plovdiv ? (lang === 'bg' ? 'Пловдив' : 'Plovdiv') : sofia ? (lang === 'bg' ? 'София' : 'Sofia') : (lang === 'bg' ? 'Варна' : 'Varna'), latitude: plovdiv ? 42.14 : sofia ? 42.7 : 43.21, longitude: sofia ? 23.3 : 27.91, timezone: 'Europe/Sofia', country: 'Bulgaria', population: 300000 }] }
-    }
-    if (parsed.hostname.startsWith('archive-')) payload = { timezone: 'Europe/Sofia', daily: daily([parsed.searchParams.get('start_date')]) }
-    if (parsed.hostname.startsWith('air-quality-')) payload = { current: { european_aqi: 12, pm10: 4, pm2_5: 2 } }
-    if (parsed.hostname.startsWith('marine-')) payload = { current: { sea_surface_temperature: 20 } }
-    return Response.json(payload)
-  })
-  let status = 200, body
-  const response = { status(code) { status = code; return this }, json(value) { body = value } }
-  await handler({ method: 'POST', body: { message, city: lang === 'bg' ? 'София' : 'Sofia', latitude: 42.7, longitude: 23.3, lang, ...extra } }, response)
-  assert.equal(status, 200)
-  return { body, calls }
-}
+import { handler, forecast, daily, dates, times, invoke } from '../tests/helpers/weather-chat-harness.mjs'
 const cases = [
   ['today', '2026-10-08', 'Какво ще е времето днес?', 'What is the weather today?'],
   ['tomorrow', '2026-10-09', 'Какво ще е времето утре?', 'What is the weather tomorrow?'],
@@ -258,7 +219,7 @@ test('Gemini is primary, receives context, and invalid/unavailable output falls 
     const data = JSON.parse(options.body.contents[0].parts[0].text)
     assert.ok(Object.hasOwn(data, 'context'))
     if (mode === 'unavailable') throw new Error('quota')
-    const value = mode === 'invalid' ? { temperature: 999 } : { intent: 'wind', requestedCity: null, timeScope: 'now', targetDate: null, needsClarification: false, clarificationQuestion: null }
+    const value = mode === 'invalid' ? { temperature: 999 } : { intent: 'wind', requestedCity: null, timeScope: 'now', targetDate: null, needsClarification: false, clarificationQuestion: null, turnType: 'new_question', citySource: 'selected', timeSource: 'default', missing: 'none' }
     return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
   })
   const ai = await invoke(t, 'Каква е температурата?', 'bg')
@@ -316,15 +277,19 @@ for (const lang of ['bg', 'en']) for (const change of ['none', 'stale_city', 'da
       generations++
       if (generations === 3 && (change === 'standalone' || change === 'city')) {
         const payload = JSON.parse(options.body.contents[0].parts[0].text)
-        assert.equal(payload.context, null)
-        assert.equal(payload.pendingClarification, null)
+        assert.ok(payload.context)
+        assert.ok(payload.pendingClarification) // Model sees original state; explicit turn metadata decides inheritance.
       }
       const value = {
         intent: generations === 1 ? 'wind' : generations === 2 ? 'unclear' : change === 'standalone' ? 'temperature' : 'rain',
         requestedCity: generations === 1 ? (bg ? 'Варна' : 'Varna') : generations === 2 ? (bg ? 'Пловдив' : 'Plovdiv') : change === 'city' || change === 'stale_city' ? (bg ? 'Варна' : 'Varna') : null,
         // Deliberately default to now; also return a stale city for the measure-only reply.
-        timeScope: generations === 1 ? 'tomorrow' : 'now', targetDate: null,
-        needsClarification: generations === 2, clarificationQuestion: null
+        timeScope: generations === 1 ? 'tomorrow' : generations === 3 && change === 'date' ? 'today' : generations === 3 && change === 'calendar' ? 'specific_date' : 'now', targetDate: generations === 3 && change === 'calendar' ? '2026-10-12' : null,
+        needsClarification: generations === 2, clarificationQuestion: null,
+        turnType: generations === 1 || generations === 3 && ['city', 'standalone'].includes(change) ? 'new_question' : generations === 2 ? 'follow_up' : 'clarification',
+        citySource: generations <= 2 || change === 'city' ? 'explicit' : change === 'standalone' ? 'selected' : 'context',
+        timeSource: generations === 1 || generations === 3 && ['date', 'calendar'].includes(change) ? 'explicit' : generations === 3 && ['city', 'standalone'].includes(change) ? 'default' : 'context',
+        missing: generations === 2 ? 'intent' : 'none'
       }
       return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
     })
@@ -367,7 +332,14 @@ async function thunderGemini(t, mode) {
     const local = parseDeterministicQuestion(data.message, data.language)
     const value = local.intent === 'unrelated' ? { ...local, intent: 'thunderstorm' } : local
     delete value.isQuick
-    if (value.intent === 'thunderstorm') { value.timeScope = 'now'; value.targetDate = null }
+    const cityOnly = local.intent === 'general_weather' && local.requestedCity && !/weather|forecast|време|прогноз/iu.test(data.message)
+    Object.assign(value, {
+      turnType: data.pendingClarification ? 'clarification' : cityOnly && data.context ? 'follow_up' : 'new_question',
+      citySource: value.requestedCity ? 'explicit' : data.pendingClarification ? 'context' : 'selected',
+      timeSource: local.timeScope !== 'general' ? 'explicit' : data.pendingClarification || cityOnly && data.context ? 'context' : 'default',
+      missing: cityOnly ? 'intent' : 'none', needsClarification: Boolean(cityOnly)
+    })
+    if (data.pendingClarification && value.intent === 'thunderstorm') { value.timeScope = 'now'; value.targetDate = null }
     return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
   }
   if (mode === 'wire') {
@@ -405,7 +377,7 @@ for (const lang of ['bg', 'en']) for (const mode of ['absent', 'unavailable', 'w
   assert.match(result.body.answer, /2026-10-09/)
   assert.equal(result.calls.find(url => url.hostname === 'api.open-meteo.com').searchParams.get('latitude'), '42.14')
   assert.equal(requests.length, mode === 'wire' ? 3 : 0)
-  assert.ok(diagnostics.some(([, data]) => data.reason === (mode === 'wire' ? 'gemini_used' : mode === 'absent' ? 'missing_configuration' : 'quota')))
+  assert.ok(diagnostics.some(([, data]) => data.reason === (mode === 'wire' ? 'gemini_valid' : mode === 'absent' ? 'missing_configuration' : 'quota')))
   assert.doesNotMatch(JSON.stringify(diagnostics), /thunder-unit-key|Пловдив|Plovdiv|Варна|Varna|42\.14|private upstream prose|message|latitude|longitude/)
 })
 
@@ -475,6 +447,6 @@ for (const reason of ['invalid_json', 'invalid_structure', 'timeout', 'network_e
   const index = ['invalid_json', 'invalid_structure', 'timeout', 'network_error', 'discovery_failed', 'model_unavailable', 'upstream_http', 'unexpected_error'].indexOf(reason)
   const { body } = await invoke(t, 'Ще гърми ли?', 'bg', {}, forecast, `2026-10-08T19:0${index}:00Z`)
   assert.equal(body.intent, 'thunderstorm')
-  assert.ok(diagnostics.some(([prefix, data]) => prefix === '[weather-chat:understanding]' && data.source === 'local' && data.reason === reason && data.attempted === true))
+  assert.ok(diagnostics.some(([prefix, data]) => prefix === '[weather-chat:understanding]' && data.phase === 'result' && data.reason === reason && data.attempted === true))
   assert.doesNotMatch(JSON.stringify(diagnostics), /private|personal|unit-key|София|latitude|longitude/)
 })
