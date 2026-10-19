@@ -34,7 +34,7 @@ for (const item of efficiencyCorpus()) test(`efficiency oracle ${item.lang}/${it
   t.mock.method(geminiClient, 'generate', async () => {
     calls++
     const value = semanticFixture({ intent: item.intent, requestedCity: item.citySource === 'context' ? null : item.place.name, citySource: item.citySource ?? 'explicit', timeScope: item.timeScope, targetDate: item.timeScope === 'specific_date' ? item.targetDate : null, timeSource: item.timeSource ?? 'explicit', turnType: item.context ? 'follow_up' : 'new_question' })
-    return { payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }, model: 'fixture' }
+    return { payload: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] }, model: 'fixture' }
   })
   const result = await invoke(t, item.message, item.lang, item.context ? { context: item.context } : {}, forecast, now(), geo(item))
   checkCoordinates(result, item.place)
@@ -78,7 +78,7 @@ test('repeated clear questions and different users never need an AI result cache
 test('uncertain location goes to Gemini after geocoding fails; canonical name is independently verified', async t => {
   const logs = setup(t)
   let calls = 0
-  t.mock.method(geminiClient, 'generate', async () => { calls++; return { payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(semanticFixture({ intent: 'rain', requestedCity: 'Varna', citySource: 'explicit', timeScope: 'tomorrow', timeSource: 'explicit' })) }] } }] } } })
+  t.mock.method(geminiClient, 'generate', async () => { calls++; return { payload: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(semanticFixture({ intent: 'rain', requestedCity: 'Varna', citySource: 'explicit', timeScope: 'tomorrow', timeSource: 'explicit' })) }] } }] } } })
   const place = { name: 'Varna', latitude: 43.2141, longitude: 27.9147 }
   const result = await invoke(t, 'Will it rain in Varan tomorrow?', 'en', {}, forecast, now(), [place])
   checkCoordinates(result, place)
@@ -120,7 +120,7 @@ test('identical complex messages with different contexts get separate AI interpr
     calls++
     const input = JSON.parse(options.body.contents[0].parts[0].text)
     assert.ok(input.context)
-    return { payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(semanticFixture({ intent: 'clothing', turnType: 'follow_up', citySource: 'context', timeScope: 'tomorrow', timeSource: 'explicit' })) }] } }] } }
+    return { payload: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(semanticFixture({ intent: 'clothing', turnType: 'follow_up', citySource: 'context', timeScope: 'tomorrow', timeSource: 'explicit' })) }] } }] } }
   })
   const dateNow = now()
   for (const place of [{ name: 'Гела', latitude: 41.65, longitude: 24.5667 }, { name: 'Sofia', latitude: 42.7, longitude: 23.3 }]) {

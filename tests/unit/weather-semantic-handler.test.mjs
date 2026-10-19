@@ -19,7 +19,7 @@ async function interpreter(t, semantic, mode = 'valid') {
     if (mode === 'absent') assert.fail('unconfigured Gemini was called')
     if (mode === 'error') throw Object.assign(new Error('untrusted private details'), { code: 'network-error' })
     const value = typeof semantic === 'function' ? semantic(requests.at(-1)) : semantic
-    return { model: 'mock', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
+    return { model: 'mock', payload: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] } }
   })
   return { logs, requests }
 }
