@@ -147,3 +147,26 @@ for (const reason of ['daily_limit', 'cooldown', 'quota_unavailable', 'ai_disabl
   assert.ok(logs.some(([prefix, entry]) => prefix === '[weather-chat:understanding]' && entry.reason === reason))
   assert.ok(logs.some(([prefix, entry]) => prefix === '[weather-chat:decision]' && entry.source === 'local'))
 })
+
+for (const failure of ['http', 'invalid-json', 'timeout']) test(`real Supabase RPC ${failure} falls back without retry or Google`, async t => {
+  const logs = setup(t)
+  let requests = 0, rpcSignal
+  const client = createGeminiClient({
+    env: { GEMINI_API_KEY: 'fixture', GEMINI_MODEL: 'gemini-2.5-flash', SUPABASE_URL: 'https://quota.example', SUPABASE_SERVICE_ROLE_KEY: 'private-fixture' },
+    logger: (...args) => logs.push(args),
+    fetchImpl: async (url, init) => {
+      assert.equal(url, 'https://quota.example/rest/v1/rpc/gemini_quota', 'only RPC is allowed')
+      requests++; rpcSignal = init.signal
+      if (failure === 'timeout') return { ok: true, status: 200, json: () => new Promise(() => {}) }
+      return failure === 'http' ? new Response(null, { status: 403 }) : new Response('invalid json')
+    }
+  })
+  t.mock.method(geminiClient, 'generate', client.generate)
+  const place = { name: 'Гела', latitude: 41.65, longitude: 24.5667 }
+  const result = await invoke(t, 'Моля кажи ще вали ли утре в Гела?', 'bg', {}, forecast, now(), [place])
+  checkCoordinates(result, place)
+  assert.equal(requests, 1)
+  assert.equal(rpcSignal.aborted, failure === 'timeout')
+  assert.ok(logs.some(([prefix, entry]) => prefix === '[weather-chat:decision]' && entry.source === 'local'))
+  assert.ok(logs.some(([prefix, entry]) => prefix === '[gemini-quota:rpc]' && entry.code === ({ http: 'http_error', 'invalid-json': 'invalid_response', timeout: 'timeout' })[failure]))
+})
