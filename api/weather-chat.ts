@@ -41,13 +41,37 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, timeout = 1
   try { return await fetch(url, { ...init, signal: controller.signal }) } finally { clearTimeout(timer) }
 }
 
-function extractGeminiJson(payload: unknown): unknown {
-  const candidates = record(payload)?.candidates
-  const content = Array.isArray(candidates) ? record(record(candidates[0])?.content) : null
-  const parts = content?.parts
-  const text = Array.isArray(parts) ? record(parts[0])?.text : undefined
-  if (typeof text !== 'string') return null
-  try { return JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')) } catch { return null }
+// Diagnostics contain only allowlisted enums, booleans and counts.
+function extractGeminiJson(payload: unknown, requestId?: string): unknown {
+  const root = record(payload)
+  const candidates = root?.candidates
+  const candidate = Array.isArray(candidates) ? record(candidates[0]) : null
+  const parts = record(candidate?.content)?.parts
+  const allParts = Array.isArray(parts) ? parts : []
+  const textParts = allParts.filter(part => typeof record(part)?.text === 'string' && record(part)?.thought !== true)
+  const text = textParts.map(part => record(part)!.text as string).join('').trim()
+  const finish = candidate?.finishReason
+  const knownReasons = ['STOP', 'MAX_TOKENS', 'SAFETY', 'RECITATION', 'OTHER', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'MALFORMED_FUNCTION_CALL', 'UNEXPECTED_TOOL_CALL', 'FINISH_REASON_UNSPECIFIED']
+  const finishReason = typeof finish !== 'string' ? 'missing' : knownReasons.includes(finish) ? finish : 'unknown'
+  const usage = record(root?.usageMetadata)
+  const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+  let result: unknown = null
+  let extractionReason = 'ok'
+  if (!candidate) extractionReason = 'missing_candidate'
+  else if (finish !== 'STOP') extractionReason = 'incomplete_or_blocked'
+  else if (!text) extractionReason = 'missing_text'
+  else {
+    // Parse the entire final text, never a substring or an individual fragment.
+    const fenced = text.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/)
+    try { result = JSON.parse(fenced ? fenced[1] : text) } catch { extractionReason = 'malformed_json' }
+  }
+  console.info('[weather-chat:gemini-response]', {
+    requestId, finishReason, candidateCount: Array.isArray(candidates) ? candidates.length : 0,
+    partCount: allParts.length, textPartCount: textParts.length, hasText: Boolean(text),
+    outputTokens: count(usage?.candidatesTokenCount), thoughtTokens: count(usage?.thoughtsTokenCount),
+    extractionReason
+  })
+  return result
 }
 
 class ServiceError extends Error {
@@ -64,7 +88,7 @@ async function callGemini(system: string, user: string, maxOutputTokens: number,
         contents: [{ role: 'user', parts: [{ text: user }] }],
         generationConfig: { temperature: 0.2, maxOutputTokens, responseMimeType: 'application/json', ...(responseSchema ? { responseSchema } : {}) }
   } })
-  const parsed = extractGeminiJson(payload)
+  const parsed = extractGeminiJson(payload, requestId)
   if (!parsed) throw new ServiceError(stage, 'invalid-json', 200, model)
   return parsed
 }
@@ -144,7 +168,7 @@ async function optionalGeminiUnderstanding(input: ChatInput, requestId: string):
   if (!process.env.GEMINI_API_KEY) { logUnderstanding('missing_configuration', false, requestId); return null }
   try {
     logUnderstanding('gemini_invoked', true, requestId)
-    const result = await callGemini(semanticSystem, JSON.stringify({ currentDate: localIsoDate(new Date(), 'Europe/Sofia'), selectedCity: input.city, language: input.lang, message: input.message, context: input.context ?? null, pendingClarification: input.pendingClarification ?? null }), 320, 'gemini-understanding', semanticSchema, requestId)
+    const result = await callGemini(semanticSystem, JSON.stringify({ currentDate: localIsoDate(new Date(), 'Europe/Sofia'), selectedCity: input.city, language: input.lang, message: input.message, context: input.context ?? null, pendingClarification: input.pendingClarification ?? null }), 1024, 'gemini-understanding', semanticSchema, requestId)
     const parsed = parseSemanticUnderstanding(result, input.lang)
     logUnderstanding(parsed ? 'gemini_valid' : 'invalid_structure', true, requestId)
     return parsed

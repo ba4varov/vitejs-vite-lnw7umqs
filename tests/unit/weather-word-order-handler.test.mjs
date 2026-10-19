@@ -21,7 +21,7 @@ function setup(t, mode, value) {
   else process.env.GEMINI_API_KEY = 'word-order-fixture'
   t.after(() => { if (key === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = key })
   t.mock.method(console, 'info', () => {})
-  t.mock.method(geminiClient, 'generate', async () => ({ payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }, model: 'fixture' }))
+  t.mock.method(geminiClient, 'generate', async () => ({ payload: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] }, model: 'fixture' }))
 }
 function coordinates(result, place) {
   assert.equal(result.body.needsClarification, false, JSON.stringify(result.body))

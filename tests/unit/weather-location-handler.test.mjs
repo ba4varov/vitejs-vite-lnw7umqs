@@ -18,7 +18,7 @@ function install(t, mode, interpretation) {
     if (mode === 'fallback') assert.fail('unconfigured Gemini called')
     if (mode === 'error') throw Object.assign(new Error('private upstream details'), { code: 'network-error' })
     const value = typeof interpretation === 'function' ? interpretation() : interpretation
-    return { model: 'fixture', payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] } }
+    return { model: 'fixture', payload: { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] } }
   })
   return logs
 }

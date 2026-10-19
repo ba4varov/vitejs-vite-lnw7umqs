@@ -8,7 +8,7 @@ let minute = 0
 const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve() }
 const advance = async (t, ms) => { t.mock.timers.tick(ms); await flush() }
 const value = semanticFixture({ intent: 'rain', timeScope: 'tomorrow', timeSource: 'explicit' })
-const success = () => Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] })
+const success = () => Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] })
 
 function setup(t, fetchImpl, configured = true) {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.parse('2026-10-08T09:00:00Z') + minute++ * 60000 })
@@ -18,7 +18,7 @@ function setup(t, fetchImpl, configured = true) {
   const logs = [], calls = [], weatherCalls = []
   t.mock.method(console, 'info', (...args) => logs.push(args))
   const client = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} },
-    env: { GEMINI_API_KEY: 'private-test-key', ...(configured ? { GEMINI_MODEL: 'gemini-2.5-flash' } : {}) },
+    env: { GEMINI_API_KEY: 'private-test-key', ...(configured ? { GEMINI_MODEL: typeof configured === 'string' ? configured : 'gemini-2.5-flash' } : {}) },
     now: () => Date.now(), logger: (...args) => logs.push(args),
     fetchImpl: async (url, init) => { calls.push({ url, init }); return fetchImpl(url, init) }
   })
@@ -80,4 +80,72 @@ test('real handler falls back when 404 recovery has no available model', async t
   await run()
   check('local', 'model_unavailable')
   assert.deepEqual(calls.map(call => call.init.method), ['POST', 'GET'])
+})
+
+const envelope = (parts, finishReason = 'STOP', extra = {}) => ({ candidates: [{ finishReason, content: { parts } }], ...extra })
+for (const [name, payload, source, reason, extraction] of [
+  ['MAX_TOKENS with valid JSON', envelope([{ text: JSON.stringify(value) }], 'MAX_TOKENS'), 'local', 'invalid_json', 'incomplete_or_blocked'],
+  ['MAX_TOKENS with partial JSON', envelope([{ text: '{"intent":' }], 'MAX_TOKENS'), 'local', 'invalid_json', 'incomplete_or_blocked'],
+  ['missing finish reason', { candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }, 'local', 'invalid_json', 'incomplete_or_blocked'],
+  ['empty response', {}, 'local', 'invalid_json', 'missing_candidate'],
+  ['empty parts', envelope([]), 'local', 'invalid_json', 'missing_text'],
+  ['thought only', envelope([{ thought: true, text: 'private thought' }]), 'local', 'invalid_json', 'missing_text'],
+  ['multiple text parts', envelope([{ thought: true, text: 'private thought' }, { text: JSON.stringify(value).slice(0, 40) }, { text: JSON.stringify(value).slice(40) }]), 'gemini', 'gemini_valid', 'ok'],
+  ['nontext first part', envelope([{ thoughtSignature: 'private signature' }, { text: JSON.stringify(value) }]), 'gemini', 'gemini_valid', 'ok'],
+  ['invalid JSON', envelope([{ text: '{broken' }]), 'local', 'invalid_json', 'malformed_json'],
+  ['two JSON objects', envelope([{ text: JSON.stringify(value) }, { text: JSON.stringify(value) }]), 'local', 'invalid_json', 'malformed_json'],
+  ['safety termination', envelope([{ text: JSON.stringify(value) }], 'SAFETY'), 'local', 'invalid_json', 'incomplete_or_blocked'],
+  ['valid structured interpretation', envelope([{ text: JSON.stringify(value) }]), 'gemini', 'gemini_valid', 'ok'],
+  ['invalid semantics', envelope([{ text: JSON.stringify({ ...value, intent: 'invented' }) }]), 'local', 'invalid_structure', 'ok'],
+  ['unknown finish reason', envelope([{ text: JSON.stringify(value) }], 'private finish'), 'local', 'invalid_json', 'incomplete_or_blocked'],
+  ['null JSON', envelope([{ text: 'null' }]), 'local', 'invalid_json', 'ok'],
+]) test(`Gemini response: ${name}`, async t => {
+  const { run, check, calls, logs } = setup(t, async () => Response.json(payload))
+  await run()
+  check(source, reason)
+  assert.equal(calls.length, 1, 'no generation retry on invalid output')
+  const diagnostic = logs.find(([prefix]) => prefix === '[weather-chat:gemini-response]')[1]
+  assert.equal(diagnostic.extractionReason, extraction)
+  assert.equal(diagnostic.textPartCount, payload.candidates?.[0].content.parts.filter(part => typeof part.text === 'string' && part.thought !== true).length ?? 0)
+  assert.equal(diagnostic.outputTokens, null)
+  assert.equal(diagnostic.thoughtTokens, null)
+  const config = JSON.parse(calls[0].init.body).generationConfig
+  assert.equal(config.maxOutputTokens, 1024)
+  assert.deepEqual(config.thinkingConfig, { thinkingBudget: 0 })
+  assert.equal(config.responseMimeType, 'application/json')
+  assert.ok(config.responseSchema)
+})
+
+test('safe diagnostics expose Google token counts without payload fields', async t => {
+  const payload = envelope([{ text: JSON.stringify(value) }], 'STOP', {
+    usageMetadata: { candidatesTokenCount: 145, thoughtsTokenCount: 320, promptTokenCount: 900 },
+    promptFeedback: { blockReasonMessage: 'private user data' }
+  })
+  const { run, check, logs } = setup(t, async () => Response.json(payload))
+  await run(); check('gemini', 'gemini_valid')
+  const diagnostic = logs.find(([prefix]) => prefix === '[weather-chat:gemini-response]')[1]
+  assert.equal(diagnostic.outputTokens, 145)
+  assert.equal(diagnostic.thoughtTokens, 320)
+  assert.deepEqual(Object.keys(diagnostic).sort(), ['requestId', 'finishReason', 'candidateCount', 'partCount', 'textPartCount', 'hasText', 'outputTokens', 'thoughtTokens', 'extractionReason'].sort())
+})
+
+test('HTTP 200 with malformed outer response falls back without retry', async t => {
+  const { run, check, calls } = setup(t, async () => new Response('broken', { status: 200 }))
+  await run(); check('local', 'invalid_json')
+  assert.equal(calls.length, 1)
+})
+
+test('Production gemini-3.8-flash sends low thinking and no deprecated sampling, without retry', async t => {
+  const { run, check, calls } = setup(t, async () => success(), 'gemini-3.8-flash')
+  await run()
+  check('gemini', 'gemini_valid')
+  assert.equal(calls.length, 1)
+  assert.match(calls[0].url, /models\/gemini-3\.8-flash:generateContent$/)
+  const config = JSON.parse(calls[0].init.body).generationConfig
+  assert.deepEqual(config.thinkingConfig, { thinkingLevel: 'low' })
+  assert.doesNotMatch(JSON.stringify(config), /minimal|thinkingBudget/)
+  for (const key of ['temperature', 'topP', 'topK', 'candidateCount']) assert.equal(Object.hasOwn(config, key), false)
+  assert.equal(config.maxOutputTokens, 1024)
+  assert.equal(config.responseMimeType, 'application/json')
+  assert.ok(config.responseSchema)
 })

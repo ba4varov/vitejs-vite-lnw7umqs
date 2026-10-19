@@ -46,6 +46,24 @@ export function compatibleFlashModels(models) {
     })
 }
 
+// Only known model families get thinking controls; unknown/future models keep defaults.
+export function semanticGenerationBody(body, model) {
+  const isFlash38 = model === 'gemini-3.8-flash'
+  const generationConfig = { ...body.generationConfig, maxOutputTokens: 1024 }
+  if (isFlash38) {
+    // Gemini 3.8 removes sampling controls and does not support multiple candidates.
+    for (const key of ['temperature', 'topP', 'topK', 'candidateCount']) delete generationConfig[key]
+  }
+  let thinkingConfig
+  if (isFlash38) thinkingConfig = { thinkingLevel: 'low' }
+  else if (/^gemini-2\.5-flash(?:-lite)?(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingBudget: 0 }
+  else if (/^gemini-2\.5-pro(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingBudget: 128 }
+  else if (/^gemini-3-flash(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingLevel: 'minimal' }
+  else if (/^gemini-3-pro(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingLevel: 'low' }
+  return { ...body, generationConfig: { ...generationConfig,
+    ...(thinkingConfig ? { thinkingConfig } : {}) } }
+}
+
 function sanitizeMessage(value, apiKey) {
   if (typeof value !== 'string') return undefined
   let result = value.replaceAll(apiKey, '[redacted]').replace(/[\r\n\t]+/g, ' ').replace(/https?:\/\/\S+/g, '[url]')
@@ -174,7 +192,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
             if (attempt > 0) await reserve(stageSignal)
             logger(`[${endpoint}:gemini-usage]`, { requestId, reason: 'generation', savedGeminiCalls: 0, geminiCalls: 1 })
             const response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
-              signal: stageSignal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(body)
+              signal: stageSignal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(stage === 'gemini-understanding' ? semanticGenerationBody(body, model) : body)
             })
             if (response.status === 429) throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: 429 })
             if (!response.ok) {
