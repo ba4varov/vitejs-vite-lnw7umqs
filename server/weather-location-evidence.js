@@ -41,6 +41,9 @@ export function collectLocationCandidates(message, lang = 'bg') {
     const name = match[1].replace(/[.!?]+$/u, '')
     const words = name.split(/\s/u)
     if (name.length < 2) continue
+    // Sentence grammar is not independent proper-name evidence. Explicit
+    // locatives still retain names that happen to coincide with these words.
+    if (words.every(word => /^(?:i|can|will|what|how|and|should|could|would|do|does|is|are|the|a|an)$/iu.test(word))) continue
     if (extractTimeScope(name) || words.length === 1 && extractRequestedDate(name)) continue
     if (parseDeterministicQuestion(name, lang)?.intent !== 'unrelated') continue
     if (match.index === 0 && words.length === 1 && !extractTimeScope(message.slice(name.length).trim().split(/\s/u)[0] ?? '')) continue

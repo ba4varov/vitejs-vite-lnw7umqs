@@ -10,6 +10,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.Scri
   .replaceAll("'../server/weather-chat-semantics.js'", JSON.stringify(new URL('../../server/weather-chat-semantics.js', import.meta.url).href))
   .replaceAll("'../server/weather-location-evidence.js'", JSON.stringify(new URL('../../server/weather-location-evidence.js', import.meta.url).href))
   .replaceAll("'../server/gemini-client.js'", JSON.stringify(new URL('../../server/gemini-client.js', import.meta.url).href))
+  .replaceAll("'../server/weather-local-routing.js'", JSON.stringify(new URL('../../server/weather-local-routing.js', import.meta.url).href))
 const { default: handler } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
 const dates = Array.from({ length: 16 }, (_, i) => `2026-10-${String(8 + i).padStart(2, '0')}`)
 const daily = time => ({ time, weather_code: time.map(() => 0), temperature_2m_min: time.map(() => 11), temperature_2m_max: time.map(() => 21), precipitation_sum: time.map(() => 0), precipitation_probability_max: time.map(() => 0), wind_speed_10m_max: time.map(() => 8), uv_index_max: time.map(() => 3) })
