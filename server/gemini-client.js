@@ -64,7 +64,7 @@ async function upstreamDetails(response, apiKey) {
 }
 
 export function createGeminiClient({ fetchImpl = fetch, env = process.env, logger = (prefix, data) => (data.code === 'ok' || prefix.endsWith(':gemini-usage]') ? console.info : console.error)(prefix, data), now = () => performance.now(), quota } = {}) {
-  const quotaGuard = quota ?? createGeminiQuota({ env, fetchImpl })
+  const quotaGuard = quota ?? createGeminiQuota({ env, fetchImpl, logger, now })
   let cooldownDay
   const quotaDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
   let cachedModel

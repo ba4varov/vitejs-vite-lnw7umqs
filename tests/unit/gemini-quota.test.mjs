@@ -93,7 +93,7 @@ test('quota response body is bounded even if a transport ignores cancellation', 
   const guard = createGeminiQuota({ env, fetchImpl: async () => ({ ok: true, json: () => new Promise(() => {}) }) })
   const result = guard.reserve()
   for (let i = 0; i < 10; i++) await Promise.resolve()
-  t.mock.timers.tick(1000)
+  t.mock.timers.tick(3000)
   assert.deepEqual(await result, { allowed: false, reason: 'quota_unavailable' })
 })
 
@@ -107,4 +107,96 @@ test('404 recovery reserves a second call; quota denial prevents replacement gen
   await assert.rejects(generate(client), { code: 'daily_limit' })
   assert.equal(calls, 2)
   assert.equal(used, 2)
+})
+
+const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve() }
+for (const phase of ['headers', 'body']) test(`RPC accepts a 1500ms ${phase} delay beyond the old deadline`, async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let rpcSignal, calls = 0
+  const logs = []
+  const guard = createGeminiQuota({ env, logger: (_, data) => logs.push(data), fetchImpl: async (_url, init) => {
+    calls++; rpcSignal = init.signal
+    const delay = () => new Promise(resolve => setTimeout(resolve, 1500))
+    if (phase === 'headers') await delay()
+    return { ok: true, status: 200, json: async () => { if (phase === 'body') await delay(); return { allowed: true, reason: 'reserved' } } }
+  } })
+  const pending = guard.reserve()
+  await flush()
+  t.mock.timers.tick(1000); await flush()
+  assert.equal(logs.length, 0)
+  t.mock.timers.tick(500)
+  assert.deepEqual(await pending, { allowed: true, reason: 'reserved' })
+  assert.equal(calls, 1)
+  assert.equal(rpcSignal.aborted, false)
+  assert.equal(logs[0].code, 'reserved')
+  t.mock.timers.tick(3000)
+  assert.equal(rpcSignal.aborted, false, 'deadline cleared after success')
+})
+
+for (const phase of ['headers', 'body']) test(`RPC timeout aborts ${phase}, never retries, and ignores late success`, async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let rpcSignal, complete, calls = 0
+  const logs = []
+  const guard = createGeminiQuota({ env, logger: (_, data) => logs.push(data), fetchImpl: async (_url, init) => {
+    calls++; rpcSignal = init.signal
+    const pending = new Promise(resolve => { complete = resolve })
+    return phase === 'headers' ? pending : { ok: true, status: 200, json: () => pending }
+  } })
+  const result = guard.reserve(); await flush()
+  t.mock.timers.tick(3000)
+  assert.deepEqual(await result, { allowed: false, reason: 'quota_unavailable' })
+  assert.equal(rpcSignal.aborted, true)
+  assert.equal(logs[0].code, 'timeout')
+  assert.equal(logs[0].status, phase === 'headers' ? null : 200)
+  complete(phase === 'headers' ? Response.json({ allowed: true, reason: 'reserved' }) : { allowed: true, reason: 'reserved' })
+  await flush()
+  assert.equal(calls, 1)
+  assert.equal(logs.length, 1)
+  assert.equal(logs[0].code, 'timeout')
+})
+
+for (const status of [401, 403, 404, 429, 500, 503]) test(`RPC logs HTTP ${status} without reading error body`, async () => {
+  const logs = []
+  let reads = 0
+  const guard = createGeminiQuota({ env, logger: (_, data) => logs.push(data), fetchImpl: async () => ({ ok: false, status, json: () => { reads++; throw Error('secret') } }) })
+  assert.deepEqual(await guard.reserve(), { allowed: false, reason: 'quota_unavailable' })
+  assert.equal(reads, 0)
+  assert.equal(logs[0].status, status)
+  assert.equal(logs[0].code, 'http_error')
+  assert.ok(logs[0].durationMs >= 0)
+})
+
+for (const type of ['json', 'shape', 'network', 'body-network']) test(`RPC safely distinguishes ${type}`, async () => {
+  const logs = []
+  const guard = createGeminiQuota({ env, logger: (...args) => logs.push(args), fetchImpl: async () => {
+    if (type === 'network') throw Error('https://private.example?token=private-service-key')
+    if (type === 'body-network') return { ok: true, status: 200, json: async () => { throw TypeError('private message') } }
+    return type === 'json' ? new Response('private invalid JSON', { status: 200 }) : Response.json({ allowed: true, reason: 'wrong', message: 'private' })
+  } })
+  assert.equal((await guard.reserve()).allowed, false)
+  assert.equal(logs[0][1].code, type.includes('network') ? 'network_error' : 'invalid_response')
+  assert.doesNotMatch(JSON.stringify(logs), /private|token|https|message/)
+})
+
+for (const extra of [{ SUPABASE_URL: '' }, { SUPABASE_URL: 'https://user:secret@example.com?token=secret' }, { SUPABASE_SERVICE_ROLE_KEY: '' }, { GEMINI_DAILY_REQUEST_LIMIT: 'invalid' }]) test(`RPC configuration fails closed: ${Object.keys(extra)[0]}`, async () => {
+  const logs = []
+  const guard = createGeminiQuota({ env: { ...env, ...extra }, logger: (_, data) => logs.push(data), fetchImpl: () => assert.fail('invalid configuration contacted Supabase') })
+  assert.equal((await guard.reserve()).allowed, false)
+  assert.equal(logs[0].code, 'configuration_error')
+  assert.doesNotMatch(JSON.stringify(logs), /secret|example|invalid.*token/)
+})
+
+test('parent cancellation interrupts body and clears listeners/deadline', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const parent = new AbortController(), logs = []
+  let signal
+  const guard = createGeminiQuota({ env, logger: (_, data) => logs.push(data), fetchImpl: async (_url, init) => {
+    signal = init.signal; return { ok: true, status: 200, json: () => new Promise(() => {}) }
+  } })
+  const pending = guard.reserve(parent.signal); await flush(); parent.abort('private reason')
+  assert.equal((await pending).allowed, false)
+  assert.equal(signal.aborted, true)
+  assert.equal(logs[0].code, 'aborted')
+  t.mock.timers.tick(3000)
+  assert.equal(logs.length, 1)
 })
