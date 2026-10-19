@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, ForecastHourly, WeatherCurrent, PendingClarification } from '../server/weather-chat-core.js'
 import { deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, clarificationTurn, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
 import { geminiClient } from '../server/gemini-client.js'
-import { semanticSchema, semanticSystem, parseSemanticUnderstanding, resolveSemanticTurn } from '../server/weather-chat-semantics.js'
+import { semanticSchema, semanticSystem, semanticInput, parseSemanticUnderstanding, resolveSemanticTurn } from '../server/weather-chat-semantics.js'
 import { collectLocationCandidates, groundLocation } from '../server/weather-location-evidence.js'
 import type { SemanticUnderstanding } from '../server/weather-chat-semantics.js'
 
@@ -168,7 +168,7 @@ async function optionalGeminiUnderstanding(input: ChatInput, requestId: string):
   if (!process.env.GEMINI_API_KEY) { logUnderstanding('missing_configuration', false, requestId); return null }
   try {
     logUnderstanding('gemini_invoked', true, requestId)
-    const result = await callGemini(semanticSystem, JSON.stringify({ currentDate: localIsoDate(new Date(), 'Europe/Sofia'), selectedCity: input.city, language: input.lang, message: input.message, context: input.context ?? null, pendingClarification: input.pendingClarification ?? null }), 1024, 'gemini-understanding', semanticSchema, requestId)
+    const result = await callGemini(semanticSystem, JSON.stringify(semanticInput(input, localIsoDate(new Date(), 'Europe/Sofia'))), 1024, 'gemini-understanding', semanticSchema, requestId)
     const parsed = parseSemanticUnderstanding(result, input.lang)
     logUnderstanding(parsed ? 'gemini_valid' : 'invalid_structure', true, requestId)
     return parsed

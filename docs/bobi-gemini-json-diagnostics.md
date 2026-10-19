@@ -29,10 +29,10 @@ Semantic interpretation uses a 1024-token ceiling instead of 320, with the same
 JSON schema and MIME type. The ten-field structured result needs headroom for
 city/date strings; thinking can consume the generation allowance. Raising the
 ceiling alone is not evidence that 320 caused the incident or a guarantee of
-completion. Existing total/discovery/generation deadlines remain unchanged.
+completion. Current deadlines are 8500 ms total, 1500 ms discovery and 7000 ms generation;
+see [latency analysis](bobi-gemini-latency-optimization.md).
 
-The client applies controls after model selection, including existing 404 model
-recovery: Gemini 2.5 Flash/Flash Lite use `thinkingBudget: 0`; 2.5 Pro uses its
+The client applies controls after model selection (404 falls back without retry): Gemini 2.5 Flash/Flash Lite use `thinkingBudget: 0`; 2.5 Pro uses its
 minimum 128 budget; Gemini 3 Flash uses `thinkingLevel: minimal`; 3 Pro uses
 `thinkingLevel: low`. The exact Production model `gemini-3.8-flash` uses
 `thinkingLevel: low` (never `minimal`) and omits REST generation parameters
@@ -68,8 +68,8 @@ content absence; invalid_structure points to semantic validation. Do not enable
 raw response logging to diagnose these cases.
 
 Supabase quota reservation/cooldown, Open-Meteo retrieval, location evidence and
-wrong-city safeguards remain in place. No new retries are introduced. Existing
-404 recovery remains unchanged and still reserves each generation attempt.
+wrong-city safeguards remain in place. No new retries are introduced. No automatic
+404 recovery remains: one understanding reserves and generates at most once.
 
 ## Validation after Production model review
 

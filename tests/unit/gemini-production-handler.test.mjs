@@ -75,11 +75,11 @@ for (const phase of ['discovery', 'generation']) for (const [status, reason] of 
   })
 }
 
-test('real handler falls back when 404 recovery has no available model', async t => {
+test('real handler falls back on 404 without discovery or retry', async t => {
   const { run, check, calls } = setup(t, async (_url, init) => init.method === 'POST' ? Response.json({}, { status: 404 }) : Response.json({ models: [] }))
   await run()
   check('local', 'model_unavailable')
-  assert.deepEqual(calls.map(call => call.init.method), ['POST', 'GET'])
+  assert.deepEqual(calls.map(call => call.init.method), ['POST'])
 })
 
 const envelope = (parts, finishReason = 'STOP', extra = {}) => ({ candidates: [{ finishReason, content: { parts } }], ...extra })

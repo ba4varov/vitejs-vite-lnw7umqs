@@ -7,6 +7,7 @@ export type SemanticUnderstanding = Understanding & {
 }
 export const semanticSchema: Record<string, unknown>
 export const semanticSystem: string
+export function semanticInput(input: ValidChatInput, currentDate: string): Record<string, unknown>
 export function parseSemanticUnderstanding(value: unknown, lang?: 'bg' | 'en'): SemanticUnderstanding | null
 export function hasInvalidCalendarLiteral(message: string, now?: Date, timezone?: string, lang?: 'bg' | 'en', dateExpected?: boolean): boolean
 export type SemanticTurn = { understanding: Understanding; message: string; context?: ConversationContext; continuation: boolean; answer?: string; pendingClarification: PendingClarification | null; reason: 'semantic' | 'semantic_clarification' | 'invalid_date' }

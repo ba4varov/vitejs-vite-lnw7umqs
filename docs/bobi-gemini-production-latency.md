@@ -1,4 +1,8 @@
-# Боби: Gemini Production latency
+# Боби: Gemini Production latency — историческа база
+
+Този документ описва предишния лимит 8000/6500 ms и стария 404 retry.
+Актуалната политика е **8500 ms общо / 7000 ms generation, без retry**.
+Виж [текущия анализ и симулации](bobi-gemini-latency-optimization.md).
 
 ## Установена причина
 
