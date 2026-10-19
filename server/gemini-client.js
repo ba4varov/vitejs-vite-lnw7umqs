@@ -48,12 +48,19 @@ export function compatibleFlashModels(models) {
 
 // Only known model families get thinking controls; unknown/future models keep defaults.
 export function semanticGenerationBody(body, model) {
+  const isFlash38 = model === 'gemini-3.8-flash'
+  const generationConfig = { ...body.generationConfig, maxOutputTokens: 1024 }
+  if (isFlash38) {
+    // Gemini 3.8 removes sampling controls and does not support multiple candidates.
+    for (const key of ['temperature', 'topP', 'topK', 'candidateCount']) delete generationConfig[key]
+  }
   let thinkingConfig
-  if (/^gemini-2\.5-flash(?:-lite)?(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingBudget: 0 }
+  if (isFlash38) thinkingConfig = { thinkingLevel: 'low' }
+  else if (/^gemini-2\.5-flash(?:-lite)?(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingBudget: 0 }
   else if (/^gemini-2\.5-pro(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingBudget: 128 }
   else if (/^gemini-3-flash(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingLevel: 'minimal' }
   else if (/^gemini-3-pro(?:-\d{3})?$/.test(model)) thinkingConfig = { thinkingLevel: 'low' }
-  return { ...body, generationConfig: { ...body.generationConfig, maxOutputTokens: 1024,
+  return { ...body, generationConfig: { ...generationConfig,
     ...(thinkingConfig ? { thinkingConfig } : {}) } }
 }
 

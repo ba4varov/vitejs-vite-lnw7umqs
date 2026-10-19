@@ -18,7 +18,7 @@ function setup(t, fetchImpl, configured = true) {
   const logs = [], calls = [], weatherCalls = []
   t.mock.method(console, 'info', (...args) => logs.push(args))
   const client = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} },
-    env: { GEMINI_API_KEY: 'private-test-key', ...(configured ? { GEMINI_MODEL: 'gemini-2.5-flash' } : {}) },
+    env: { GEMINI_API_KEY: 'private-test-key', ...(configured ? { GEMINI_MODEL: typeof configured === 'string' ? configured : 'gemini-2.5-flash' } : {}) },
     now: () => Date.now(), logger: (...args) => logs.push(args),
     fetchImpl: async (url, init) => { calls.push({ url, init }); return fetchImpl(url, init) }
   })
@@ -133,4 +133,19 @@ test('HTTP 200 with malformed outer response falls back without retry', async t 
   const { run, check, calls } = setup(t, async () => new Response('broken', { status: 200 }))
   await run(); check('local', 'invalid_json')
   assert.equal(calls.length, 1)
+})
+
+test('Production gemini-3.8-flash sends low thinking and no deprecated sampling, without retry', async t => {
+  const { run, check, calls } = setup(t, async () => success(), 'gemini-3.8-flash')
+  await run()
+  check('gemini', 'gemini_valid')
+  assert.equal(calls.length, 1)
+  assert.match(calls[0].url, /models\/gemini-3\.8-flash:generateContent$/)
+  const config = JSON.parse(calls[0].init.body).generationConfig
+  assert.deepEqual(config.thinkingConfig, { thinkingLevel: 'low' })
+  assert.doesNotMatch(JSON.stringify(config), /minimal|thinkingBudget/)
+  for (const key of ['temperature', 'topP', 'topK', 'candidateCount']) assert.equal(Object.hasOwn(config, key), false)
+  assert.equal(config.maxOutputTokens, 1024)
+  assert.equal(config.responseMimeType, 'application/json')
+  assert.ok(config.responseSchema)
 })
