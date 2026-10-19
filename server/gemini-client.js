@@ -1,7 +1,7 @@
 import { createGeminiQuota } from './gemini-quota.js'
 const API_ROOT = 'https://generativelanguage.googleapis.com/v1beta'
-// Per understanding, including HTTP bodies and the single 404 recovery.
-export const GEMINI_BUDGET_MS = Object.freeze({ total: 8000, discovery: 1500, generation: 6500 })
+// One understanding includes quota reservation, discovery, headers and body.
+export const GEMINI_BUDGET_MS = Object.freeze({ total: 8500, discovery: 1500, generation: 7000 })
 const STABLE_TEXT_MODEL = /^gemini-\d+(?:\.\d+)?-(?:flash(?:-lite)?|pro)(?:-\d{3})?$/
 const EXCLUDED_MODEL_KINDS = /(?:image|imagen|live|audio|tts|speech|transcri|embed|preview|experimental|\bexp\b)/i
 
@@ -95,8 +95,10 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
   }
 
   // Abort fetch AND bound awaiting its body. Clear timers/listeners on every exit.
-  async function timedStage({ endpoint, stage, phase, signal: parent, requestId }, operation) {
+  async function timedStage({ endpoint, stage, phase, signal: parent, requestId, requestStarted }, operation) {
     const started = now()
+    const preparationMs = requestStarted === undefined ? undefined : Math.max(0, Math.round(started - requestStarted))
+    const availableMs = preparationMs === undefined ? GEMINI_BUDGET_MS[phase] : Math.max(0, Math.min(GEMINI_BUDGET_MS[phase], GEMINI_BUDGET_MS.total - preparationMs))
     const controller = new AbortController()
     const signal = parent ? AbortSignal.any([parent, controller.signal]) : controller.signal
     const timer = setTimeout(() => controller.abort(), GEMINI_BUDGET_MS[phase])
@@ -121,6 +123,8 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
       logger(`[${endpoint}:gemini-stage]`, {
         endpoint, stage, phase, durationMs: Math.max(0, Math.round(now() - started)),
         status: failure?.httpStatus ?? null, code: failure?.code ?? 'ok',
+        ...(preparationMs === undefined ? {} : { preparationMs, availableMs, totalDurationMs: Math.max(0, Math.round(now() - requestStarted)) }),
+        ...(failure?.code === 'timeout' ? { timeoutSource: parent?.aborted ? 'total' : 'stage' } : {}),
         ...(requestId ? { requestId } : {})
       })
     }
@@ -147,7 +151,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
     const configured = !ignoreConfigured ? normalizeName(env.GEMINI_MODEL) : ''
     if (configured) {
       // A conservative stable text-model grammar is checked locally. Availability
-      // is checked by generateContent itself; 404 triggers discovery below.
+      // is checked by generateContent itself; errors fall back without retry.
       if (!STABLE_TEXT_MODEL.test(configured)) {
         throw new GeminiServiceError(stage, 'configured-model-unavailable', { safeMessage: 'Configured model is incompatible' })
       }
@@ -170,6 +174,7 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
       logger(`[${endpoint}:gemini-usage]`, { requestId, reason: error.code, savedGeminiCalls: 1, geminiCalls: 0 })
       log(endpoint, error, requestId); throw error
     }
+    const requestStarted = now()
     const deadline = new AbortController()
     const timer = setTimeout(() => deadline.abort(), GEMINI_BUDGET_MS.total)
     const signal = deadline.signal
@@ -186,33 +191,25 @@ export function createGeminiClient({ fetchImpl = fetch, env = process.env, logge
       // after another instance has exhausted the shared daily allowance.
       await reserve(signal)
       model = await resolveModel(stage, { signal, endpoint, requestId })
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const payload = await timedStage({ endpoint, stage, phase: 'generation', signal, requestId }, async stageSignal => {
-            if (attempt > 0) await reserve(stageSignal)
-            logger(`[${endpoint}:gemini-usage]`, { requestId, reason: 'generation', savedGeminiCalls: 0, geminiCalls: 1 })
-            const response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
-              signal: stageSignal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(stage === 'gemini-understanding' ? semanticGenerationBody(body, model) : body)
-            })
-            if (response.status === 429) throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: 429 })
-            if (!response.ok) {
-              throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: response.status, model, ...await upstreamDetails(response, env.GEMINI_API_KEY) })
-            }
-            try { return await response.json() } catch {
-              throw new GeminiServiceError(stage, 'invalid-json', { httpStatus: response.status })
-            }
+      try {
+        const payload = await timedStage({ endpoint, stage, phase: 'generation', signal, requestId, requestStarted }, async stageSignal => {
+          logger(`[${endpoint}:gemini-usage]`, { requestId, reason: 'generation', savedGeminiCalls: 0, geminiCalls: 1 })
+          const response = await fetchImpl(`${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, {
+            signal: stageSignal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, body: JSON.stringify(stage === 'gemini-understanding' ? semanticGenerationBody(body, model) : body)
           })
-          cachedModel = model
-          return { payload, model }
-        } catch (error) {
-          if (error instanceof GeminiServiceError && error.httpStatus === 404) cachedModel = undefined
-          if (error instanceof GeminiServiceError && error.httpStatus === 404 && attempt === 0) {
-            const previous = model
-            model = await resolveModel(stage, { exclude: previous, ignoreConfigured: true, signal, endpoint, requestId })
-            continue
+          if (response.status === 429) throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: 429 })
+          if (!response.ok) throw new GeminiServiceError(stage, 'upstream-http', { httpStatus: response.status, model, ...await upstreamDetails(response, env.GEMINI_API_KEY) })
+          try { return await response.json() } catch {
+            throw new GeminiServiceError(stage, 'invalid-json', { httpStatus: response.status })
           }
-          throw error
-        }
+        })
+        cachedModel = model
+        return { payload, model }
+      } catch (error) {
+        // Invalidate for a future independent request; never spend another
+        // reservation or generation inside this understanding, including 404.
+        if (error instanceof GeminiServiceError && error.httpStatus === 404) cachedModel = undefined
+        throw error
       }
     } catch (error) {
       const serviceError = error instanceof GeminiServiceError ? error : new GeminiServiceError(stage, 'unexpected-error')

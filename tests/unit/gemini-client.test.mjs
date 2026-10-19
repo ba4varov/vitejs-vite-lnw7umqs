@@ -49,18 +49,15 @@ test('filters unsupported and non-text or preview-only models', async () => {
   assert.equal(await client.resolveModel('test'), 'gemini-2.0-flash')
 })
 
-test('invalidates a 404 model, refreshes discovery, and retries exactly once', async () => {
+test('404 invalidates a discovered model without discovery or generation retry', async () => {
   const { client, calls } = fakeClient([
-    response(200, { models: [model('gemini-2.5-flash'), model('gemini-2.0-flash')] }),
-    response(404, { error: { status: 'NOT_FOUND', message: 'gone' } }),
-    response(200, { models: [model('gemini-2.5-flash'), model('gemini-2.0-flash')] }),
-    response(200, { candidates: [] })
+    response(200, { models: [model('gemini-2.5-flash')] }),
+    response(404, { error: { status: 'NOT_FOUND' } }),
+    response(200, { models: [model('gemini-2.0-flash')] })
   ])
-  const result = await client.generate({ endpoint: 'weather-chat', stage: 'gemini-understanding', body: { contents: [] } })
-  assert.equal(result.model, 'gemini-2.0-flash')
-  assert.equal(calls.length, 4)
-  assert.match(calls[1].url, /gemini-2\.5-flash/)
-  assert.match(calls[3].url, /gemini-2\.0-flash/)
+  await assert.rejects(client.generate({ endpoint: 'weather-chat', stage: 'gemini-understanding', body: {} }), { code: 'upstream-http', httpStatus: 404 })
+  assert.equal(calls.length, 2) // Initial discovery + exactly one generation.
+  assert.equal(await client.resolveModel('test'), 'gemini-2.0-flash') // Future independent operation.
 })
 
 test('returns a controlled error when discovery has no compatible model', async () => {
@@ -131,7 +128,7 @@ test('direct generation may take 6 seconds without the old 5-second timeout', as
   assert.deepEqual(logs.map(([, data]) => [data.phase, data.durationMs, data.code, data.requestId]), [['generation', 6000, 'ok', 'trace-id']])
 })
 
-test('cold discovery 1 second plus generation 6 seconds succeeds within the 8-second budget', async t => {
+test('cold discovery 1 second plus generation 6 seconds succeeds within the shared budget', async t => {
   const { client, calls, logs } = timedClient(t, [delayed(1000, models), delayed(6000, ok)])
   const result = generate(client)
   await flush(); await advance(t, 1000); await advance(t, 6000)
@@ -149,23 +146,21 @@ test('slow discovery is aborted at 1.5 seconds and never attempts generation', a
   assert.deepEqual([logs[0][1].phase, logs[0][1].durationMs, logs[0][1].code], ['discovery', 1500, 'timeout'])
 })
 
-test('slow generation is aborted at 6.5 seconds without retry', async t => {
+test('slow generation is aborted at 7 seconds without retry', async t => {
   const { client, calls, logs } = timedClient(t, [models, delayed(9000, ok)])
   const result = assert.rejects(generate(client), error => error.code === 'timeout' && !error.httpStatus)
   await flush(); await advance(t, GEMINI_BUDGET_MS.generation); await result
   assert.equal(calls.length, 2)
   assert.ok(calls[1].init.signal.aborted)
-  assert.equal(logs[1][1].durationMs, 6500)
+  assert.equal(logs[1][1].durationMs, GEMINI_BUDGET_MS.generation)
   assert.equal(logs[1][1].phase, 'generation')
 })
 
-test('404 recovery shares the total deadline instead of resetting the budget', async t => {
-  const { client, calls, logs } = timedClient(t, [delayed(5000, missing), delayed(1000, models), delayed(4000, ok)], { GEMINI_MODEL: 'gemini-2.5-flash' })
-  const result = assert.rejects(generate(client), error => error.code === 'timeout')
-  await flush(); await advance(t, 5000); await advance(t, 1000); await advance(t, 2000); await result
-  assert.equal(calls.length, 3)
-  assert.ok(calls[2].init.signal.aborted)
-  assert.deepEqual(logs.slice(0, 3).map(([, data]) => [data.phase, data.durationMs, data.code]), [['generation', 5000, 'upstream-http'], ['discovery', 1000, 'ok'], ['generation', 2000, 'timeout']])
+test('a slow 404 ends immediately, without spending the remaining deadline on another request', async t => {
+  const { client, calls } = timedClient(t, [delayed(5000, missing)], { GEMINI_MODEL: 'gemini-3.8-flash' })
+  const result = assert.rejects(generate(client), { code: 'upstream-http', httpStatus: 404 })
+  await flush(); await advance(t, 5000); await result
+  assert.equal(calls.length, 1)
 })
 
 for (const status of [200, 401]) test(`deadline includes hanging HTTP ${status} response body`, async t => {
@@ -174,23 +169,14 @@ for (const status of [200, 401]) test(`deadline includes hanging HTTP ${status} 
   const hanging = new Promise(() => {})
   const custom = createGeminiClient({ quota: { reserve: async () => ({ allowed: true }), block: async () => {} }, env: { GEMINI_API_KEY: key, GEMINI_MODEL: 'gemini-2.5-flash' }, logger: () => {}, fetchImpl: async (url, init) => { calls.push({ url, init }); return { ...response(status, {}), json: () => hanging } } })
   const result = assert.rejects(generate(custom), error => error.code === 'timeout' && !error.httpStatus)
-  await flush(); await advance(t, 6500); await result
+  await flush(); await advance(t, GEMINI_BUDGET_MS.generation); await result
   assert.ok(calls[0].init.signal.aborted)
 })
 
-test('configured missing model discovers a compatible replacement once and caches it', async () => {
-  const { client, calls } = fakeClient([missing, models, ok, ok], { GEMINI_MODEL: 'gemini-9.0-flash' })
-  assert.equal((await generate(client)).model, 'gemini-2.5-flash')
-  await generate(client)
-  assert.deepEqual(calls.map(call => call.init.method), ['POST', 'GET', 'POST', 'POST'])
-  assert.match(calls[2].url, /gemini-2\.5-flash/)
-  assert.match(calls[3].url, /gemini-2\.5-flash/)
-})
-
-test('second generation 404 ends recovery without further calls', async () => {
-  const { client, calls } = fakeClient([missing, models, missing], { GEMINI_MODEL: 'gemini-2.5-flash' })
-  await assert.rejects(generate(client), error => error.code === 'upstream-http' && error.httpStatus === 404)
-  assert.equal(calls.length, 3)
+test('configured missing model falls back without a second request or silent model switch', async () => {
+  const { client, calls } = fakeClient([missing], { GEMINI_MODEL: 'gemini-9.0-flash' })
+  await assert.rejects(generate(client), { code: 'upstream-http', httpStatus: 404 })
+  assert.equal(calls.length, 1)
 })
 
 for (const phase of ['discovery', 'generation']) for (const status of [400, 401, 403, 429, 500]) {

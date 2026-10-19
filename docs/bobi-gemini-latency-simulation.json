@@ -1,0 +1,212 @@
+{
+  "baseline": "a5899090120c361ec1150d884c85c81fa1d29132",
+  "clock": "mocked milliseconds; not live latency",
+  "schemaUnchanged": true,
+  "sizes": {
+    "systemPromptBytes": {
+      "before": 3010,
+      "after": 1972
+    },
+    "contextExampleBytes": {
+      "before": 730,
+      "after": 651
+    }
+  },
+  "results": [
+    {
+      "scenario": "fast",
+      "before": {
+        "outcome": "ok",
+        "elapsedMs": 1000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 1000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "normal",
+      "before": {
+        "outcome": "ok",
+        "elapsedMs": 4500,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 4500,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "production-reservation-fast-answer",
+      "before": {
+        "outcome": "ok",
+        "elapsedMs": 7533,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 7533,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "production-reservation-6800",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 8000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 8333,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "fast-reservation-6800",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 6600,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 6900,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "production-reservation-hang",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 8000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "timeout",
+        "elapsedMs": 8500,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "slow-reservation-5400",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 8000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 8200,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "quota-timeout",
+      "before": {
+        "outcome": "quota_unavailable",
+        "elapsedMs": 3000,
+        "quotaCalls": 1,
+        "googleCalls": 0
+      },
+      "after": {
+        "outcome": "quota_unavailable",
+        "elapsedMs": 3000,
+        "quotaCalls": 1,
+        "googleCalls": 0
+      }
+    },
+    {
+      "scenario": "generation-stage-timeout",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 6600,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "timeout",
+        "elapsedMs": 7100,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "cold-discovery",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 8000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 8333,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "slow-discovery",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 1600,
+        "quotaCalls": 1,
+        "googleCalls": 0
+      },
+      "after": {
+        "outcome": "timeout",
+        "elapsedMs": 1600,
+        "quotaCalls": 1,
+        "googleCalls": 0
+      }
+    },
+    {
+      "scenario": "slow-generation-body",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 8000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 8333,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    },
+    {
+      "scenario": "slow-quota-body",
+      "before": {
+        "outcome": "timeout",
+        "elapsedMs": 8000,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      },
+      "after": {
+        "outcome": "ok",
+        "elapsedMs": 8333,
+        "quotaCalls": 1,
+        "googleCalls": 1
+      }
+    }
+  ]
+}

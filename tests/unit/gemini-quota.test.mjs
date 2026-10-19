@@ -97,16 +97,16 @@ test('quota response body is bounded even if a transport ignores cancellation', 
   assert.deepEqual(await result, { allowed: false, reason: 'quota_unavailable' })
 })
 
-test('404 recovery reserves a second call; quota denial prevents replacement generation', async () => {
+test('404 consumes only the initial reservation and never retries', async () => {
   let used = 0, calls = 0
   const quota = { reserve: async () => ({ allowed: ++used === 1, reason: used === 1 ? 'reserved' : 'daily_limit' }), block: async () => {} }
   const client = make({ quota, fetchImpl: async (_url, init) => {
     calls++
     return init.method === 'POST' ? new Response(null, { status: 404 }) : Response.json({ models: [{ name: 'models/gemini-2.0-flash', supportedGenerationMethods: ['generateContent'] }] })
   } })
-  await assert.rejects(generate(client), { code: 'daily_limit' })
-  assert.equal(calls, 2)
-  assert.equal(used, 2)
+  await assert.rejects(generate(client), { code: 'upstream-http', httpStatus: 404 })
+  assert.equal(calls, 1)
+  assert.equal(used, 1)
 })
 
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve() }
