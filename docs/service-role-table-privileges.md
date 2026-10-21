@@ -113,3 +113,18 @@ baseline different from Dxtm/postgres, use its recorded grants instead of this
 rollback. Never put the rollback in the forward migrations directory.
 
 No production SQL, deployment or merge is performed by this PR.
+
+## Recorded validation for this change
+
+- npm run test:service-role:sql: PASS on PostgreSQL 17.11.
+- npm run test:admin:sql: PASS, including real local PostgREST/JWT checks.
+- npm test: exit 0; 2076 tests, 2065 passed, 0 failed, 1 skipped, 10 TODO
+  (pre-existing known local parser defects reported as TODO).
+- npm run build: PASS (TypeScript and Vite).
+- npm run lint: exit 0; two existing no-unsafe-finally warnings in
+  scripts/push-node-operator.mjs lines 68 and 69, outside this change.
+- git diff --check: PASS.
+
+Initial sandboxed HTTP transport tests could not use local sockets; the final
+full test run above used permitted local sockets. No production endpoints were
+used. Browser suites and full GoTrue/deployed API checks were not run.
