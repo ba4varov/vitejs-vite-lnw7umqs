@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createInitialLocation } from './initial-location.js'
+import { createInitialLocation, INITIAL_LOCATION_TIMEOUT } from './initial-location.js'
 const flush = () => new Promise(resolve => setImmediate(resolve))
 const deferred = () => { let resolve; const promise=new Promise(done=>{resolve=done});return {promise,resolve} }
 function setup(state='granted',extras={}) {
@@ -19,7 +19,7 @@ for(const state of ['denied','prompt',undefined])test(`permission ${state} falls
 })
 test('missing geolocation falls back',async()=>{const s=setup();delete s.nav.geolocation;assert.deepEqual(await s.chooser.start(),{source:'fallback'})})
 test('permission query never resolves: independent deadline wins',async()=>{
- const d=deferred(),s=setup('granted',{navigator:{permissions:{query:()=>d.promise}}});const result=s.chooser.start();s.timers[0]();assert.deepEqual(await result,{source:'fallback'});d.resolve({state:'granted'});await flush();assert.equal(s.chooser.settled,true)
+ const d=deferred(),s=setup('granted',{navigator:{permissions:{query:()=>d.promise},geolocation:{getCurrentPosition(){assert.fail('late permission must not start GPS')}}}});const result=s.chooser.start();s.timers[0]();assert.deepEqual(await result,{source:'fallback'});d.resolve({state:'granted'});await flush();assert.equal(s.chooser.settled,true)
 })
 test('GPS error falls back and success after deadline is ignored',async()=>{
  const s=setup();const result=s.chooser.start();await flush();s.callbacks[0].error();assert.deepEqual(await result,{source:'fallback'});s.gps();assert.deepEqual(await result,{source:'fallback'})
@@ -44,4 +44,35 @@ test('GPS coordinates release election immediately without reverse geocoding',as
 })
 test('invalid GPS coordinates never become a forecast location',async()=>{
  const s=setup();const result=s.chooser.start();await flush();s.callbacks[0].success({coords:{latitude:NaN,longitude:27}});assert.deepEqual(await result,{source:'fallback'})
+})
+
+test('startup uses the accepted 4.5 second total ceiling', async () => {
+ let release, delay
+ const chooser=createInitialLocation({navigator:{permissions:{query:()=>new Promise(()=>{})},geolocation:{getCurrentPosition(){}}},schedule:(callback,ms)=>{release=callback;delay=ms},cancel:()=>{}})
+ const result=chooser.start()
+ assert.equal(INITIAL_LOCATION_TIMEOUT,4500);assert.equal(delay,4500)
+ release();assert.deepEqual(await result,{source:'fallback'})
+})
+
+for (const delivery of [800,2000,3800]) test(`granted automatic GPS at ${delivery} ms wins without waiting for the ceiling`, async t => {
+ t.mock.timers.enable({apis:['setTimeout']})
+ const s=setup('granted',{schedule:setTimeout,cancel:clearTimeout})
+ const result=s.chooser.start();await flush()
+ assert.equal(s.callbacks[0].options.timeout,4500)
+ t.mock.timers.tick(delivery);assert.equal(s.chooser.settled,false)
+ s.gps();assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89})
+ t.mock.timers.tick(4500-delivery);assert.equal((await result).source,'geolocation')
+})
+for (const state of ['denied','prompt','unsupported','no-permissions']) test(`unavailable GPS settles without advancing the deadline: ${state}`,async()=>{
+ const s=setup(state)
+ if(state==='unsupported') {delete s.nav.geolocation;s.nav.permissions.query=()=>new Promise(()=>{})}
+ if(state==='no-permissions')delete s.nav.permissions
+ const result=s.chooser.start();await flush()
+ assert.equal(s.chooser.settled,true);assert.deepEqual(await result,{source:'fallback'});assert.equal(s.callbacks.length,0)
+})
+test('GPS delivered beyond 4.5 seconds cannot replace fallback',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']})
+ const s=setup('granted',{schedule:setTimeout,cancel:clearTimeout});const result=s.chooser.start();await flush()
+ t.mock.timers.tick(4500);assert.deepEqual(await result,{source:'fallback'})
+ t.mock.timers.tick(1);s.gps();assert.deepEqual(await result,{source:'fallback'})
 })

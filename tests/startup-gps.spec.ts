@@ -4,18 +4,20 @@ import { clickHeaderControl } from './header-navigation'
 import fs from 'node:fs/promises'
 
 test.use({ hasTouch: true })
-type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'
+type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'
 const gps={latitude:43.2256,longitude:27.8888}
 const sofia={id:'00000000-0000-0000-0000-000000000010',name:'Sofia',latitude:42.6977,longitude:23.3219,geoname_id:null,country_code:null,admin1_id:null}
 async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
  const calls:{source:string,lat:string|null}[]=[], images:string[]=[]
  let releaseDefault=()=>{},releaseLabel=()=>{}
- let temperatureOverride:number|null=null
+ const favorite=mode==='saved-varna'?{...sofia,name:'Varna',latitude:43.2141,longitude:27.9147}:sofia
+ let temperatureOverride:number|null=null, nextWeatherFailures=0
+ let weatherHold:Promise<void>|null=null, releaseWeather=()=>{}
  const defaultWait=new Promise<void>(r=>{releaseDefault=r}),labelWait=new Promise<void>(r=>{releaseLabel=r})
  await page.setViewportSize({width,height:900});await page.clock.install({time:new Date('2026-10-14T09:00:00Z')});await page.clock.pauseAt(new Date('2026-10-14T09:01:00Z'))
  await page.addInitScript(({mode,lang})=>{
   localStorage.setItem('meteoPulseLanguage',lang)
-  if(mode==='default')localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'gps-fixture-token',refresh_token:'gps-fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002'}}))
+  if(mode==='default'||mode==='saved-varna')localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'gps-fixture-token',refresh_token:'gps-fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002'}}))
   const w=window as any;w.gpsCalls=[];w.forecastHistory=[]
   window.addEventListener('DOMContentLoaded',()=>{
    new MutationObserver(()=>{
@@ -30,9 +32,9 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
  },{mode,lang})
  await page.route('**/*',async route=>{
   const u=new URL(route.request().url()),source=u.hostname==='api.open-meteo.com'?'weather':u.hostname==='marine-api.open-meteo.com'?'marine':u.hostname==='air-quality-api.open-meteo.com'?'aqi':null
-  if(source){calls.push({source,lat:u.searchParams.get('latitude')});if(source==='weather'){const lat=Number(u.searchParams.get('latitude'));return route.fulfill({json:{...weather,current:{...weather.current,temperature_2m:temperatureOverride??(lat===gps.latitude?13:lat===sofia.latitude?17:12)}}})}return route.fulfill({json:source==='marine'?{current:{sea_surface_temperature:20}}:{current:{european_aqi:35,pm10:12,pm2_5:6}}})}
+  if(source){calls.push({source,lat:u.searchParams.get('latitude')});if(source==='weather'){if(weatherHold)await weatherHold;if(nextWeatherFailures>0){nextWeatherFailures--;return route.fulfill({status:503,json:{}})}const lat=Number(u.searchParams.get('latitude'));return route.fulfill({json:{...weather,current:{...weather.current,temperature_2m:temperatureOverride??(lat===gps.latitude?13:lat===sofia.latitude?17:12)}}})}return route.fulfill({json:source==='marine'?{current:{sea_surface_temperature:20}}:{current:{european_aqi:35,pm10:12,pm2_5:6}}})}
   if(u.hostname==='nominatim.openstreetmap.org'){if(mode==='slow-label')await labelWait;return route.fulfill({json:{address:{city:u.searchParams.get('accept-language')==='bg'?'Варна':'Varna',suburb:u.searchParams.get('accept-language')==='bg'?'Трошево':'Troshevo'}}}).catch(()=>{})}
-  if(u.pathname.startsWith('/rest/v1/')){if(mode==='default')await defaultWait;return route.fulfill({json:u.pathname.endsWith('/favorite_places')?[sofia]:[{default_place_id:sofia.id}]})}
+  if(u.pathname.startsWith('/rest/v1/')){if(mode==='default'||mode==='saved-varna')await defaultWait;return route.fulfill({json:u.pathname.endsWith('/favorite_places')?[favorite]:[{default_place_id:favorite.id}]})}
   if(u.hostname==='picsum.photos'){images.push(u.href);return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#123456"/></svg>'})}
   if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/'))return route.continue()
   if(u.pathname==='/api/weather-advice')return route.fulfill({json:{advice:'Weather advice fixture.'}})
@@ -43,7 +45,7 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
  if(dark){await clickHeaderControl(page,page.locator('.header-menu > .icon-btn'));if(await page.locator('.mobile-menu-toggle').isVisible())await page.locator('.mobile-menu-toggle').click()}
  const locate=async(index=0,coords=gps)=>{await expect.poll(()=>page.evaluate(()=> (window as any).gpsCalls.length)).toBeGreaterThan(index);await page.evaluate(({index,coords})=>(window as any).gpsCalls[index].success({coords}),{index,coords})}
  const stable=async()=>({temp:await page.locator('.big-temp').textContent(),heading:await page.locator('.main-card h2').textContent(),background:await page.locator('.main-card > img').getAttribute('src')})
- return {calls,images,locate,stable,releaseDefault,releaseLabel,changeTemperature:(value:number)=>{temperatureOverride=value},weatherCalls:()=>calls.filter(c=>c.source==='weather')}
+ return {calls,images,locate,stable,releaseDefault,releaseLabel,failNextWeather:()=>{nextWeatherFailures++},holdWeather:()=>{weatherHold=new Promise<void>(r=>{releaseWeather=r})},releaseWeather:()=>{weatherHold=null;releaseWeather()},changeTemperature:(value:number)=>{temperatureOverride=value},weatherCalls:()=>calls.filter(c=>c.source==='weather')}
 }
 for(const width of [390,1440])for(const lang of ['bg','en'])for(const dark of [false,true])for(const mode of ['fast','slow','denied','missing','late','manual','default'] as Mode[]){
  test(`startup ${mode} ${width} ${lang} ${dark}`,async({page},info)=>{
@@ -53,7 +55,7 @@ for(const width of [390,1440])for(const lang of ['bg','en'])for(const dark of [f
   if(mode==='slow'){await page.clock.fastForward(3800);expect(s.calls).toHaveLength(0)}
   if(mode==='fast'||mode==='slow')await s.locate()
   if(mode==='manual'){await page.locator('.city-row .city-btn').nth(1).click();await s.locate()}
-  if(mode==='default'){await s.locate();await page.clock.fastForward(1000);expect(s.calls).toHaveLength(0);s.releaseDefault()}
+  if(mode==='default'){await s.locate();await page.clock.fastForward(500);expect(s.calls).toHaveLength(0);s.releaseDefault()}
   if(mode==='late')await page.clock.fastForward(5000)
   const temperature=mode==='fast'||mode==='slow'?'13°C':mode==='manual'||mode==='default'?'17°C':'12°C'
   await expect(page.locator('.big-temp')).toHaveText(temperature)
@@ -83,7 +85,7 @@ for(const mode of ['no-permissions','stalled-permission','denied-callback','slow
  if(mode==='slow-label')await expect(page.locator('.big-temp')).toHaveText('13°C')
  if(mode==='stalled-permission')await page.clock.fastForward(5000)
  await expect(page.locator('.big-temp')).toHaveText(mode==='slow-label'?'13°C':'12°C')
- const first=await s.stable();s.releaseLabel();await page.clock.fastForward(10000);expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+ const first=await s.stable();s.releaseLabel();await page.clock.fastForward(10000);if(mode==='slow-label'){await expect(page.locator('.main-card h2')).toContainText('Troshevo');expect((await s.stable()).temp).toBe(first.temp);expect((await s.stable()).background).toBe(first.background)}else expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
 })
 test('late default is loaded but cannot reorder an already displayed fallback',async({page})=>{
  const s=await setup(page,'default');await page.clock.fastForward(5000);await expect(page.locator('.big-temp')).toHaveText('12°C');const first=await s.stable();s.releaseDefault();await expect(page.locator('.place-chip')).toHaveCount(1);expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
@@ -109,3 +111,117 @@ test('language change can localize GPS after first forecast without another weat
  await expect(page.locator('.big-temp')).toHaveText('13°C');await expect(page.locator('.main-card h2')).toContainText('Варна');await expect(page.locator('.main-card h2')).toContainText('Трошево')
  const first=await s.stable();await page.clock.fastForward(10000);expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
 })
+
+for(const width of [390,1440]) {
+ test(`late reverse label enriches snapshot and cannot overwrite manual city ${width}`,async({page})=>{
+  const s=await setup(page,'slow-label','en',width)
+  await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+  await expect(page.locator('.main-card h2')).toContainText('My Location')
+  const image=(await s.stable()).background
+  s.releaseLabel();await expect(page.locator('.main-card h2')).toContainText('Troshevo')
+  expect((await s.stable()).background).toBe(image);expect(s.weatherCalls()).toHaveLength(1)
+  await page.locator('.city-row .city-btn').nth(1).click()
+  await expect(page.locator('.big-temp')).toHaveText('17°C');await expect(page.locator('.main-card h2')).toContainText('Sofia')
+  expect(s.weatherCalls().at(-1)?.lat).toBe(String(sofia.latitude))
+ })
+ test(`manual city beats an older reverse response ${width}`,async({page})=>{
+  const s=await setup(page,'slow-label','en',width)
+  await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+  await page.locator('.city-row .city-btn').nth(1).click();await expect(page.locator('.big-temp')).toHaveText('17°C')
+  s.releaseLabel();await page.clock.fastForward(10000)
+  await expect(page.locator('.main-card h2')).toContainText('Sofia');await expect(page.locator('.main-card h2')).not.toContainText('Troshevo')
+  expect(s.weatherCalls()).toHaveLength(2)
+ })
+ test(`saved Varna cannot overwrite a newer explicit GPS action ${width}`,async({page})=>{
+  const s=await setup(page,'saved-varna','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(1)
+  await expect(page.locator('.big-temp')).toHaveText('13°C');s.releaseDefault();await s.locate(0,{latitude:43.2141,longitude:27.9147})
+  await page.clock.fastForward(5000);await expect(page.locator('.big-temp')).toHaveText('13°C')
+  await expect(page.locator('.main-card h2')).toContainText('Troshevo');expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(gps.latitude))
+ })
+ test(`quiet refresh failure and recovery preserve data, scroll and GPS ${width}`,async({page})=>{
+  const s=await setup(page,'fast','en',width);await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+  await page.evaluate(()=>window.scrollTo({top:1800,behavior:'instant'}));await page.clock.fastForward(1000)
+  const before=await page.evaluate(()=>window.scrollY);expect(before).toBeGreaterThan(500)
+  const first=await s.stable();s.failNextWeather();await page.clock.fastForward(15*60*1000)
+  await expect(page.locator('.forecast-update-error')).toContainText('Forecast update failed')
+  expect(await s.stable()).toEqual(first);await expect(page.locator('.forecast-refresh')).toHaveCount(0)
+  await expect(page.getByText('Location is unavailable.',{exact:false})).toHaveCount(0)
+  expect(Math.abs(await page.evaluate(()=>window.scrollY)-before)).toBeLessThanOrEqual(2)
+  expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  s.changeTemperature(14);await page.clock.fastForward(15*60*1000);await expect(page.locator('.big-temp')).toHaveText('14°C')
+  await expect(page.locator('.forecast-update-error')).toHaveCount(0);expect(s.weatherCalls()).toHaveLength(3)
+  expect(Math.abs(await page.evaluate(()=>window.scrollY)-before)).toBeLessThanOrEqual(2)
+  expect((await s.stable()).background).toBe(first.background)
+ })
+ test(`pending refresh does not duplicate in-flight requests or flash content ${width}`,async({page})=>{
+  const s=await setup(page,'denied','en',width);await expect(page.locator('.big-temp')).toHaveText('12°C');s.holdWeather()
+  await page.clock.fastForward(15*60*1000);await expect.poll(()=>s.weatherCalls().length).toBe(2)
+  await page.clock.fastForward(15*60*1000);expect(s.weatherCalls()).toHaveLength(2)
+  await expect(page.locator('.big-temp')).toHaveText('12°C');await expect(page.locator('.forecast-refresh')).toHaveCount(0)
+  s.releaseWeather();await expect(page.locator('.big-temp')).toHaveText('12°C')
+ })
+ test(`full reload resets document scroll while delayed data stays at top ${width}`,async({page})=>{
+  const s=await setup(page,'denied','en',width);await expect(page.locator('.big-temp')).toHaveText('12°C')
+  await page.evaluate(()=>window.scrollTo({top:1800,behavior:'instant'}));await page.clock.fastForward(1000);expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(500)
+  s.holdWeather();await page.reload({waitUntil:'domcontentloaded'});await expect(page.locator('.forecast-loading')).toBeVisible();expect(await page.evaluate(()=>scrollY)).toBe(0)
+  s.releaseWeather();await expect(page.locator('.big-temp')).toHaveText('12°C');await page.clock.fastForward(5000)
+  expect(await page.evaluate(()=>history.scrollRestoration)).toBe('manual');expect(await page.evaluate(()=>scrollY)).toBe(0)
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ })
+}
+for(const width of [390,1440])test(`same-coordinate explicit GPS refreshes a pending label without another forecast ${width}`,async({page})=>{
+ const s=await setup(page,'slow-label','en',width);await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+ await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(1);s.releaseLabel()
+ await expect(page.locator('.main-card h2')).toContainText('Troshevo');await expect(page.locator('.big-temp')).toHaveText('13°C');expect(s.weatherCalls()).toHaveLength(1)
+})
+
+for(const width of [390,1440]) {
+ for(const delivery of [800,2000,3800])test(`accepted automatic GPS at ${delivery} ms ${width}`,async({page})=>{
+  const s=await setup(page,'slow','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await expect(page.locator('.forecast-loading')).toBeVisible()
+  await expect(page.locator('.city-row .city-btn').nth(1)).toBeVisible()
+  await page.clock.fastForward(delivery)
+  expect(s.weatherCalls()).toHaveLength(0);await expect(page.locator('.main-card')).toHaveCount(0)
+  await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+  expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(gps.latitude))
+  const first=await s.stable();await page.clock.fastForward(5000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+  const history=await page.evaluate(()=>(window as any).forecastHistory)
+  expect([...new Set(history.map((value:any)=>value.temp))]).toEqual(['13°C'])
+ })
+ test(`preferred city wins before a 3.8 second automatic GPS ${width}`,async({page})=>{
+  const s=await setup(page,'default','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  s.releaseDefault();await expect(page.locator('.big-temp')).toHaveText('17°C')
+  const first=await s.stable();await page.clock.fastForward(3800);await s.locate();await page.clock.fastForward(1000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(sofia.latitude))
+ })
+ test(`manual choice wins over 3.8 second automatic GPS ${width}`,async({page})=>{
+  const s=await setup(page,'manual','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await page.clock.fastForward(2000);await page.locator('.city-row .city-btn').nth(1).click()
+  await expect(page.locator('.big-temp')).toHaveText('17°C');const first=await s.stable()
+  await page.clock.fastForward(1800);await s.locate();await page.clock.fastForward(1000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+ })
+ for(const mode of ['denied','missing','no-permissions'] as Mode[])test(`no deadline wait for ${mode} ${width}`,async({page})=>{
+  const s=await setup(page,mode,'en',width)
+  // The clock stays paused: fallback must render without advancing 4.5 seconds.
+  await expect(page.locator('.big-temp')).toHaveText('12°C')
+  expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
+  expect(s.weatherCalls()).toHaveLength(1)
+ })
+ test(`automatic GPS after 4500 ms cannot move the fallback ${width}`,async({page})=>{
+  const s=await setup(page,'late','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await page.clock.fastForward(4500);await expect(page.locator('.big-temp')).toHaveText('12°C')
+  await page.evaluate(()=>scrollTo({top:1800,behavior:'instant'}));await page.clock.fastForward(100)
+  const offset=await page.evaluate(()=>scrollY),first=await s.stable()
+  await s.locate();await page.clock.fastForward(1000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+  expect(Math.abs(await page.evaluate(()=>scrollY)-offset)).toBeLessThanOrEqual(2)
+ })
+}

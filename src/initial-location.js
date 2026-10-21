@@ -1,4 +1,6 @@
 import { startupTiming } from './startup-timing.js'
+// Preserve the accepted mobile GPS window. This is a ceiling, not a delay:
+// known permission denial/unavailable GPS and successful fixes settle immediately.
 export const INITIAL_LOCATION_TIMEOUT = 4500
 
 // One bounded startup election, shared by StrictMode's effect rehearsal.
@@ -34,6 +36,13 @@ export function createInitialLocation({ navigator: browser, timeout = INITIAL_LO
       started = true
       startupTiming.mark('permission:start')
       timer = schedule(() => finish(gps || { source: 'fallback' }), timeout)
+      // Unsupported GPS cannot benefit from waiting for a Permissions response.
+      if (!browser?.geolocation?.getCurrentPosition) {
+        gpsDone = true
+        startupTiming.mark('permission:end')
+        complete()
+        return result
+      }
       // Automatic access must not display a permission prompt. Unsupported or
       // stalled Permissions APIs fall back; the explicit location button can ask.
       Promise.resolve().then(() => browser?.permissions?.query({ name: 'geolocation' })).then(permission => {

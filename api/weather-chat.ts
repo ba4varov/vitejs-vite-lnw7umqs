@@ -97,9 +97,6 @@ type Place = { name: string; latitude: number; longitude: number; timezone: stri
 type AmbiguousPlace = { ambiguous: true; name: string; options: string[] }
 async function resolvePlace(input: ChatInput, requestedCity: string | null): Promise<Place | AmbiguousPlace | null> {
   if (!requestedCity) return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
-  if (requestedCity.trim().toLocaleLowerCase() === input.city.split(',')[0].trim().toLocaleLowerCase()) {
-    return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
-  }
   const queryName = requestedCity.split(',')[0].replace(/^(?:село|град)\s+/iu, '').trim()
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(queryName)}&count=10&language=${/\p{Script=Cyrillic}/u.test(queryName) ? 'bg' : 'en'}&format=json`
   let response: Response
@@ -107,22 +104,25 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null): Pro
   if (!response.ok) throw new ServiceError('geocoding', 'upstream-http', response.status)
   const results = ((await response.json()) as { results?: GeocodingPlace[] })?.results
   if (!Array.isArray(results) || !results.length) return null
-  const [namePart, qualifier] = requestedCity.split(',').map(value => value.trim())
+  const [namePart, ...qualifiers] = requestedCity.split(',').map(value => value.trim())
   const normalized = (value: unknown) => typeof value === 'string' ? value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() : ''
+  const cleanQualifier = (value: string) => normalized(value.replace(/^(?:област|обл\.?|region|province|state)\s+/iu, '').replace(/\s+(?:region|province|state)$/iu, ''))
   const requestedName = normalized(namePart.replace(/^(?:село|град)\s+/iu, ''))
-  const requestedQualifier = normalized(qualifier)
-  const ranked = results.filter(place => Number.isFinite(place.latitude) && Math.abs(place.latitude) <= 90 && Number.isFinite(place.longitude) && Math.abs(place.longitude) <= 180).map(place => ({ place, score:
-    (normalized(place.name) === requestedName ? 100 : 0) +
-    (requestedQualifier && [place.country, place.country_code, place.admin1, place.admin2].some(value => normalized(value).includes(requestedQualifier)) ? 50 : 0) +
-    (['P', 'place', 'city', 'town', 'village'].some(value => String(place.feature_code ?? place.feature_class ?? '').toLocaleLowerCase().includes(value.toLocaleLowerCase())) ? 10 : 0) +
-    Math.log10(Math.max(1, Number(place.population) || 1))
-  })).sort((a, b) => b.score - a.score)
-  if (!ranked.length || normalized(ranked[0].place.name) !== requestedName) return null
-  if ((requestedQualifier && ![ranked[0].place.country, ranked[0].place.country_code, ranked[0].place.admin1, ranked[0].place.admin2].some(value => normalized(value).includes(requestedQualifier))) || (ranked.length > 1 && ranked[0].score - ranked[1].score < 1)) {
-    return { ambiguous: true, name: namePart, options: ranked.slice(0, 3).map(({ place }) => [place.admin1, place.country].filter(Boolean).join(', ')).filter((value): value is string => Boolean(value)) }
+  // Population is not identity. Every exact-name result remains eligible until
+  // all supplied region/country qualifiers (or confirmed coordinates) identify it.
+  const matches = results.filter(place => Number.isFinite(place.latitude) && Math.abs(place.latitude) <= 90 && Number.isFinite(place.longitude) && Math.abs(place.longitude) <= 180 && normalized(place.name) === requestedName)
+  const qualified = matches.filter(place => qualifiers.every(qualifier =>
+    [place.country, place.country_code, place.admin1, place.admin2].some(value => cleanQualifier(String(value ?? '')) === cleanQualifier(qualifier))))
+  const unique = [...new Map(qualified.map(place => [`${place.latitude}:${place.longitude}`, place])).values()]
+  // Reuse a confirmed identity only after independently checking Open-Meteo,
+  // never merely because a bare name equals the selected city's label.
+  const confirmed = input.context && normalized(input.context.city) === normalized(requestedCity)
+    ? unique.find(place => Math.abs(place.latitude - input.context!.latitude) < 0.001 && Math.abs(place.longitude - input.context!.longitude) < 0.001) : undefined
+  if (!matches.length) return null
+  if (unique.length !== 1 && !confirmed) {
+    return { ambiguous: true, name: namePart, options: (unique.length ? unique : matches).slice(0, 3).map(place => [place.admin1, place.country].filter(Boolean).join(', ')).filter(Boolean) }
   }
-  const place = ranked[0].place
-  if (!place || typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return null
+  const place = confirmed ?? unique[0]
   return { name: place.name, latitude: place.latitude, longitude: place.longitude, timezone: typeof place.timezone === 'string' ? place.timezone : 'UTC' }
 }
 
@@ -267,7 +267,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
     placeInput = input.context && !input.quickAction ? { ...input, city: input.context.city, latitude: input.context.latitude, longitude: input.context.longitude } : input
     const qualifiedReply = turn.continuation && input.pendingClarification?.missing === 'location' && understood.requestedCity?.includes(',')
-    const evidence = input.quickAction ? [] : collectLocationCandidates(userMessage, input.lang).filter(candidate => !qualifiedReply || candidate.strength !== 'name')
+    const rawEvidence = input.quickAction ? [] : collectLocationCandidates(userMessage, input.lang)
+    const evidence = Object.assign(rawEvidence.filter(candidate => !qualifiedReply || candidate.strength !== 'name'), { overflow: 'overflow' in rawEvidence && rawEvidence.overflow === true })
     const grounded = await groundLocation(evidence, understood.requestedCity, ai?.citySource === 'explicit', resolve).catch(error => {
       console.info('[weather-chat:location]', { requestId, interpreter: decisionSource, evidence: 'unavailable', candidates: evidence.length, resolution: 'blocked' })
       throw error
