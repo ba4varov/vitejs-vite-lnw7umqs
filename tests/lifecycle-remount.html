@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="UTF-8"></head><body><div id="root"></div>
+<script type="module">
+// Deliberately remount the real App for classification validation. Test-only:
+// this HTML is not an application entrypoint and is absent from dist.
+import {createElement,StrictMode} from 'react'
+import {createRoot} from 'react-dom/client'
+import App from '/src/App.tsx'
+import {startupLifecycle} from '/src/startup-timing.js'
+const root=createRoot(document.getElementById('root'))
+startupLifecycle.record('root:create')
+let generation=0
+window.remountFixture=()=>root.render(createElement(StrictMode,null,createElement(App,{key:++generation})))
+window.remountFixture()
+</script></body></html>

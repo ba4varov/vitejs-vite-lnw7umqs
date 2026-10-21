@@ -1,5 +1,5 @@
 import type { ConversationContext, PendingClarification } from '../server/weather-chat-core.js'
-import { startupTiming } from './startup-timing.js'
+import { startupTiming, startupLifecycle } from './startup-timing.js'
 import { createInitialLocation } from './initial-location.js'
 import { createForecastRequests, enrichForecast } from './forecast-sources.js'
 import { formatAqiValue } from './aqi-display.js'
@@ -291,6 +291,22 @@ const WeatherApp = () => {
   const validLocationRef = useRef(weatherCoords)
   validLocationRef.current = weatherCoords
   const hasCurrentForecast = Boolean(weather && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon)
+  const lifecycleInstanceRef = useRef<number | null>(null)
+  const lifecycleViewRef = useRef('')
+  useEffect(() => {
+    if (!startupLifecycle.enabled) return
+    lifecycleInstanceRef.current ??= startupLifecycle.instance()
+    startupLifecycle.record('app:setup', { instance: lifecycleInstanceRef.current })
+    return () => startupLifecycle.record('app:cleanup', { instance: lifecycleInstanceRef.current })
+  }, [])
+  useEffect(() => {
+    if (!startupLifecycle.enabled) return
+    const view = hasCurrentForecast ? 'forecast' : !initialLocationReady ? 'initial-location' : error && !loading ? 'error' : 'forecast-loading'
+    const signature = `${view}:${initialLocationReady}:${locationSource}`
+    if (signature === lifecycleViewRef.current) return
+    lifecycleViewRef.current = signature
+    startupLifecycle.record('app:view', { instance: lifecycleInstanceRef.current, view, ready: initialLocationReady, hasForecast: hasCurrentForecast, source: locationSource })
+  }, [initialLocationReady, hasCurrentForecast, error, loading, locationSource])
   const marineMissing = currentSources?.marineStatus === 'loading' ? tLoading(lang) : translations[lang].noSeaData
   const aqiMissing = currentSources?.aqiStatus === 'loading' ? tLoading(lang) : translations[lang].aqiNoData
   const [places, setPlaces] = useState<Place[]>([])
@@ -469,6 +485,7 @@ const WeatherApp = () => {
 
   useEffect(() => { const unsubscribe = subscribeSession(active => {
     const { accountChanged, ticket } = placesGuardRef.current.changeSession(active?.user.id || null)
+    startupLifecycle.record('session:observed', { authenticated: Boolean(active), accountChanged })
     setSession(active)
     if (!accountChanged && active) return
     setPlacesError(null); setPlacesBusy(false)
@@ -924,6 +941,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         setPlaceDetails({ region: selection.region, country: selection.country })
         updateCoords({ lat: selection.lat, lon: selection.lon })
       }
+      startupLifecycle.record('location:decision', { source: selection.source })
       setInitialLocationReady(true)
     })
     return () => { active = false }

@@ -1,5 +1,7 @@
+import { installStartupLifecycle, createStartupLifecycle } from './startup-lifecycle.js'
 // Opt-in, page-lifetime diagnostics. Only fixed phase names and elapsed numbers;
-// no URLs, coordinates, city names, response bodies, storage, or telemetry.
+// no URLs, coordinates, city names, response bodies, or telemetry.
+// The separate opt-in lifecycle journal uses bounded sessionStorage across reloads.
 const phases = new Set(['module', 'react', 'permission:start', 'permission:end', 'gps:start', 'gps:end', 'default:start', 'default:end', 'location:ready', 'reverse:start', 'reverse:end', 'weather:start', 'weather:response', 'weather:parsed', 'weather:processed', 'weather:error', 'card:commit', 'card:paint', 'marine:end', 'aqi:end'])
 export function createStartupTiming(enabled, now = () => performance.now()) {
   const events = []
@@ -17,3 +19,5 @@ if (typeof window !== 'undefined' && new URLSearchParams(location.search).get('s
   Object.defineProperty(window, 'meteoStartupTiming', { value: () => startupTiming.snapshot(), configurable: true })
 }
 startupTiming.mark('module')
+
+export const startupLifecycle = typeof window === 'undefined' ? createStartupLifecycle(false) : installStartupLifecycle(window, startupTiming.enabled)
