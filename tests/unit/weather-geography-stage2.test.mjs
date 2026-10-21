@@ -44,9 +44,9 @@ for(const lang of ['bg','en']) {
   const text=bg?`Ще вали ли утре в ${small.name}${comma?',':''} област ${small.admin1}?`:`Will it rain tomorrow in ${small.name}${comma?',':''} state ${small.admin1}?`
   coordinates(await install(t,lang,null,'explicit',true)(text),small)
  })
- test(`selected same-name coordinates do not short circuit geocoding ${lang}`,async t=>{
+ test(`selected same-name coordinates retain the selected identity ${lang}`,async t=>{
   const result=await install(t,lang,large.name)(bg?'Ще вали ли утре в Баня?':'Will it rain tomorrow in Springfield?',{city:large.name,latitude:small.latitude,longitude:small.longitude})
-  clarifies(result);assert.ok(result.calls.some(url=>url.hostname.startsWith('geocoding-')))
+  coordinates(result,small);assert.ok(result.calls.every(url=>!url.hostname.startsWith('geocoding-')))
  })
  test(`confirmed same-name context stays at verified coordinates ${lang}`,async t=>{
   const run=install(t,lang,small.name)
