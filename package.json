@@ -13,6 +13,7 @@
     "test:forecast:browser": "playwright test --config=playwright.forecast-cards.config.ts",
     "test:admin:browser": "playwright test",
     "test:admin:sql": "node scripts/test-admin-sql.mjs",
+    "test:service-role:sql": "node scripts/test-service-role-privileges.mjs",
     "typecheck": "tsc -b",
     "test:signup:browser": "playwright test --config=playwright.signup.config.ts",
     "test:signup:sql": "node scripts/test-signup-activity-sql.mjs",
