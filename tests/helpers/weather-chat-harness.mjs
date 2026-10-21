@@ -25,6 +25,7 @@ async function invoke(t, message, lang, extra = {}, weatherPayload = forecast, n
   const calls = []
   t.mock.method(globalThis, 'fetch', async url => {
     const parsed = new URL(url); calls.push(parsed)
+    assert.ok(new Set(['geocoding-api.open-meteo.com', 'api.open-meteo.com', 'archive-api.open-meteo.com', 'air-quality-api.open-meteo.com', 'marine-api.open-meteo.com']).has(parsed.hostname), `fixture-contract: unexpected upstream ${parsed.hostname}`)
     let payload = weatherPayload
     if (parsed.hostname.startsWith('geocoding-')) {
       const query = parsed.searchParams.get('name')

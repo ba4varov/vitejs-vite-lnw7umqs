@@ -7,45 +7,48 @@ import { pathToFileURL } from 'node:url'
 import { geminiClient } from '../server/gemini-client.js'
 import { invoke, forecast } from '../tests/helpers/weather-chat-harness.mjs'
 import { efficiencyCorpus } from '../tests/helpers/gemini-efficiency-corpus.mjs'
-import { semanticFixture } from '../tests/helpers/bobi-language-corpus.mjs'
+import { geminiResponse, efficiencySemantic, efficiencyExpected, checkOutcome } from '../tests/helpers/bobi-regression.mjs'
+import { parseSemanticUnderstanding } from '../server/weather-chat-semantics.js'
 
 if (!process.argv[2]) throw new Error('Usage: node scripts/compare-bobi-gemini-usage.mjs <baseline-directory>')
 const baselineUrl = pathToFileURL(resolve(process.argv[2]) + '/').href
 const { invoke: beforeInvoke } = await import(new URL('tests/helpers/weather-chat-harness.mjs', baselineUrl))
 const { geminiClient: beforeGemini } = await import(new URL('server/gemini-client.js', baselineUrl))
-const totals = { scenarios: 0, beforeCalls: 0, afterCalls: 0, regressions: 0, categories: {} }
-let minute = 0
-for (const item of efficiencyCorpus()) test(`${item.lang}/${item.category}/${minute++}`, async t => {
-  const oldKey = process.env.GEMINI_API_KEY
-  process.env.GEMINI_API_KEY = 'offline-fixture'
-  t.after(() => { if (oldKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldKey })
-  t.mock.method(console, 'info', () => {})
-  let beforeCalls = 0, afterCalls = 0
-  const oracle = async () => ({ payload: { candidates: [{ content: { parts: [{ text: JSON.stringify(semanticFixture({ intent: item.intent, requestedCity: item.citySource === 'context' ? null : item.place.name, citySource: item.citySource ?? 'explicit', timeScope: item.timeScope, targetDate: item.timeScope === 'specific_date' ? item.targetDate : null, timeSource: item.timeSource ?? 'explicit', turnType: item.context ? 'follow_up' : 'new_question' })) }] } }] } })
-  t.mock.method(beforeGemini, 'generate', () => { beforeCalls++; return oracle() })
-  t.mock.method(geminiClient, 'generate', () => { afterCalls++; return oracle() })
-  const dateNow = new Date(Date.parse('2026-10-08T00:00:00Z') + totals.scenarios * 60000).toISOString()
-  const args = [t, item.message, item.lang, item.context ? { context: item.context } : {}, forecast, dateNow, [item.place]]
-  const before = await beforeInvoke(...args), after = await invoke(...args)
-  for (const result of [before, after]) {
-    try {
-      assert.equal(result.body.needsClarification, false)
-      assert.equal(result.body.intent, item.intent)
-      assert.equal(result.body.targetDate, item.targetDate)
-      const weather = result.calls.filter(url => !url.hostname.startsWith('geocoding-'))
-      assert.ok(weather.some(url => url.hostname === 'api.open-meteo.com'))
-      for (const url of weather) {
-        assert.equal(Number(url.searchParams.get('latitude')), item.place.latitude)
-        assert.equal(Number(url.searchParams.get('longitude')), item.place.longitude)
+const totals = { scenarios: 0, beforeCalls: 0, afterCalls: 0, failures: [], categories: {} }
+let sequence = 0
+for (const item of efficiencyCorpus()) {
+  const index = sequence++
+  test(`${item.lang}/${item.category}/${index}`, async t => {
+    const oldKey = process.env.GEMINI_API_KEY
+    process.env.GEMINI_API_KEY = 'offline-fixture'
+    t.after(() => { if (oldKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = oldKey })
+    t.mock.method(console, 'info', () => {})
+    const semantic = efficiencySemantic(item)
+    assert.ok(parseSemanticUnderstanding(semantic, item.lang), 'fixture-contract: invalid semantic fixture')
+    const counts = { before: 0, after: 0 }
+    t.mock.method(beforeGemini, 'generate', async () => { counts.before++; return geminiResponse(semantic) })
+    t.mock.method(geminiClient, 'generate', async () => { counts.after++; return geminiResponse(semantic) })
+    const dateNow = new Date(Date.parse('2026-10-08T09:00:00Z') + index * 60000).toISOString()
+    const failures = []
+    for (const [side, run] of [['before', beforeInvoke], ['after', invoke]]) {
+      try {
+        // Fresh copies prevent one implementation from mutating the other's inputs.
+        const result = await run(t, item.message, item.lang, structuredClone(item.context ? { context: item.context } : {}), structuredClone(forecast), dateNow, structuredClone([item.place]))
+        checkOutcome(result, efficiencyExpected(item))
+        assert.equal(counts[side], side === 'before' ? 1 : item.local ? 0 : 1, 'Gemini route')
+      } catch (error) {
+        failures.push({ side, index, lang: item.lang, category: item.category, message: item.message, error: error.message })
       }
-    } catch (error) { totals.regressions++; throw error }
-  }
-  assert.equal(afterCalls, item.local ? 0 : 1)
-  totals.scenarios++; totals.beforeCalls += beforeCalls; totals.afterCalls += afterCalls
-  const category = totals.categories[item.category] ??= { scenarios: 0, beforeCalls: 0, afterCalls: 0 }
-  category.scenarios++; category.beforeCalls += beforeCalls; category.afterCalls += afterCalls
-})
+    }
+    // Count attempted cases and calls even when either implementation failed.
+    totals.scenarios++; totals.beforeCalls += counts.before; totals.afterCalls += counts.after
+    totals.failures.push(...failures)
+    const category = totals.categories[item.category] ??= { scenarios: 0, beforeCalls: 0, afterCalls: 0, failures: 0 }
+    category.scenarios++; category.beforeCalls += counts.before; category.afterCalls += counts.after; category.failures += failures.length
+    assert.equal(failures.length, 0, JSON.stringify(failures))
+  })
+}
 test.after(() => {
-  const percentSaved = Math.round(1000 * (totals.beforeCalls - totals.afterCalls) / totals.beforeCalls) / 10
+  const percentSaved = totals.beforeCalls ? Math.round(1000 * (totals.beforeCalls - totals.afterCalls) / totals.beforeCalls) / 10 : null
   console.log(JSON.stringify({ ...totals, percentSaved }))
 })
