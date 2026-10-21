@@ -7,7 +7,7 @@ import type { ValidChatInput, Understanding, RelativeTimeScope, WeatherSummary, 
 import { deterministicWeatherAnswer, extractRequestedDate, findDailyForecast, localIsoDate, clarificationTurn, parseUnderstanding, relativeForecastDate, unrelatedWeatherAnswer, validateChatInput, weekendForecastDates, zipForecastHours } from '../server/weather-chat-core.js'
 import { geminiClient } from '../server/gemini-client.js'
 import { semanticSchema, semanticSystem, semanticInput, parseSemanticUnderstanding, resolveSemanticTurn } from '../server/weather-chat-semantics.js'
-import { collectLocationCandidates, groundLocation } from '../server/weather-location-evidence.js'
+import { collectLocationCandidates, groundLocation, normalizePlaceName } from '../server/weather-location-evidence.js'
 import type { SemanticUnderstanding } from '../server/weather-chat-semantics.js'
 
 type ChatInput = ValidChatInput
@@ -97,6 +97,12 @@ type Place = { name: string; latitude: number; longitude: number; timezone: stri
 type AmbiguousPlace = { ambiguous: true; name: string; options: string[] }
 async function resolvePlace(input: ChatInput, requestedCity: string | null): Promise<Place | AmbiguousPlace | null> {
   if (!requestedCity) return { name: input.city, latitude: input.latitude, longitude: input.longitude, timezone: null }
+  // A selected place and a successful conversation context already carry an
+  // identity (name + coordinates). Repeating that exact label keeps the identity;
+  // it is not a new, bare-name search. Qualifiers and other names still geocode.
+  const confirmed = [input, input.context].find(place => place &&
+    normalizePlaceName(place.city) === normalizePlaceName(requestedCity))
+  if (confirmed) return { name: confirmed.city, latitude: confirmed.latitude, longitude: confirmed.longitude, timezone: null }
   const queryName = requestedCity.split(',')[0].replace(/^(?:село|град)\s+/iu, '').trim()
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(queryName)}&count=10&language=${/\p{Script=Cyrillic}/u.test(queryName) ? 'bg' : 'en'}&format=json`
   let response: Response
@@ -114,15 +120,11 @@ async function resolvePlace(input: ChatInput, requestedCity: string | null): Pro
   const qualified = matches.filter(place => qualifiers.every(qualifier =>
     [place.country, place.country_code, place.admin1, place.admin2].some(value => cleanQualifier(String(value ?? '')) === cleanQualifier(qualifier))))
   const unique = [...new Map(qualified.map(place => [`${place.latitude}:${place.longitude}`, place])).values()]
-  // Reuse a confirmed identity only after independently checking Open-Meteo,
-  // never merely because a bare name equals the selected city's label.
-  const confirmed = input.context && normalized(input.context.city) === normalized(requestedCity)
-    ? unique.find(place => Math.abs(place.latitude - input.context!.latitude) < 0.001 && Math.abs(place.longitude - input.context!.longitude) < 0.001) : undefined
   if (!matches.length) return null
-  if (unique.length !== 1 && !confirmed) {
+  if (unique.length !== 1) {
     return { ambiguous: true, name: namePart, options: (unique.length ? unique : matches).slice(0, 3).map(place => [place.admin1, place.country].filter(Boolean).join(', ')).filter(Boolean) }
   }
-  const place = confirmed ?? unique[0]
+  const place = unique[0]
   return { name: place.name, latitude: place.latitude, longitude: place.longitude, timezone: typeof place.timezone === 'string' ? place.timezone : 'UTC' }
 }
 
@@ -225,7 +227,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const cache = new Map<string, Promise<Place | AmbiguousPlace | null>>()
     const resolve = (name: string) => {
       const key = name.toLocaleLowerCase()
-      if (!cache.has(key)) cache.set(key, resolvePlace(placeInput, name))
+      if (!cache.has(key)) cache.set(key, resolvePlace(input, name))
       return cache.get(key)!
     }
     let route = localRoute(input)

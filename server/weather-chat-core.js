@@ -229,7 +229,7 @@ export function extractRequestedCity(message, _lang = 'bg') {
   ]
   const candidates = patterns.flatMap(pattern => [...cleaned.matchAll(pattern)].map(match => match[1]
     .replace(/,\s*(?:докато|когато|а|но|when|while)(?=\s|$).*$/iu, '')
-    .replace(/\s+(?:какво|каква|какъв|ще|е|бъде|времето|прогнозата).*$/iu, '').trim())).filter(candidate => !weekdayOnly(candidate))
+    .replace(/\s+(?:какво|каква|какъв|ще|е|бъде|времето|прогнозата)(?=\s|$).*$/iu, '').trim())).filter(candidate => !weekdayOnly(candidate))
   if (candidates.length) {
     const candidate = candidates.at(-1)
     if (!candidate.split(/\s+/u).every(word => PROTECTED_LOCATION.has(normalizeQuestion(word).replace(/[.,]/g, '')))) return candidate
