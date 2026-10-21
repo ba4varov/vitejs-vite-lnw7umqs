@@ -17,7 +17,8 @@ export function oneEditApart(a, b) {
 export function collectLocationCandidates(message, lang = 'bg') {
   const candidates = [], seen = new Set()
   const add = (text, strength, anchored = strength !== 'name') => {
-    if (!text || text.length > 100 || candidates.length >= 3) return
+    if (!text || text.length > 100) return
+    text = text.replace(/\s+(?:област|обл\.?|region|province|state)\s+(.+)$/iu, ', $1')
     const key = normalizePlaceName(text)
     if (!key || seen.has(key)) return
     seen.add(key); candidates.push({ text, strength, anchored })
@@ -49,7 +50,53 @@ export function collectLocationCandidates(message, lang = 'bg') {
     if (match.index === 0 && words.length === 1 && !extractTimeScope(message.slice(name.length).trim().split(/\s/u)[0] ?? '')) continue
     add(name, 'name')
   }
-  return candidates
+  // A route supplies a destination; its origin is evidence, not the forecast
+  // target. Comparisons/disjunctions keep every place eligible for clarification.
+  const comparison = /(?<!\p{L})(?:или|между|сравни|сравнение|or|between|compare)(?!\p{L})/iu.test(message)
+  // Names in a list need not be capitalized. Discover each slot before applying
+  // the probe budget, including comma-separated places before a final 'or'.
+  const list = message.match(/(?<!\p{L})(?:във|в|in|at|near|между|between|сравни|compare)\s+(.+)/iu)?.[1]
+  if (comparison && list) for (const slot of list.split(/\s*(?:,|(?<!\p{L})(?:или|и|or|and)(?!\p{L}))\s*/iu)) {
+    const name = extractRequestedCity(`in ${slot}`, lang)
+    if (name && parseDeterministicQuestion(name, lang)?.intent === 'unrelated') add(name, 'syntax', true)
+  }
+  const route = message.match(/(?<!\p{L})(?:от|from)\s+(.+?)\s+(?:до|към|to|towards?)\s+(.+)/iu)
+  if (route && !comparison) {
+    const origin = extractRequestedCity(`in ${route[1]}`, lang)
+    const destination = extractRequestedCity(`in ${route[2]}`, lang)
+    if (origin && destination) {
+      add(origin, 'syntax', true); add(destination, 'syntax', true)
+      for (const candidate of candidates) {
+        if (normalizePlaceName(candidate.text) === normalizePlaceName(origin)) candidate.role = 'origin'
+        if (normalizePlaceName(candidate.text) === normalizePlaceName(destination)) candidate.role = 'destination'
+      }
+    }
+  }
+  // Attach raw comma-qualified region/country evidence even if AI drops it.
+  // Proper-name tokens inside the qualifier are not additional destinations.
+  for (const candidate of candidates.slice()) {
+    const escaped = candidate.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const qualified = message.match(new RegExp(`${escaped},\\s*((?:(?:област|обл\\.?|region|province|state)\\s+)?[\\p{Lu}][\\p{L}'’.-]*(?:\\s+[\\p{Lu}][\\p{L}'’.-]*){0,3})`, 'u'))
+    if (!qualified) continue
+    const qualifier = qualified[1]
+    if (/^(?:как|какво|каква|какъв|колко|дали|кога|къде|ще|what|how|when|where|whether|will|would|should|can|could|is|are)(?:\s|$)/iu.test(qualifier)) continue
+    candidate.text += `, ${qualifier}`
+    for (let index = candidates.length - 1; index >= 0; index--) {
+      if (candidates[index] !== candidate && normalizePlaceName(qualifier).includes(normalizePlaceName(candidates[index].text))) candidates.splice(index, 1)
+    }
+  }
+  for (const qualified of candidates.slice().filter(candidate => candidate.text.includes(','))) {
+    const qualifier = normalizePlaceName(qualified.text.split(',').slice(1).join(' '))
+    for (let index = candidates.length - 1; index >= 0; index--) {
+      if (candidates[index] !== qualified && (normalizePlaceName(candidates[index].text) === qualifier || candidates[index].strength === 'name' && normalizePlaceName(candidates[index].text) === normalizePlaceName(qualified.text.split(',')[0]))) candidates.splice(index, 1)
+    }
+  }
+  for (const candidate of candidates) if (comparison) candidate.role = 'comparison'
+  // Keep the three parallel probes budget, but fail closed when evidence was
+  // truncated. An omitted fourth place must never authorize the first one.
+  const bounded = candidates.slice(0, 3)
+  if (candidates.length > bounded.length || list && list.split(',').length > 3) bounded.overflow = true
+  return bounded
 }
 
 // This verifies location evidence only; it never changes the weather intent or
@@ -57,7 +104,16 @@ export function collectLocationCandidates(message, lang = 'bg') {
 const samePlace = (a, b) => a && b && !('ambiguous' in a) && !('ambiguous' in b) && a.latitude === b.latitude && a.longitude === b.longitude
 
 export async function groundLocation(candidates, requestedCity, explicitAI, resolve) {
+  if (candidates.overflow) return { status: 'ambiguous', requestedCity: null, candidates: candidates.length }
+  candidates = candidates.filter(candidate => candidate.role !== 'origin')
   if (!candidates.length) return { status: 'none', candidates: 0 }
+  // The explicit destination is grounded independently of the interpreter's
+  // citySource. A stale AI origin/context cannot redirect this route.
+  const destination = candidates.find(candidate => candidate.role === 'destination')
+  if (destination) { requestedCity = destination.text; explicitAI = true }
+
+  const qualifiedCandidate = candidates.find(candidate => candidate.text.includes(',') && candidate.anchored)
+  if (qualifiedCandidate) { requestedCity = qualifiedCandidate.text; explicitAI = true }
   const sameCandidate = requestedCity && candidates.find(candidate => normalizePlaceName(candidate.text) === normalizePlaceName(requestedCity))
   const anchored = requestedCity && candidates.some(candidate => {
     const raw = normalizePlaceName(candidate.text), canonical = normalizePlaceName(requestedCity.split(',')[0])
@@ -72,9 +128,10 @@ export async function groundLocation(candidates, requestedCity, explicitAI, reso
   const places = [...unique.values()]
   const strong = candidates.filter(candidate => candidate.strength !== 'name')
   const sameQuery = sameCandidate && probes.find(({ candidate }) => candidate === sameCandidate)
+  if (candidates.some(candidate => candidate.role === 'comparison') && candidates.length > 1) return { status: 'ambiguous', requestedCity: null, candidates: candidates.length }
   // A qualified semantic place must be checked as a whole. A popular result
   // for the bare name cannot erase an explicitly specified region/country.
-  if (explicitAI && requestedCity?.includes(',') && anchored && !sameQuery) {
+  if (explicitAI && requestedCity?.includes(',') && anchored && !sameQuery && !candidates.some(candidate => candidate.role === 'comparison')) {
     const qualified = aiPlace
     if (qualified && !('ambiguous' in qualified)) return { status: 'verified', place: qualified, candidates: candidates.length }
     return { status: qualified ? 'ambiguous' : 'unverified', requestedCity, candidates: candidates.length }

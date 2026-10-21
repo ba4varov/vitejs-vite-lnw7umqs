@@ -35,4 +35,4 @@ export function locationCorpus() {
     return { lang, place, message, variation }
   })))
 }
-export const geoFixtures = lang => locationFixtures[lang].map(place => ({ ...place, timezone: 'Europe/Sofia', country: lang === 'bg' ? 'Bulgaria' : 'Fixture country', population: 100000 }))
+export const geoFixtures = lang => [...locationFixtures[lang], { name: lang === 'bg' ? 'София' : 'Sofia', latitude: 42.7, longitude: 23.3 }].map(place => ({ ...place, timezone: 'Europe/Sofia', country: lang === 'bg' ? 'Bulgaria' : 'Fixture country', population: 100000 }))
