@@ -5,10 +5,44 @@ service_role on public.favorite_places, public.place_settings and
 public.gemini_project_quota. It does not change CRUD or column grants, RLS,
 RPC definitions/EXECUTE, existing foreign keys, triggers or default privileges.
 
+## Production record — 2026-10-21
+
+The operator confirmed that
+`supabase/migrations/20261021130000_service_role_table_privileges.sql`
+from [PR #112](https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/112)
+was successfully applied manually to the production database on 21 October 2026.
+
+| Confirmed check | Result |
+| --- | --- |
+| Production PostgreSQL | 17.6 |
+| TRUNCATE, REFERENCES, TRIGGER, MAINTAIN for service_role on each of the three target tables | All 12 results are false |
+| Favorite cities | Working |
+| Administration panel | Working |
+| Chatbot | Working after the separate fix in [PR #113](https://github.com/ba4varov/vitejs-vite-lnw7umqs/pull/113) |
+
+These are operator-reported production results, not checks rerun by this
+documentation update. The chatbot fix is separate from the privilege migration;
+its recovery must not be attributed to PR #112. The report does not establish
+that every preflight/staging check below was performed or that every earlier
+migration was applied.
+
+`supabase_migrations.schema_migrations` does **not exist** in production.
+Manual application succeeded without a Supabase CLI tracking entry. Do not
+reapply the migration to populate history, create the history table manually,
+or mark all repository migrations as applied. The absence of tracking does not
+mean that the database changes are absent. Record future operator actions in
+reviewed deployment notes until a tracking process is approved.
+
+See the [proposed Supabase CLI tracking adoption plan](supabase-migration-tracking.md).
+It requires reconciliation of every previous migration before any production
+tracking write. This documentation PR executes no SQL, creates no migration
+history and changes no production database state.
+
 ## Compatibility and prerequisites
 
 Existing SQL runners use postgres:17-bookworm. supabase/config.toml does not
-pin a database major version. Production version has NOT been queried or verified.
+pin a database major version. Production PostgreSQL 17.6 was confirmed by the
+operator on 2026-10-21; validate the version separately for any other environment.
 MAINTAIN requires PostgreSQL 17+. The migration explicitly aborts below 17.
 Do not silently omit MAINTAIN on an older server: stop and reassess the baseline.
 
@@ -80,7 +114,11 @@ this migration or test service-role quota HTTP. Staging still needs real JWT
 places/admin checks, service-role quota HTTP, concurrent reservations and the
 AI quota-unavailable fallback. Do not reset production quota to test rollover.
 
-## Apply after review and staging
+## Manual application reference for other environments
+
+Production application is complete as recorded above. These instructions are
+retained for other environments or an explicitly reviewed future operation;
+they are not instructions to rerun the production migration.
 
 1. Complete the preflight above and all staging checks. Save ACL/column grants
    and effective privileges before the change. Keep the rollback file available.
@@ -89,7 +127,8 @@ AI quota-unavailable fallback. Do not reset production quota to test rollover.
    `psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261021130000_service_role_table_privileges.sql`
    with the intended connection configured securely outside the command.
    Do not run a blanket db push that could apply unrelated pending migrations.
-   Record migration history using the established project procedure.
+   Record the action in deployment notes. Production has no CLI history table;
+   do not create or repair tracking as part of applying this file.
 3. The file supplies BEGIN/COMMIT and a 5-second lock timeout. A failure rolls
    back the transaction; investigate contention rather than increasing scope.
 4. Re-run the privilege query: all 12 Dxtm results must be false; CRUD and column
@@ -108,13 +147,18 @@ Only for the verified Dxtm/postgres baseline, run as postgres:
 
 This grants exactly the original four rights, without ALL or grant options.
 It changes no data. Recheck ACL/effective rights and the failed feature; record
-the rollback in migration history according to the existing process. For a
+the rollback in deployment notes, including its effect on any future tracking
+reconciliation. Do not create or edit CLI history under this runbook. For a
 baseline different from Dxtm/postgres, use its recorded grants instead of this
 rollback. Never put the rollback in the forward migrations directory.
 
-No production SQL, deployment or merge is performed by this PR.
+This documentation update performs no production SQL, deployment or merge.
+The earlier manual production application is recorded above.
 
-## Recorded validation for this change
+## Historical validation recorded in PR #112
+
+The following results predate this documentation update and were not rerun here.
+The local PostgreSQL version below is distinct from production PostgreSQL 17.6.
 
 - npm run test:service-role:sql: PASS on PostgreSQL 17.11.
 - npm run test:admin:sql: PASS, including real local PostgREST/JWT checks.
