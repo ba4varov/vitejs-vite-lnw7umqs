@@ -1,5 +1,7 @@
 import { startupTiming } from './startup-timing.js'
-export const INITIAL_LOCATION_TIMEOUT = 4500
+// The startup election has a one-second responsiveness budget. Slow/late GPS
+// cannot hold the first forecast; explicit GPS remains available afterwards.
+export const INITIAL_LOCATION_TIMEOUT = 1000
 
 // One bounded startup election, shared by StrictMode's effect rehearsal.
 // Default-place resolution and permission/GPS run concurrently; a known default

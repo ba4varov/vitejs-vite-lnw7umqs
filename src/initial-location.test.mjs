@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createInitialLocation } from './initial-location.js'
+import { createInitialLocation, INITIAL_LOCATION_TIMEOUT } from './initial-location.js'
 const flush = () => new Promise(resolve => setImmediate(resolve))
 const deferred = () => { let resolve; const promise=new Promise(done=>{resolve=done});return {promise,resolve} }
 function setup(state='granted',extras={}) {
@@ -44,4 +44,12 @@ test('GPS coordinates release election immediately without reverse geocoding',as
 })
 test('invalid GPS coordinates never become a forecast location',async()=>{
  const s=setup();const result=s.chooser.start();await flush();s.callbacks[0].success({coords:{latitude:NaN,longitude:27}});assert.deepEqual(await result,{source:'fallback'})
+})
+
+test('startup responsiveness deadline is one second and never waits for a late GPS', async () => {
+ let release, delay
+ const chooser=createInitialLocation({navigator:{permissions:{query:()=>new Promise(()=>{})}},schedule:(callback,ms)=>{release=callback;delay=ms},cancel:()=>{}})
+ const result=chooser.start()
+ assert.equal(INITIAL_LOCATION_TIMEOUT,1000);assert.equal(delay,1000)
+ release();assert.deepEqual(await result,{source:'fallback'})
 })

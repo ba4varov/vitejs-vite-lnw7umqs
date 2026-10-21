@@ -257,7 +257,9 @@ const WeatherApp = () => {
   startupTiming.mark('react')
   const initialLocationRef = useRef(createInitialLocation({ navigator }))
   const [initialLocationReady, setInitialLocationReady] = useState(false)
-  const initialGpsLabelRef = useRef<any>(null)
+  const locationRevisionRef = useRef(0)
+  const [gpsLabelGeneration, setGpsLabelGeneration] = useState(0)
+  const forecastInFlightRef = useRef<{ key: string, id: number } | null>(null)
   const initialDefaultTicketRef = useRef<any>(null)
   const explicitGpsPendingRef = useRef(false)
   const explicitGpsRef = useRef(0)
@@ -364,8 +366,15 @@ const WeatherApp = () => {
     return () => { observer.disconnect(); document.removeEventListener('visibilitychange', recordView) }
   }, [loading, Boolean(weather), forecastReady])
 
+  const updateCoords = (next: { lat: number, lon: number }) => {
+    // Invalidate older async work synchronously, before React's next commit.
+    locationKeyRef.current = `${next.lat},${next.lon}`
+    setCoords(next)
+  }
+
   const finalizeManualLocation = () => {
     initialLocationRef.current.manual()
+    locationRevisionRef.current++
     explicitGpsPendingRef.current = false
     explicitGpsRef.current++
     setGpsBusy(false)
@@ -378,7 +387,7 @@ const WeatherApp = () => {
     if (manual) { forecastIntent.current++; placesGuardRef.current.manualSelection() }
     locationChoiceRef.current = true
     setLocationSource('place')
-    setCity(place.name); setCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
+    setCity(place.name); updateCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
   }
 
   useEffect(() => {
@@ -408,9 +417,11 @@ const WeatherApp = () => {
     if (locationSource === 'geolocation') return
     const guard = currentLocalizationGuardRef.current
     const ticket = guard.begin()
+    const revision = locationRevisionRef.current
+    const key = locationKey
     const current = { name: city, lat: coords.lat, lon: coords.lon, ...placeDetails }
     void localizeCurrentLocation(current, lang, t.quickCities, localizePlace, { signal: ticket.controller.signal }).then(localized => {
-      if (!guard.isCurrent(ticket)) return
+      if (!guard.isCurrent(ticket) || revision !== locationRevisionRef.current || key !== locationKeyRef.current || lang !== langRef.current) return
       setCity(localized.name)
       setPlaceDetails(details => ({
         ...details,
@@ -634,7 +645,7 @@ const WeatherApp = () => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
     setCity(result.name)
     setPlaceDetails({ geonameId: Number(result.id), countryCode: result.country_code, admin1Id: result.admin1_id == null ? undefined : Number(result.admin1_id), region: result.admin1, country: result.country })
-    setCoords({ lat: result.latitude, lon: result.longitude })
+    updateCoords({ lat: result.latitude, lon: result.longitude })
     setSearchInput('')
     setSuggestions([])
     setSearchStatus('idle')
@@ -688,21 +699,23 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       if (requestId === weatherRequestIdRef.current) setAiAdvice(fallbackAdvice())
     }
   }
-  const fetchWeather = async (lat: number, lon: number) => {
+  const fetchWeather = async (lat: number, lon: number, quiet = false) => {
     const key = `${lat},${lon}`
+    if (forecastInFlightRef.current?.key === key) return
     const sameLocation = validLocationRef.current?.lat === lat && validLocationRef.current?.lon === lon
     if (!sameLocation) {
       setPlannerForecast(null)
       setNotificationForecast(null)
     }
     setSources(previous => previous.key === key
-      ? { ...previous, marineStatus: 'loading', aqiStatus: 'loading' }
+      ? { ...previous, marineStatus: previous.marine ? 'ready' : 'loading', aqiStatus: previous.aqi ? 'ready' : 'loading' }
       : { key, marine: null, aqi: null, marineStatus: 'loading', aqiStatus: 'loading' })
     const viewIntent = forecastIntent.current
     const requestId = ++weatherRequestIdRef.current
-    setLoading(true)
+    forecastInFlightRef.current = { key, id: requestId }
+    setLoading(!quiet || !sameLocation)
     setError(null)
-    setAiAdvice(null)
+    if (!sameLocation) setAiAdvice(null)
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
@@ -830,9 +843,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         })
       }
       startupTiming.mark('weather:processed')
-      // Freeze automatic startup labels with the first primary snapshot. A slow
-      // neighborhood lookup must neither delay weather nor rename its card later.
-      if (initialGpsLabelRef.current?.key === key) initialGpsLabelRef.current.pending = false
+      // Coordinates own the snapshot; reverse geocoding can enrich its label later.
       setWeather(nextWeather)
       setHourly(hr)
       setPlannerLocation({lat,lon})
@@ -863,11 +874,13 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
       }
 
-    } catch (e: any) {
+    } catch {
       if (requestId !== weatherRequestIdRef.current || locationKeyRef.current !== key) return
-      console.error(e);
-      setError(t.error)
+      // Upstream errors can contain request URLs. Keep coordinates out of logs.
+      setError(sameLocation ? (langRef.current === 'bg' ? 'Прогнозата не се обнови. Показваме последните валидни данни.' : 'Forecast update failed. Showing the last valid data.') : t.error)
       setLoading(false)
+    } finally {
+      if (forecastInFlightRef.current?.id === requestId) forecastInFlightRef.current = null
     }
   }
 
@@ -891,9 +904,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setSelectedDay(null)
       setSelectedHour(null)
       fetchWeather(coords.lat, coords.lon)
-      interval = setInterval(() => fetchWeather(coords.lat, coords.lon), 15 * 60 * 1000)
+      interval = setInterval(() => fetchWeather(coords.lat, coords.lon, true), 15 * 60 * 1000)
     })
-    return () => { active = false; clearInterval(interval); weatherRequestIdRef.current++; requestsRef.current.cancel() }
+    return () => { active = false; clearInterval(interval); weatherRequestIdRef.current++; forecastInFlightRef.current = null; requestsRef.current.cancel() }
   }, [initialLocationReady, coords.lat, coords.lon])
 
   useEffect(() => {
@@ -906,11 +919,10 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       }
       else if (selection.source === 'geolocation') {
         setLocationSource('geolocation')
-        initialGpsLabelRef.current = { key: `${selection.lat},${selection.lon}`, lang: langRef.current, pending: true }
         setCity(selection.name || translations[langRef.current].myLocation)
         setExactLocation(selection.exactLocation || null)
         setPlaceDetails({ region: selection.region, country: selection.country })
-        setCoords({ lat: selection.lat, lon: selection.lon })
+        updateCoords({ lat: selection.lat, lon: selection.lon })
       }
       setInitialLocationReady(true)
     })
@@ -920,6 +932,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   const useMyLocation = () => {
     if (!navigator.geolocation?.getCurrentPosition) { setGpsError(true); return }
     initialLocationRef.current.manual()
+    locationRevisionRef.current++
     explicitGpsPendingRef.current = true
     setGpsError(false)
     forecastIntent.current++
@@ -947,13 +960,15 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       const lat = position.coords.latitude, lon = position.coords.longitude
       if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lon) || Math.abs(lon) > 180) { setGpsBusy(false); setGpsError(true); return }
       locationChoiceRef.current = false
-      initialGpsLabelRef.current = null
+      setGpsLabelGeneration(generation => generation + 1)
       setGpsBusy(false)
       setLocationSource('geolocation')
-      setCity(translations[langRef.current].myLocation)
-      setPlaceDetails({})
-      setExactLocation(null)
-      setCoords({ lat, lon })
+      if (locationSource !== 'geolocation' || locationKeyRef.current !== `${lat},${lon}`) {
+        setCity(translations[langRef.current].myLocation)
+        setPlaceDetails({})
+        setExactLocation(null)
+      }
+      updateCoords({ lat, lon })
     }, fail, { timeout: 5000, maximumAge: 60000 }) } catch { fail() }
   }
 
@@ -961,12 +976,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
   useEffect(() => {
     if (locationSource !== 'geolocation') return
-    if (initialGpsLabelRef.current?.key === locationKey && initialGpsLabelRef.current.lang === lang && !initialGpsLabelRef.current.pending) return
-    if (initialGpsLabelRef.current?.lang !== lang) initialGpsLabelRef.current = null
     const controller = new AbortController()
     startupTiming.mark('reverse:start')
-    const startupLabel = initialGpsLabelRef.current
-    const labelCurrent = () => !controller.signal.aborted && !locationChoiceRef.current && (!startupLabel || startupLabel.pending)
+    const revision = locationRevisionRef.current
+    const key = locationKey
+    const labelCurrent = () => !controller.signal.aborted && !locationChoiceRef.current && revision === locationRevisionRef.current && key === locationKeyRef.current && lang === langRef.current
     void reverseGeocodeLocation(coords, lang, { signal: controller.signal }).then(data => {
       startupTiming.mark('reverse:end')
       if (!labelCurrent()) return
@@ -976,7 +990,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setExactLocation(localized.exactLocation)
     }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) setCity(t.myLocation) })
     return () => controller.abort()
-  }, [lang, coords.lat, coords.lon, locationSource])
+  }, [lang, coords.lat, coords.lon, locationSource, gpsLabelGeneration])
 
   const activeAlerts = [];
   if (weather) {
@@ -1090,7 +1104,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           return (
             <button key={c.name}
               aria-pressed={city === c.name}
-              onClick={() => { finalizeManualLocation(); forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); setCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              onClick={() => { finalizeManualLocation(); forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); updateCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -1120,15 +1134,16 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         </section>
       )}
 
-      {error && !loading && (
+      {error && !loading && !hasCurrentForecast && (
         <div className="card center-text">
-          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {t.error}</p>
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
           <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>{t.tryAgain}</button>
         </div>
       )}
 
       {hasCurrentForecast && (
         <main ref={forecastDashboardRef} className="forecast-dashboard">
+          {error && <p className="forecast-update-error" role="status">{error} <button type="button" onClick={() => fetchWeather(coords.lat, coords.lon, true)}>{t.tryAgain}</button></p>}
           {loading && <div className="forecast-refresh" role="status" aria-live="polite">↻ {t.refreshing}</div>}
           {activeAlerts.length > 0 && (
             <div className="alerts-container">

@@ -5,6 +5,10 @@ import App from './App.tsx'
 import AdminApp from './AdminApp.tsx'
 import {pushSupport,preparePushWorker} from './push-browser.js'
 
+// A full document load always starts at the top. Background data updates do
+// not run this module again and preserve the reader's scroll position.
+window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+
 // Registration alone never requests notification permission or subscribes.
 if(pushSupport()==='supported')void preparePushWorker().catch(()=>{})
 
