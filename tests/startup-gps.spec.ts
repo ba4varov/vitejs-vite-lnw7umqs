@@ -52,7 +52,7 @@ for(const width of [390,1440])for(const lang of ['bg','en'])for(const dark of [f
   const s=await setup(page,mode,lang,width,dark)
   const gpsMode=['fast','slow','late','manual','default'].includes(mode)
   if(gpsMode){await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1);expect(s.calls).toHaveLength(0);await expect(page.locator('.main-card')).toHaveCount(0)}
-  if(mode==='slow'){await page.clock.fastForward(800);expect(s.calls).toHaveLength(0)}
+  if(mode==='slow'){await page.clock.fastForward(3800);expect(s.calls).toHaveLength(0)}
   if(mode==='fast'||mode==='slow')await s.locate()
   if(mode==='manual'){await page.locator('.city-row .city-btn').nth(1).click();await s.locate()}
   if(mode==='default'){await s.locate();await page.clock.fastForward(500);expect(s.calls).toHaveLength(0);s.releaseDefault()}
@@ -73,7 +73,7 @@ for(const width of [390,1440])for(const lang of ['bg','en'])for(const dark of [f
    expect([...new Set(history.map((value:any)=>value.heading))]).toEqual([first.heading])
    expect([...new Set(history.map((value:any)=>value.background))]).toEqual([first.background])
    await page.screenshot({path:info.outputPath('gps-first-forecast.png'),fullPage:true})
-   await fs.writeFile(info.outputPath('stable-startup.json'),JSON.stringify({gpsDeliveryMs:800,additionalObservationMs:10000,first,afterLateWindow:await s.stable(),domHistory:history,calls:s.calls,images:s.images},null,2))
+   await fs.writeFile(info.outputPath('stable-startup.json'),JSON.stringify({gpsDeliveryMs:3800,additionalObservationMs:10000,first,afterLateWindow:await s.stable(),domHistory:history,calls:s.calls,images:s.images},null,2))
    await info.attach('stable-startup',{path:info.outputPath('stable-startup.json'),contentType:'application/json'})
   }
  })
@@ -176,3 +176,52 @@ for(const width of [390,1440])test(`same-coordinate explicit GPS refreshes a pen
  await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(1);s.releaseLabel()
  await expect(page.locator('.main-card h2')).toContainText('Troshevo');await expect(page.locator('.big-temp')).toHaveText('13°C');expect(s.weatherCalls()).toHaveLength(1)
 })
+
+for(const width of [390,1440]) {
+ for(const delivery of [800,2000,3800])test(`accepted automatic GPS at ${delivery} ms ${width}`,async({page})=>{
+  const s=await setup(page,'slow','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await expect(page.locator('.forecast-loading')).toBeVisible()
+  await expect(page.locator('.city-row .city-btn').nth(1)).toBeVisible()
+  await page.clock.fastForward(delivery)
+  expect(s.weatherCalls()).toHaveLength(0);await expect(page.locator('.main-card')).toHaveCount(0)
+  await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+  expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(gps.latitude))
+  const first=await s.stable();await page.clock.fastForward(5000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+  const history=await page.evaluate(()=>(window as any).forecastHistory)
+  expect([...new Set(history.map((value:any)=>value.temp))]).toEqual(['13°C'])
+ })
+ test(`preferred city wins before a 3.8 second automatic GPS ${width}`,async({page})=>{
+  const s=await setup(page,'default','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  s.releaseDefault();await expect(page.locator('.big-temp')).toHaveText('17°C')
+  const first=await s.stable();await page.clock.fastForward(3800);await s.locate();await page.clock.fastForward(1000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(sofia.latitude))
+ })
+ test(`manual choice wins over 3.8 second automatic GPS ${width}`,async({page})=>{
+  const s=await setup(page,'manual','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await page.clock.fastForward(2000);await page.locator('.city-row .city-btn').nth(1).click()
+  await expect(page.locator('.big-temp')).toHaveText('17°C');const first=await s.stable()
+  await page.clock.fastForward(1800);await s.locate();await page.clock.fastForward(1000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+ })
+ for(const mode of ['denied','missing','no-permissions'] as Mode[])test(`no deadline wait for ${mode} ${width}`,async({page})=>{
+  const s=await setup(page,mode,'en',width)
+  // The clock stays paused: fallback must render without advancing 4.5 seconds.
+  await expect(page.locator('.big-temp')).toHaveText('12°C')
+  expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
+  expect(s.weatherCalls()).toHaveLength(1)
+ })
+ test(`automatic GPS after 4500 ms cannot move the fallback ${width}`,async({page})=>{
+  const s=await setup(page,'late','en',width)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await page.clock.fastForward(4500);await expect(page.locator('.big-temp')).toHaveText('12°C')
+  await page.evaluate(()=>scrollTo({top:1800,behavior:'instant'}));await page.clock.fastForward(100)
+  const offset=await page.evaluate(()=>scrollY),first=await s.stable()
+  await s.locate();await page.clock.fastForward(1000)
+  expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1)
+  expect(Math.abs(await page.evaluate(()=>scrollY)-offset)).toBeLessThanOrEqual(2)
+ })
+}
