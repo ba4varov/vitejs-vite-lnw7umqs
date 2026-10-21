@@ -1,0 +1,66 @@
+{
+  "scenarios": 62,
+  "beforeCalls": 62,
+  "afterCalls": 32,
+  "failures": [],
+  "categories": {
+    "simple": {
+      "scenarios": 12,
+      "beforeCalls": 12,
+      "afterCalls": 0,
+      "failures": 0
+    },
+    "word_order": {
+      "scenarios": 12,
+      "beforeCalls": 12,
+      "afterCalls": 0,
+      "failures": 0
+    },
+    "natural": {
+      "scenarios": 12,
+      "beforeCalls": 12,
+      "afterCalls": 12,
+      "failures": 0
+    },
+    "typo": {
+      "scenarios": 8,
+      "beforeCalls": 8,
+      "afterCalls": 8,
+      "failures": 0
+    },
+    "context": {
+      "scenarios": 4,
+      "beforeCalls": 4,
+      "afterCalls": 0,
+      "failures": 0
+    },
+    "context_complex": {
+      "scenarios": 2,
+      "beforeCalls": 2,
+      "afterCalls": 2,
+      "failures": 0
+    },
+    "travel": {
+      "scenarios": 8,
+      "beforeCalls": 8,
+      "afterCalls": 8,
+      "failures": 0
+    },
+    "weekday": {
+      "scenarios": 2,
+      "beforeCalls": 2,
+      "afterCalls": 0,
+      "failures": 0
+    },
+    "word_order_complex": {
+      "scenarios": 2,
+      "beforeCalls": 2,
+      "afterCalls": 2,
+      "failures": 0
+    }
+  },
+  "percentSaved": 48.4,
+  "baseline": "7d89cbd437392415f71cd42ed834453ad1704666",
+  "main": "addff27618515852eb259f6a6d955022eada44bd",
+  "measurement": "offline generate invocations, not live HTTP requests"
+}

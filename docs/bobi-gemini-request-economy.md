@@ -171,3 +171,6 @@ SQL assertions: изпълнете миграцията, после `tests/sql/g
 - SQL миграцията и `tests/sql/gemini-quota.sql` — успешно в PostgreSQL/PGlite.
 - Before/after script — 62 успешни сценария, 62 → 32 AI извиквания, 0 отклонения.
 - `git diff --check` — успешно.
+
+Повторна проверка след #108: [тестова основа и известни локални дефекти](bobi-regression-foundation.md).
+62 → 32 се възпроизвежда с валиден STOP envelope; това не означава пълна точност на локалния fallback.
