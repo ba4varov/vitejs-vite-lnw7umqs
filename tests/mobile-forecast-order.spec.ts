@@ -24,7 +24,8 @@ for (const width of [320,360,390,430,640,641,768,1440]) for (const lang of ['bg'
     await expect(page.locator('.weather-chat')).toHaveCount(1)
     await expect(page.locator('.hourly-row button')).toHaveCount(24)
     await expect(page.locator('.daily-grid button')).toHaveCount(14)
-    await expect(page.locator('.weather-chat')).toHaveAccessibleName(lang === 'bg' ? /Боби/ : /Bobby/)
+    await expect(page.locator('.weather-chat')).toHaveAccessibleName(lang === 'bg' ? 'Попитай Nimbo за времето' : 'Ask Nimbo about the weather')
+    await expect(page.locator('.chat-message.bot p').first()).toHaveText(lang === 'bg' ? 'Здравей! Аз съм Nimbo. Попитай ме как да се подготвиш за времето.' : "Hi! I'm Nimbo. Ask me how to prepare for the weather.")
     await expect(page.locator('.chat-messages')).toHaveAttribute('aria-live', 'polite')
     for (const [section, row] of [['.hourly-section','.hourly-row'],['.forecast-section','.daily-grid']]) {
       const strip = page.locator(row)

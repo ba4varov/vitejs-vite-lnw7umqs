@@ -40,7 +40,7 @@ export function WeatherPlanner({lang, session, forecast, city, onSignIn}: {lang:
     <h2 id="planner-title">{bg?'Моят метео планер':'My Weather Planner'} <span className="planner-badge">Pro · Beta</span></h2>
     <details className="planner-plans"><summary><span className="planner-desktop-copy">{bg?'Планове':'Plans'}</span><span className="planner-mobile-copy">{bg?'Повече за планера и плановете':'More about the planner and plans'}</span></summary>
       {['guest','free'].includes(access) && <p className="planner-mobile-copy">{bg?'Планерът подбира удобни двучасови интервали от следващите 72 часа.':'The planner selects convenient two-hour windows in the next 72 hours.'}</p>}
-      <div className="planner-plan-grid"><div><h3>Free</h3><p>{bg?'Всички досегашни прогнози, графики, любими градове и Боби остават при същите условия, включително за гости.':'All existing forecasts, charts, favorites and Bobby remain available under the same conditions, including for guests.'}</p></div>
+      <div className="planner-plan-grid"><div><h3>Free</h3><p>{bg?'Всички досегашни прогнози, графики, любими градове и Nimbo остават при същите условия, включително за гости.':'All existing forecasts, charts, favorites and Nimbo remain available under the same conditions, including for guests.'}</p></div>
       <div><h3>Pro</h3><p>{bg?'Всичко от Free и метео планер с до три подходящи интервала за разходка, градинарство или спорт на открито.':'Everything in Free plus a weather planner with up to three suitable windows for walking, gardening or outdoor sport.'}</p></div></div>
       <p>{bg?'Pro функциите са в тестово развитие и се активират административно.':'Pro features are in testing and are activated administratively.'}</p>
     </details>

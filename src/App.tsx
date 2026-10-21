@@ -84,11 +84,11 @@ const translations = {
     pm25: 'ФПЧ 2.5 (PM2.5)',
     aqiChart: 'AQI Индекс (24 часа)',
     aqiNoData: 'Няма данни',
-    chatTitle: 'Попитай Боби за времето',
+    chatTitle: 'Попитай Nimbo за времето',
     chatSubtitle: 'Съветите се съобразяват с актуалната прогноза за избраното място.',
     chatPlaceholder: 'Напр. Да взема ли чадър?',
     chatSend: 'Изпрати',
-    chatGreeting: 'Здравей! Аз съм Боби. Попитай ме как да се подготвиш за времето.',
+    chatGreeting: 'Здравей! Аз съм Nimbo. Попитай ме как да се подготвиш за времето.',
     chatSuggestions: ['Да взема ли чадър?', 'Как да се облека?', 'Подходящо ли е за разходка?'],
     weekDays: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
     months: ['Яну', 'Фев', 'Мар', 'Апр', 'Май', 'Юни', 'Юли', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
@@ -172,11 +172,11 @@ const translations = {
     pm25: 'PM2.5',
     aqiChart: 'AQI (24 Hours)',
     aqiNoData: 'No data',
-    chatTitle: 'Ask Bobby about the weather',
+    chatTitle: 'Ask Nimbo about the weather',
     chatSubtitle: 'Advice is based on the live forecast for the selected location.',
     chatPlaceholder: 'E.g. Should I take an umbrella?',
     chatSend: 'Send',
-    chatGreeting: 'Hi! I am Bobby. Ask me how to prepare for the weather.',
+    chatGreeting: 'Hi! I\'m Nimbo. Ask me how to prepare for the weather.',
     chatSuggestions: ['Should I take an umbrella?', 'What should I wear?', 'Is it good for a walk?'],
     weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -1282,7 +1282,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
               {chatLoading && (
                 <div className="chat-message bot">
                   <span aria-hidden="true">🌤️</span>
-                  <p>{lang === 'bg' ? 'Боби мисли…' : 'Bobby is thinking…'}</p>
+                  <p>{lang === 'bg' ? 'Nimbo мисли…' : 'Nimbo is thinking…'}</p>
                 </div>
               )}
             </div>
