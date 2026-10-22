@@ -137,3 +137,7 @@ CHROMIUM_PATH=/usr/bin/chromium GPS_TEST_PORT=4193 npx playwright test --config=
 Production първопричина или обявена поправка на Redmi симптома**. Следващата
 необходима стъпка е capture на реалния телефон със същия deployment и lifecycle
 journal, без допълнителни ръчни reload-и.
+
+За capture без компютър вече е добавен opt-in панел. Вижте
+[Android diagnostic panel](android-diagnostic-panel.md) за копиране, ръчен fallback
+и ограничения. Старите console API и форматите им остават същите.

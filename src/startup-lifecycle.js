@@ -12,7 +12,7 @@ const enums = {
 }
 const booleans = ['ready','hasForecast','persisted','discarded','controlled','authenticated','accountChanged']
 const integer = value => Number.isSafeInteger(value) && value >= 0 && value <= 1000000
-function safeEntry(value) {
+export function safeEntry(value) {
  if (!value || !events.has(value.event) || !integer(value.document) || !Number.isFinite(value.ms) || value.ms < 0) return null
  const entry = {event:value.event,document:value.document,ms:Math.round(value.ms*10)/10}
  if(integer(value.instance))entry.instance=value.instance
