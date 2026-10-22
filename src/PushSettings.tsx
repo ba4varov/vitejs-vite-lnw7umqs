@@ -13,9 +13,10 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
  const [checks,setChecks]=useState<Record<string,string>>({})
  const [keyChecks,setKeyChecks]=useState<Record<string,{p256dh:string;auth:string}>>({})
+ const [keyStage,setKeyStage]=useState('')
  const renewalLock=useRef(false)
  const diagnosticEpoch=useRef(0)
- useEffect(()=>{diagnosticEpoch.current++;setChecks({});setKeyChecks({});return()=>{diagnosticEpoch.current++}},[session.user.id,session.access_token])
+ useEffect(()=>{diagnosticEpoch.current++;setChecks({});setKeyChecks({});setKeyStage('');return()=>{diagnosticEpoch.current++}},[session.user.id,session.access_token])
  const live=useRef(true)
  const apply=(d:PushSnapshot)=>{if(live.current){setData(d);setDraft(d.preferences)}}
  useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{live.current=false}},[session.user.id,session.access_token])
@@ -43,12 +44,12 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
    if(live.current&&epoch===diagnosticEpoch.current){if(result.data)apply(result.data);setMessage(pushRenewalMessages[lang][result.status])}
   }finally{renewalLock.current=false;if(live.current)setBusy(false)}
  }
- const check=async(device:PushDevice)=>{setBusy(true);setChecks({});setKeyChecks({});try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}
+ const check=async(device:PushDevice)=>{setBusy(true);setChecks({});setKeyChecks({});setKeyStage('');try{const result=await checkPushRegistration({device,key:data?.publicKey});if(live.current)setChecks({[device.id]:result})}finally{if(live.current)setBusy(false)}}
  const checkKeys=async(device:PushDevice)=>{
   const epoch=diagnosticEpoch.current
-  setBusy(true);setChecks({});setKeyChecks({})
+  setBusy(true);setChecks({});setKeyChecks({});setKeyStage('')
   try {
-   const result=await checkPushKeys({device,key:data?.publicKey,authorize:()=>pushKeySessionMatches(session),verify:(body:object)=>pushKeyRequest(session,body)})
+   const result=await checkPushKeys({device,key:data?.publicKey,authorize:()=>pushKeySessionMatches(session),verify:(body:object)=>pushKeyRequest(session,body),onDiagnostic:(stage:string)=>{if(live.current&&epoch===diagnosticEpoch.current)setKeyStage(stage)}})
    if(live.current&&epoch===diagnosticEpoch.current)setKeyChecks({[device.id]:result})
   }finally{if(live.current)setBusy(false)}
  }
@@ -95,6 +96,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
     {' '}<button type="button" disabled={busy} onClick={()=>void checkKeys(d)}>{bg?'Провери p256dh/auth':'Check p256dh/auth'}</button>
     {keyChecks[d.id]&&<p role="status">
      p256dh: {pushKeyMessages[lang][keyChecks[d.id].p256dh]}; auth: {pushKeyMessages[lang][keyChecks[d.id].auth]}.
+     {keyStage&&<span> {bg?'Диагностичен етап':'Diagnostic stage'}: <code>{keyStage}</code>.</span>}
      {' '}{bg?'Съвпадението не доказва, че FCM ще приеме известие.':'A match does not prove that FCM will accept a notification.'}
     </p>}
     {checks[d.id]&&<p role="status">{pushRegistrationMessages[lang][checks[d.id]]}</p>}

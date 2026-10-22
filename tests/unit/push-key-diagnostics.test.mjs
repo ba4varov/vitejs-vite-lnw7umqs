@@ -52,18 +52,75 @@ async function api({body=proofBody,authStatus=200,rpc={p256dh:'match',auth:'mism
  return {res,calls}
 }
 test('API authenticates before RPC and passes only proofs using user JWT',async()=>{
- const {res,calls}=await api();assert.equal(res.code,200);assert.deepEqual(res.data,{keys:{p256dh:'match',auth:'mismatch'}});assert.equal(calls.length,2);assert.equal(calls[1].o.headers.Authorization,'Bearer synthetic-token');assert.match(calls[1].url,/\/rpc\/check_my_push_keys$/);assert.equal(res.headers['Cache-Control'],'private, no-store');assert.equal(res.headers.Vary,'Authorization')
+ const {res,calls}=await api();assert.equal(res.code,200);assert.deepEqual(res.data,{keys:{p256dh:'match',auth:'mismatch'},diagnostic:'rpc:complete'});assert.equal(calls.length,2);assert.equal(calls[1].o.headers.Authorization,'Bearer synthetic-token');assert.match(calls[1].url,/\/rpc\/check_my_push_keys$/);assert.equal(res.headers['Cache-Control'],'private, no-store');assert.equal(res.headers.Vary,'Authorization')
 })
 test('invalid/expired/missing session never reaches SQL RPC',async()=>{
  for(const authorization of [null,'Bearer expired']){const {res,calls}=await api({authorization,authStatus:401});assert.equal(res.code,401);assert.ok(calls.length<=1)}
 })
 test('foreign or stale device result stays unavailable without exposing identifiers',async()=>{
- const {res}=await api({rpc:unavailable});assert.deepEqual(res.data,{keys:unavailable});assert.ok(!JSON.stringify(res.data).includes(id))
+ const {res}=await api({rpc:unavailable});assert.deepEqual(res.data,{keys:unavailable,diagnostic:'rpc:result-unavailable'});assert.ok(!JSON.stringify(res.data).includes(id))
 })
 test('raw keys, extra fields and malformed proofs are rejected before RPC',async()=>{
  for(const body of [{...proofBody,auth:a.toString('base64url')},{...proofBody,p256dh:key},{...proofBody,endpoint},{...proofBody,nonce:'short'}]){const {res,calls}=await api({body});assert.equal(res.code,400);assert.equal(calls.length,1)}
 })
 test('unknown RPC fields, migration absence and private error text never leak',async()=>{
- for(const options of [{rpc:{p256dh:'match',auth:'match',secret:key}},{rpc:{message:a.toString('base64url')},rpcStatus:404}]){const {res}=await api(options);assert.equal(res.code,503);assert.deepEqual(res.data,{keys:unavailable})}
+ for(const options of [{rpc:{p256dh:'match',auth:'match',secret:key}},{rpc:{message:a.toString('base64url')},rpcStatus:404}]){const {res}=await api(options);assert.equal(res.code,503);assert.deepEqual(res.data,{keys:unavailable,diagnostic:options.rpcStatus===404?'rpc:not-found':'rpc:response'})}
  for(const lang of ['bg','en'])for(const status of ['match','mismatch','missing','unavailable'])assert.equal(typeof pushKeyMessages[lang][status],'string')
+})
+test('RPC HTTP and allowlisted SQL failures stay distinct without private error text',async()=>{
+ for(const [status,code,expected] of [[401,'x','rpc:unauthorized'],[403,'x','rpc:forbidden'],[404,'x','rpc:not-found'],[500,'x','rpc:rejected'],[404,'PGRST202','rpc:schema-cache'],[403,'42501','rpc:sql-permission'],[400,'42702','rpc:sql-ambiguous'],[404,'42883','rpc:sql-function'],[500,'toString','rpc:rejected']]){
+  const {res}=await api({rpcStatus:status,rpc:{code,message:endpoint,details:key,hint:id}})
+  assert.deepEqual(res.data,{keys:unavailable,diagnostic:expected})
+ }
+})
+test('browser reports fixed stages, preserves result statuses and never echoes exceptions',async()=>{
+ for(const [kind,expected] of [['session','session:before'],['identity','browser:identity'],['read','browser:key-read'],['format','browser:key-format'],['transport','request:transport'],['rpc','rpc:sql-permission']]){
+  const f=fixture(),stages=[];f.onDiagnostic=s=>stages.push(s)
+  if(kind==='session')f.authorize=async()=>false
+  if(kind==='identity')f.device.id='invalid'
+  if(kind==='read')f.sub.getKey=()=>{throw Error(endpoint)}
+  if(kind==='format')f.sub.getKey=()=>new Uint8Array(1).buffer
+  if(kind==='transport')f.verify=async()=>{throw Error(endpoint)}
+  if(kind==='rpc')f.verify=async()=>{throw Object.assign(Error(key),{diagnostic:'rpc:sql-permission'})}
+  await checkPushKeys(f);assert.deepEqual(stages,[expected])
+ }
+})
+test('client preserves safe API errors and blocks arbitrary diagnostics and HTML',async()=>{
+ for(const [response,expected] of [[Response.json({diagnostic:'rpc:schema-cache',message:endpoint},{status:503}),'rpc:schema-cache'],[Response.json({diagnostic:endpoint},{status:503}),'request:http'],[new Response('<html>'+endpoint,{status:502}),'request:http'],[Response.json({keys:unavailable,diagnostic:endpoint}),'request:response']]){
+  await assert.rejects(requestPushKeyCheck(session,{}, {getSession:async()=>session,fetcher:async()=>response}),e=>e.diagnostic===expected&&!e.message.includes(endpoint))
+ }
+})
+test('client classifies timeout and transport failures without copying messages',async()=>{
+ for(const name of ['TimeoutError','AbortError','TypeError'])await assert.rejects(requestPushKeyCheck(session,{}, {getSession:async()=>session,fetcher:async()=>{throw Object.assign(Error(endpoint),{name})}}),e=>e.diagnostic===(name==='TypeError'?'request:transport':'request:timeout'))
+})
+test('server distinguishes auth/RPC transport, timeout and malformed responses',async()=>{
+ for(const stage of ['auth','rpc'])for(const kind of ['transport','timeout','response']){
+  const res={setHeader(){},status(n){this.code=n;return this},json(data){this.data=data;return this}}
+  await handlePushKeyDiagnostics({method:'POST',body:proofBody,headers:{authorization:'Bearer synthetic'},query:{}},res,{SUPABASE_URL:'https://db.invalid',SUPABASE_ANON_KEY:'anon'},async url=>{
+   if((stage==='auth')===url.endsWith('/auth/v1/user')){
+    if(kind==='response')return new Response(endpoint,{status:200})
+    throw Object.assign(Error(endpoint),{name:kind==='timeout'?'TimeoutError':'TypeError'})
+   }
+   return Response.json({id})
+  })
+  assert.deepEqual(res.data,{keys:unavailable,diagnostic:`${stage}:${kind}`})
+ }
+})
+test('end to end RPC failure reaches browser stage and no sensitive fields reach UI result',async()=>{
+ const f=fixture(),stages=[];f.onDiagnostic=s=>stages.push(s)
+ f.verify=body=>requestPushKeyCheck(session,body,{getSession:async()=>session,fetcher:async()=>{
+  const {res}=await api({rpcStatus:403,rpc:{code:'42501',message:endpoint,details:key}})
+  return Response.json(res.data,{status:res.code})
+ }})
+ assert.deepEqual(await checkPushKeys(f),unavailable);assert.deepEqual(stages,['rpc:sql-permission'])
+})
+test('session provider failures retain the correct boundary',async()=>{
+ for(const after of [false,true]){
+  let calls=0
+  await assert.rejects(requestPushKeyCheck(session,{}, {getSession:async()=>{if(++calls>(after?1:0))throw Error(endpoint);return session},fetcher:async()=>Response.json({keys:unavailable})}),e=>e.diagnostic===(after?'session:after-request':'session:before-request'))
+ }
+})
+test('browser rejects unknown verify response fields instead of silently trusting them',async()=>{
+ const f=fixture(),stages=[];f.onDiagnostic=s=>stages.push(s);f.verify=async()=>({p256dh:'match',auth:'match',secret:endpoint})
+ assert.deepEqual(await checkPushKeys(f),unavailable);assert.deepEqual(stages,['request:response'])
 })
