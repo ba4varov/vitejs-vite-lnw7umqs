@@ -104,3 +104,51 @@ if(!production)test('controlled real React remount changes instance within the s
  expect(events.filter((e:any)=>e.event==='root:create')).toHaveLength(1)
  expect(events.filter((e:any)=>e.event==='app:view'&&e.view==='initial-location')).toHaveLength(2)
 })
+
+for (const clipboard of ['success','missing','reject'] as const) test(`diagnostic panel mobile copy ${clipboard}`,async({page})=>{
+ await page.addInitScript(({clipboard})=>{
+  Object.defineProperty(navigator,'clipboard',{configurable:true,value:clipboard==='missing'?undefined:{writeText:async(text:string)=>{if(clipboard==='reject')throw Error('denied');(window as any).copiedReport=text}}})
+ },{clipboard})
+ await prepare(page,800,60,false)
+ const panel=page.getByTestId('startup-diagnostics')
+ await panel.locator('summary').click()
+ await page.evaluate(()=>window.scrollTo(0,400))
+ const y=await page.evaluate(()=>window.scrollY)
+ await panel.getByRole('button',{name:'Копирай диагностиката',exact:true}).click()
+ if(clipboard==='success'){
+  await expect(panel.getByRole('status')).toHaveText('Диагностиката е копирана.')
+  expect(JSON.parse(await page.evaluate(()=>(window as any).copiedReport)).lifecycle.events.length).toBeGreaterThan(0)
+ }else{
+  const area=panel.locator('textarea');await expect(area).toBeVisible()
+  expect(JSON.parse(await area.inputValue()).timing.length).toBeGreaterThan(0)
+  await panel.getByRole('button',{name:'Избери целия текст'}).click()
+  expect(await area.evaluate((el:HTMLTextAreaElement)=>el.selectionEnd-el.selectionStart)).toBe((await area.inputValue()).length)
+ }
+ expect(await page.evaluate(()=>window.scrollY)).toBe(y)
+ const box=await panel.boundingBox();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+ const before=await journal(page)
+ await page.reload()
+ expect((await journal(page)).events.some((e:any)=>e.document===before.document)).toBe(true)
+ await expect(page.getByTestId('startup-diagnostics')).toBeVisible()
+})
+test('panel blocks unsafe snapshot before clipboard or manual export',async({page})=>{
+ await prepare(page,800,60,false)
+ await page.evaluate(()=>Object.defineProperty(window,'meteoStartupTiming',{configurable:true,value:()=>[{phase:'module',ms:1,email:'private@example.com'}]}))
+ const panel=page.getByTestId('startup-diagnostics');await panel.locator('summary').click()
+ await panel.getByRole('button',{name:'Копирай диагностиката'}).click()
+ await expect(panel.getByRole('status')).toContainText('блокирано')
+ await expect(panel.locator('textarea')).toHaveCount(0)
+})
+test('English panel and disabled query values',async({page})=>{
+ await prepare(page,800,60,false)
+ await page.getByRole('button',{name:'Отвори менюто',exact:true}).click()
+ await page.getByRole('button',{name:'Switch to English'}).click()
+ await page.getByRole('button',{name:'Close menu',exact:true}).first().click()
+ await page.getByTestId('startup-diagnostics').locator('summary').click()
+ await expect(page.getByRole('button',{name:'Copy diagnostics'})).toBeVisible()
+ for(const path of ['/','/?startupTiming=0','/?startupTiming=true']){
+  await page.goto(path)
+  await expect(page.getByTestId('startup-diagnostics')).toHaveCount(0)
+  expect(await page.evaluate(()=>typeof (window as any).meteoStartupTiming)).toBe('undefined')
+ }
+})

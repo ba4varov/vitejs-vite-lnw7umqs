@@ -1,3 +1,4 @@
+import StartupDiagnostics from './StartupDiagnostics'
 import type { ConversationContext, PendingClarification } from '../server/weather-chat-core.js'
 import { startupTiming, startupLifecycle } from './startup-timing.js'
 import { createInitialLocation } from './initial-location.js'
@@ -1061,6 +1062,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         }
       `}</style>
 
+      {startupTiming.enabled && <StartupDiagnostics lang={lang} />}
       <div className="header-row">
         <div className="header-title-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
           <h1><a className="brand-home" href={import.meta.env.BASE_URL} aria-label={lang === 'bg' ? 'Метео Пулс — начална страница' : 'Meteo Pulse — home'}>{t.title}</a></h1>
