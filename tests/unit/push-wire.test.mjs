@@ -65,6 +65,8 @@ async function fixture(run){
    if(mode==='json'){res.writeHead(400,{'content-type':'application/json','content-length':Buffer.byteLength(rejection)});res.end(rejection);return}
    if(mode==='html'){res.writeHead(400,{'content-type':'text/html; charset=UTF-8'});res.end(htmlRejection);return}
    if(mode==='empty'){res.writeHead(400,{'content-length':0});res.end();return}
+   if(mode==='jwt'){res.writeHead(403,{'content-type':'text/plain; charset=utf-8'});res.end('invalid JWT provided\n');return}
+   if(mode==='jwt-permission'){res.writeHead(403,{'content-type':'text/plain; charset=utf-8','content-length':40});res.end('permission denied: invalid JWT provided\n');return}
    if(mode==='unknown'){res.writeHead(400,{'content-type':'text/html'});res.end('<p>'+privateText+'</p>');return}
    if(mode==='incomplete'){res.writeHead(400,{'content-type':'text/plain','content-length':100});res.end('short');return}
    if(mode==='timeout'){res.writeHead(400,{'content-type':'text/plain','content-length':100});res.flushHeaders();return}
@@ -113,6 +115,6 @@ test('one authorized attempt reads safe 400 diagnostics from local content-lengt
 }))
 test('native Deno TLS writes valid encrypted FCM wire requests and reads bounded rejection diagnostics',{skip:!process.env.DENO_BINARY},async()=>fixture(async({requests,root,port})=>{
  const {stdout}=await exec(process.env.DENO_BINARY,['run','--frozen','--cached-only','--config','supabase/functions/push-test/deno.json','--allow-net=127.0.0.1','--allow-env=ECE_KEYLOG,DEBUG,NODE_DEBUG','--allow-read='+root,'tests/edge-push/wire-client.mjs',join(root,'ca.pem'),String(port)],{env:{...process.env,DENO_DIR:resolve('work/deno-cache'),ECE_KEYLOG:'',DEBUG:'',NODE_DEBUG:''},timeout:15000})
- assert.deepEqual(JSON.parse(stdout),{results:[{status:201},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_unauthorized_registration',providerBodyStatus:'recognized'},{status:400,providerBodyStatus:'empty'}],wrongNameRejected:true})
- assert.equal(requests.length,5)
+ assert.deepEqual(JSON.parse(stdout),{results:[{status:201},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_unauthorized_registration',providerBodyStatus:'recognized'},{status:400,providerBodyStatus:'empty'},{status:403,providerReason:'fcm_invalid_jwt',providerBodyStatus:'recognized'},{status:403,providerReason:'fcm_invalid_jwt',providerBodyStatus:'recognized'},{status:400,providerBodyStatus:'unknown_format'}],wrongNameRejected:true})
+ assert.equal(requests.length,8)
 }))

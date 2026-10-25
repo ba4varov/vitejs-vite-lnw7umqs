@@ -89,3 +89,34 @@ test('observed full plaintext VAPID mismatch maps exactly, never by substring',a
  }
  for(const input of [details.endpoint,keys.privateKey,{},null])assert.equal(safeProviderBodyStatus(input),undefined)
 })
+
+test('observed FCM invalid JWT plaintext is recognized through fragmented HTTP framing',async()=>{
+ // Public provider response: https://github.com/web-push-libs/web-push/issues/532
+ // Reported with 403; this diagnostic does not establish the cause of a 400.
+ const reason='fcm_invalid_jwt'
+ for(const body of ['invalid JWT provided\n','permission denied: invalid JWT provided\n']){
+  for(const split of [1,7,4096]){
+   for(const framing of [`Content-Length: ${body.length}\r\n`,'Transfer-Encoding: chunked\r\n','']){
+    const payload=framing.startsWith('Transfer-Encoding')?body.length.toString(16)+'\r\n'+body+'\r\n0\r\n\r\n':body
+    assert.deepEqual(await simulate('HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain; charset=utf-8\r\n'+framing+'\r\n'+payload,{split}),{status:403,retryAfter:undefined,providerBodyStatus:'recognized',providerReason:reason})
+   }
+  }
+ }
+ assert.equal(safeProviderReason(reason),reason)
+ const body='invalid JWT provided\n'
+ for(const [text,type] of [[body.trim()+' '+details.endpoint,'text/plain'],['prefix '+body,'text/plain'],[body,'text/html'],[JSON.stringify({message:body}),'application/json']]){
+  const result=await simulate(`HTTP/1.1 403 Forbidden\r\nContent-Type: ${type}\r\nContent-Length: ${Buffer.byteLength(text)}\r\n\r\n${text}`)
+  assert.equal(result.providerBodyStatus,'unknown_format');assert.equal(result.providerReason,undefined)
+ }
+})
+
+test('complete valid HTTP 400 bodies can remain unknown without implying broken wire framing',async()=>{
+ const cases=[
+  ['text/plain','request rejected for an unrecognized reason'],
+  ['text/html','<!doctype html><html><head><title>Error 400 (Bad Request)</title></head><body><p>Bad Request</p></body></html>'],
+  ['application/json',JSON.stringify({error:{code:400,message:'request rejected for an unrecognized reason'}})],
+ ]
+ for(const [type,body] of cases){
+  assert.deepEqual(await simulate(`HTTP/1.1 400 Bad Request\r\nContent-Type: ${type}\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`,{split:1}),{status:400,retryAfter:undefined,providerBodyStatus:'unknown_format'})
+ }
+})

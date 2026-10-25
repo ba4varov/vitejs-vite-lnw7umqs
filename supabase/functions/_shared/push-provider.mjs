@@ -11,7 +11,7 @@ const reasons={
  InvalidTTL:'fcm_invalid_ttl',
 }
 const bodyStatuses=['recognized','empty','unknown_format','incomplete','timeout','too_large','unsupported_encoding','invalid_framing','read_failed']
-export const safeProviderReason=value=>typeof value==='string'&&[...Object.values(reasons),'fcm_vapid_subscription_mismatch'].includes(value)?value:undefined
+export const safeProviderReason=value=>typeof value==='string'&&[...Object.values(reasons),'fcm_vapid_subscription_mismatch','fcm_invalid_jwt'].includes(value)?value:undefined
 export const safeProviderBodyStatus=value=>typeof value==='string'&&bodyStatuses.includes(value)?value:undefined
 export const providerPhraseReason=value=>typeof value==='string'&&Object.hasOwn(reasons,value)?reasons[value]:undefined
 function classify(bytes,type) {
@@ -22,6 +22,7 @@ function classify(bytes,type) {
   reason=providerPhraseReason(text)
   // Observed FCM Web Push response, not an FCM HTTP v1 error schema.
   if(text==='the VAPID credentials in the authorization header do not correspond to the credentials used to create the subscriptions.')reason='fcm_vapid_subscription_mismatch'
+  if(['invalid JWT provided','permission denied: invalid JWT provided'].includes(text))reason='fcm_invalid_jwt'
  }else if(type==='text/html'){
   // Match the observed FCM error template, not keywords embedded in arbitrary HTML.
   const html=/^<html>\s*<head>\s*<title>\s*([A-Za-z]+)\s*<\/title>\s*<\/head>\s*<body(?:\s+[^<>]*)?>\s*<h1>\s*([A-Za-z]+)\s*<\/h1>\s*<h2>\s*Error [45][0-9]{2}\s*<\/h2>\s*(?:<!--[\s\S]*?-->\s*)*<\/body>\s*<\/html>$/i.exec(text)
