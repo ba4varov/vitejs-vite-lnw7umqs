@@ -1120,3 +1120,19 @@ button:focus-visible, input:focus-visible, a:focus-visible, iframe:focus-visible
 .search-row .location-btn { flex: 0 0 44px; min-height: 44px; border: 1px solid var(--weather-line); border-radius: 12px; background: var(--weather-surface); color: var(--weather-ink); font-size: 1.2rem; cursor: pointer; }
 .search-row .location-btn:disabled { opacity: .6; cursor: wait; }
 .search-row .location-btn:focus-visible { outline: 3px solid var(--weather-blue); outline-offset: 2px; }
+
+.rain-warning {
+  grid-column: 1 / -1;
+  border: 2px solid #a46212;
+  border-inline-start-width: 6px;
+  border-radius: 16px;
+  background: #fff4dc;
+  color: #563507;
+  padding: clamp(16px, 3vw, 24px);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.rain-warning h2 { color: inherit; margin: 0 0 12px; font-size: clamp(1.15rem, 3vw, 1.45rem); }
+.rain-warning p { margin: 8px 0; line-height: 1.5; }
+.rain-warning small { display: block; line-height: 1.5; }
+.dark .rain-warning { background: #332919; color: #ffdf9f; border-color: #d8a54c; }
