@@ -20,9 +20,17 @@ export function failureDiagnostic(error){
  return diagnostics.get(error)||'Операцията спря: непотвърден резултат.'
 }
 
+// Fixed local messages only: never include input, lengths, exception text or claims.
+function validateCredential(value,session){
+ const field=session?'администраторски access token':'операторски token'
+ const valid=session?/^([A-Za-z0-9_-]+\.){2}[A-Za-z0-9_-]+$/.test(value):/^[A-Za-z0-9_-]{43,128}$/.test(value)
+ if(!valid)throw stopped(`Локално въвеждане: ${field} е празен, непълен или с невалиден формат. Няма изпратена заявка.`)
+}
+
 // Credentials only enter through the hidden TTY prompts, never argv, env or files.
 export function createNodeClient(token,session,fetcher=fetch){
- if(!/^[A-Za-z0-9_-]{43,128}$/.test(token)||!/^([A-Za-z0-9_-]+\.){2}[A-Za-z0-9_-]+$/.test(session))throw Error('INVALID_CREDENTIALS')
+ validateCredential(token,false)
+ validateCredential(session,true)
  return async body=>{
   const signal=AbortSignal.timeout(55000)
   let reader,timer,response
@@ -99,6 +107,8 @@ function prompt(text,hidden=false) {
    for(let i=0;i<chars.length;i++){
     const c=chars[i]
     if(c==='\u0003'){done(Error('CANCELLED'));return}
+    // An unfinished escape must not consume the explicit Enter indefinitely.
+    if(escape&&(c==='\r'||c==='\n')){invalid=true;done();return}
     if(escape||c==='\u001b'){
      escape+=c
      if(escape==='\u001b[200~'){pasting=true;escape='';continue}
@@ -128,7 +138,9 @@ async function main(){
  let token='',session=''
  try{
   token=await prompt('Съществуващ операторски token (скрит; само в паметта):',true)
+  validateCredential(token,false)
   session=await prompt('Текущ access token на избрания администратор (скрит):',true)
+  validateCredential(session,true)
   await runNodeOperator(o,{node:createNodeClient(token,session),confirm:phrase=>prompt('За един-единствен опит въведете точно: '+phrase),output:console.log})
  }finally{token='';session=''}
 }
