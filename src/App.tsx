@@ -1,3 +1,4 @@
+import { RainWarning } from './RainWarning'
 import StartupDiagnostics from './StartupDiagnostics'
 import type { ConversationContext, PendingClarification } from '../server/weather-chat-core.js'
 import { startupTiming, startupLifecycle } from './startup-timing.js'
@@ -1165,6 +1166,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         <main ref={forecastDashboardRef} className="forecast-dashboard">
           {error && <p className="forecast-update-error" role="status">{error} <button type="button" onClick={() => fetchWeather(coords.lat, coords.lon, true)}>{t.tryAgain}</button></p>}
           {loading && <div className="forecast-refresh" role="status" aria-live="polite">↻ {t.refreshing}</div>}
+          <RainWarning forecast={gpsBusy ? null : notificationForecast} city={city} lang={lang} updated={lastUpdated} />
           {activeAlerts.length > 0 && (
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
