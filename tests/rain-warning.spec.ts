@@ -24,7 +24,8 @@ for (const width of [390,1440]) for (const lang of ['bg','en']) for (const dark 
   await expect(warning).toBeVisible()
   await expect(warning).toContainText(lang==='bg'?'48,5':'48.5')
   await expect(warning).toContainText('Open-Meteo')
-  await expect(warning).toContainText('Europe/Sofia')
+  await expect(warning).toContainText(lang==='bg'?'Местно време':'Local time')
+  await expect(warning).not.toContainText('Europe/Sofia')
   if(dark){
    await clickHeaderControl(page,page.locator('.header-menu > .icon-btn'))
    const toggle=page.locator('.mobile-menu-toggle')
