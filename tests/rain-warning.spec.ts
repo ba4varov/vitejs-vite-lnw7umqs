@@ -42,3 +42,25 @@ for (const width of [390,1440]) for (const lang of ['bg','en']) for (const dark 
   await expect(warning).toHaveCount(1)
  })
 }
+
+test('GPS pending clears the warning and new forecast restores it', async ({page})=>{
+ await page.clock.install({time:new Date('2026-10-12T20:59:00Z')})
+ const data=structuredClone(weather)
+ data.hourly.precipitation=Array(360).fill(2)
+ await page.route('**/*',route=>{
+  const url=new URL(route.request().url())
+  if(url.hostname==='127.0.0.1'&&!url.pathname.startsWith('/api/'))return route.continue()
+  return route.fulfill({json:url.hostname==='api.open-meteo.com'?data:{}})
+ })
+ await page.goto('/')
+ const warning=page.locator('.rain-warning')
+ await expect(warning).toBeVisible()
+ await page.evaluate(()=>{
+  navigator.geolocation.getCurrentPosition=(success)=>{(window as any).gpsSuccess=success}
+ })
+ await page.locator('.location-btn').click()
+ await expect(warning).toHaveCount(0)
+ await page.evaluate(()=>(window as any).gpsSuccess({coords:{latitude:42,longitude:23}}))
+ await expect(warning).toBeVisible()
+ await expect(warning).toContainText('48')
+})
