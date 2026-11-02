@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 
 const device='5ff76543-ea64-4721-9846-3859621e954f'
-const id='b0000000-0000-0000-0000-000000000001',operator='a'.repeat(43)
+const id='b0000000-0000-0000-0000-000000000001',operator='a'.repeat(64)
 const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')
 const payload=Buffer.from(JSON.stringify({sub:id,role:'authenticated',exp:4102444800})).toString('base64url')
 const signed=header+'.'+payload
@@ -23,8 +23,8 @@ output=b'';stage=0;deadline=time.monotonic()+10;pending=[];next_at=0
 try:
  while time.monotonic()<deadline:
   if pending and time.monotonic()>=next_at:
-   os.write(master,pending.pop(0).encode());next_at=time.monotonic()+0.15
-  if select.select([master],[],[],0.05)[0]:
+   os.write(master,pending.pop(0).encode());next_at=time.monotonic()+0.02
+  if select.select([master],[],[],0.01)[0]:
    try: chunk=os.read(master,65536)
    except OSError: break
    if not chunk: break
@@ -33,9 +33,9 @@ try:
    if prompts>stage:
     if stage<2:
      answer=[case['operator'],case['jwt']][stage]
-     os.write(master,(answer+chr(13)).encode())
+     pending=answer[:];next_at=time.monotonic()+0.02
     else:
-     pending=case['confirmation'][:];next_at=time.monotonic()+0.15
+     pending=case['confirmation'][:];next_at=time.monotonic()+0.02
     stage+=1
   elif child.poll() is not None: break
  if child.poll() is None: child.wait(timeout=2)
@@ -44,13 +44,22 @@ finally:
  if child.poll() is None: child.kill();child.wait()
  os.close(master)
 `
-function cli(session,valid,{confirmation=['CANCEL\r'],send=false,inputSession=session,preflight=null}={}){
+function cli(session,valid,{confirmation=['CANCEL\r'],send=false,inputSession=session,preflight=null,inputOperator=[operator+'\r'],verifyHiddenBlocks=false}={}){
  const dir=mkdtempSync(join(tmpdir(),'meteo-cli-'))
  try{
   const preload=join(dir,'mock-fetch.mjs')
   writeFileSync(preload,`
 import assert from 'node:assert/strict'
 const calls=[]
+// Observe the same data events as the CLI without printing any input. A single
+// PTY write is not by itself proof of a single Node data event.
+const expectedBlocks=${JSON.stringify(verifyHiddenBlocks?[...inputOperator,...inputSession]:[])}
+let observedBlocks=0,wholeBlocks=true
+if(expectedBlocks.length)process.stdin.on('data',chunk=>{
+ if(observedBlocks>=expectedBlocks.length)return
+ wholeBlocks=wholeBlocks&&chunk.equals(Buffer.from(expectedBlocks[observedBlocks]))
+ observedBlocks++
+})
 globalThis.fetch=async(url,options)=>{
  assert.ok(url==='https://ba4varov-wheater.vercel.app/api/push-operator')
  assert.ok(options.headers.authorization===${JSON.stringify('Bearer '+operator+'.'+session)},'CLI must preserve the entered JWT')
@@ -66,13 +75,14 @@ globalThis.fetch=async(url,options)=>{
  }
  return new Response(JSON.stringify(body.operation==='prepare'?{error:'PUSH_TEST_READY',permitId:'${id}',userId:'${id}',deviceId:'${device}',category:'wind'}:body.operation==='send'?{error:'PUSH_TEST_ACCEPTED',diagnostic:{category:'accepted',providerStatus:201}}:{error:'PUSH_TEST_CLOSED'}))
 }
-process.on('exit',()=>{assert.deepEqual(calls,${JSON.stringify(preflight?['prepare']:valid?(send?['prepare','send','cancel']:['prepare','cancel']):[])});console.log('CLI_FIXTURE_OK')})
+process.on('exit',()=>{if(expectedBlocks.length){assert.ok(wholeBlocks&&observedBlocks===expectedBlocks.length,'Each hidden paste and Enter must arrive as its own complete data block');console.log('CLI_WHOLE_BLOCKS_OK')}assert.deepEqual(calls,${JSON.stringify(preflight?['prepare']:valid?(send?['prepare','send','cancel']:['prepare','cancel']):[])});console.log('CLI_FIXTURE_OK')})
 `)
-  const result=spawnSync('python3',['-c',harness,JSON.stringify({cmd:[process.execPath,'--import',preload,'scripts/push-node-operator.mjs',id,device],operator,jwt:inputSession,confirmation})],{encoding:'utf8',timeout:15000})
+  const result=spawnSync('python3',['-c',harness,JSON.stringify({cmd:[process.execPath,'--import',preload,'scripts/push-node-operator.mjs',id,device],operator:inputOperator,jwt:Array.isArray(inputSession)?inputSession:[inputSession+'\r'],confirmation})],{encoding:'utf8',timeout:15000})
   assert.equal(result.status,0,'PTY harness must complete')
   const observed=JSON.parse(result.stdout)
   assert.ok(!observed.output.includes(operator)&&!observed.output.includes(session),'Hidden credentials must not echo')
   assert.match(observed.output,/CLI_FIXTURE_OK/)
+  if(verifyHiddenBlocks)assert.match(observed.output,/CLI_WHOLE_BLOCKS_OK/)
   assert.equal(observed.pending,0,'Input must wait for the explicit final Enter or Ctrl+C')
   return observed
  }finally{rmSync(dir,{recursive:true,force:true})}
@@ -132,4 +142,50 @@ test('actual CLI prints safe preflight diagnostics and exits before SEND ONE',()
   for(const value of ['SYNTHETIC_PRIVATE_ERROR','PRIVATE_ENDPOINT',id,device,'https://','SEND ONE','Error:',' at '])assert.ok(!result.output.includes(value))
   if(preflight.body?.includes('PUSH_NODE_DISABLED'))assert.ok(result.output.includes('Код: PUSH_NODE_DISABLED.'))
  }
+})
+
+// Ctrl+Shift+V is handled by the terminal emulator: the CLI receives pasted bytes,
+// optionally enclosed in bracketed-paste markers, rather than a key chord.
+test('Ctrl+Shift+V plain paste in both hidden fields preserves tokens across prompts',()=>{
+ const result=cli(jwt,true,{inputOperator:[operator,'\r'],inputSession:[jwt,'\r']})
+ assert.equal(result.code,0);assert.equal(result.prompts,3)
+})
+test('bracketed paste in both hidden fields accepts whole and fragmented markers',()=>{
+ for(const paste of [value=>['\x1b[200~'+value+'\x1b[201~','\r'],value=>['\x1b','[20','0~',value.slice(0,12),value.slice(12),'\x1b[20','1~','\r']]){
+  const result=cli(jwt,true,{inputOperator:paste(operator),inputSession:paste(jwt)})
+  assert.equal(result.code,0);assert.equal(result.prompts,3)
+ }
+})
+test('hidden input errors stop locally with a field-specific diagnostic and no requests',()=>{
+ for(const field of ['operator','session']){
+  for(const input of [['\r'],['bad','\r'],['\x1b[200~'+(field==='operator'?operator:jwt)+'\n\x1b[201~','\r'],['\x1b[A'+(field==='operator'?operator:jwt),'\r'],['\x1b[20','\r']]){
+   const result=cli(jwt,false,field==='operator'?{inputOperator:input}:{inputSession:input})
+   assert.equal(result.code,1)
+   assert.match(result.output,field==='operator'?/Локално въвеждане: операторски token/:/Локално въвеждане: администраторски access token/)
+   assert.doesNotMatch(result.output,/непотвърден резултат|SEND ONE|USER_UUID:|DEVICE_UUID:/)
+  }
+ }
+})
+
+test('incomplete ANSI marker followed by Enter stops locally rather than swallowing Enter',()=>{
+ for(const field of ['operator','session']){
+  const result=cli(jwt,false,field==='operator'?{inputOperator:['\x1b[20','\r']}:{inputSession:['\x1b[20','\r']})
+  assert.equal(result.code,1)
+  assert.match(result.output,/Локално въвеждане:/)
+ }
+})
+
+
+// An array item is emitted by one os.write, never a character loop. The preload
+// additionally verifies that the CLI sees each payload in one data event and
+// Enter in a separate event. Both fields must complete before mocked prepare.
+for(const bracketed of [false,true])test(`single PTY write per hidden token, separate Enter: ${bracketed?'bracketed':'plain'} paste`,()=>{
+ const paste=value=>[bracketed?'\x1b[200~'+value+'\x1b[201~':value,'\r']
+ const result=cli(jwt,true,{inputOperator:paste(operator),inputSession:paste(jwt),verifyHiddenBlocks:true})
+ assert.equal(result.code,0)
+ assert.equal(result.prompts,3)
+ assert.match(result.output,/USER_UUID: /)
+ assert.match(result.output,/DEVICE_UUID: /)
+ assert.match(result.output,/въведете точно: SEND ONE/)
+ assert.match(result.output,/Няма опит за изпращане/)
 })
