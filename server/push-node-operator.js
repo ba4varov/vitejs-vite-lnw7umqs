@@ -2,9 +2,9 @@ import {createOperatorHandler} from '../supabase/functions/_shared/push-operator
 import {preparePush,validVapid} from '../supabase/functions/_shared/push-test.mjs'
 import {isFcmEndpoint,prepareNodeAttempt} from './push-node-transport.js'
 
-const rpcNames=new Set(['push_session_permit','push_operator_access','prepare_push_operator','inspect_push_operator','arm_push_operator','claim_push_test','authorize_push_test','finish_push_test','close_push_operator','cancel_push_operator'])
+const rpcNames=new Set(['push_session_scope','push_session_target','prepare_push_session','push_session_permit','push_operator_access','prepare_push_operator','inspect_push_operator','arm_push_operator','claim_push_test','authorize_push_test','finish_push_test','close_push_operator','cancel_push_operator'])
 const cleanupNames=new Set(['finish_push_test','close_push_operator','cancel_push_operator'])
-const booleanNames=new Set(['push_session_permit','push_operator_access','arm_push_operator','authorize_push_test','close_push_operator','cancel_push_operator'])
+const booleanNames=new Set(['push_session_scope','push_session_permit','push_operator_access','arm_push_operator','authorize_push_test','close_push_operator','cancel_push_operator'])
 const reply=(status,error)=>new Response(JSON.stringify({error,deliveryEnabled:false}),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
 const token=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{43,128}$/.test(value)
 

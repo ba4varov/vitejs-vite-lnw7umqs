@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test'
 const publicKey=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url')
 const preferences={enabled:false,cities:[],categories:[]}
 async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false,diagnostic=false,publicKeyAvailable=true,sessionDiagnostic=false}:{permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean;diagnostic?:boolean;publicKeyAvailable?:boolean;sessionDiagnostic?:boolean}={}) {
- await page.addInitScript(({permission,publicKey}:any)=>{
+ await page.addInitScript(({permission,publicKey,sessionDiagnostic}:any)=>{
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}))
   const scope:any=window;scope.localNotifications=0;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
   let permissionValue='default',subscription:any=null
@@ -17,7 +17,8 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
    getSubscription:async()=>subscription,
    subscribe:async()=>{scope.pushSubscribes++;subscription={options:{applicationServerKey:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},endpoint:'https://fcm.googleapis.com/wp/isolated',toJSON:()=>({endpoint:'https://fcm.googleapis.com/wp/isolated',expirationTime:null,keys:{p256dh:publicKey,auth:'AQEBAQEBAQEBAQEBAQEBAQ'}}),unsubscribe:async()=>{scope.pushUnsubscribes++;subscription=null;return true}};return subscription},
   }})})
- },{permission,publicKey})
+  if(sessionDiagnostic){permissionValue='granted';scope.diagnosticSubscription('match')}
+ },{permission,publicKey,sessionDiagnostic})
  const origin=new URL(process.env.PUSH_PREVIEW_URL||'http://127.0.0.1:4173').origin
  // Even hosted Preview checks only fetch static assets. All account APIs are fixtures.
  await page.route('**/*',(r:any)=>new URL(r.request().url()).origin===origin?(new URL(r.request().url()).pathname.startsWith('/api/')?r.fulfill({status:503,json:{error:'ISOLATED_TEST'}}):r.fallback()):r.fulfill({json:{}}))
@@ -28,10 +29,11 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
  const sessionCalls:any[]=[]
  await page.route('**/api/push-operator',async(r:any)=>{
   const body=r.request().postDataJSON();sessionCalls.push(body)
-  const result=body.operation==='access'?{code:'rights:allowed',allowed:sessionDiagnostic}:body.operation==='prepare'?{code:'device:ready',permitId:'b0000000-0000-0000-0000-000000000002',expiresAt:new Date(Date.now()+120000).toISOString()}:body.operation==='cancel'?{code:'device:closed'}:{code:'fcm:accepted',diagnostic:{category:'accepted',providerStatus:201}}
+  const result=body.operation==='access'?{code:'rights:allowed',allowed:sessionDiagnostic,target:sessionDiagnostic?{deviceId:'b1000000-0000-0000-0000-000000000001',label:'Desktop Chrome synthetic'}:null}:body.operation==='prepare'?{code:'device:ready',permitId:'b0000000-0000-0000-0000-000000000002',expiresAt:new Date(Date.now()+120000).toISOString()}:body.operation==='cancel'?{code:'device:closed'}:{code:'fcm:accepted',diagnostic:{category:'accepted',providerStatus:201}}
   return r.fulfill({json:{...result,deliveryEnabled:false,phoneDelivery:'unconfirmed'}})
  })
- const calls:any[]=[];let prefs:any={...preferences},devices:any[]=diagnostic?[{id:sessionDiagnostic?'5ff76543-ea64-4721-9846-3859621e954f':'00000000-0000-0000-0000-000000000003',label:'Note 13 Pro',fingerprint:hash,createdAt:'2026-10-14T00:00:00Z'}]:[]
+ if(sessionDiagnostic)await page.route('**/api/push-key-diagnostics',r=>r.fulfill({json:{keys:{p256dh:'match',auth:'match'}}}))
+ const calls:any[]=[];let prefs:any={...preferences},devices:any[]=diagnostic?[{id:sessionDiagnostic?'b1000000-0000-0000-0000-000000000001':'00000000-0000-0000-0000-000000000003',label:sessionDiagnostic?'Desktop Chrome synthetic':'Note 13 Pro',fingerprint:hash,createdAt:'2026-10-14T00:00:00Z'}]:[]
  await page.route('**/api/push',async(r:any)=>{
   const method=r.request().method(),body=r.request().postDataJSON();calls.push({method,body})
   if(missingMigration)return r.fulfill({status:503,json:{error:'PUSH_UNAVAILABLE'}})
@@ -348,11 +350,11 @@ for(const confirm of [false,true])test(`session Push requires immediate confirma
  const state=await setup(page,{diagnostic:true,sessionDiagnostic:true})
  await choose(page)
  await page.evaluate(()=>{(window as any).setTestPushPermission('granted');(window as any).diagnosticSubscription('match')})
- page.on('dialog',dialog=>confirm?dialog.accept():dialog.dismiss())
+ page.on('dialog',dialog=>{expect(dialog.message()).toContain('Desktop Chrome synthetic');expect(dialog.message()).not.toContain('Redmi');return confirm?dialog.accept():dialog.dismiss()})
  await page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true}).click()
  if(confirm){
   await expect(page.locator('.push-settings').getByRole('status')).toContainText('fcm:accepted')
-  await expect(page.locator('.push-settings').getByRole('status')).toContainText('Доставката до телефона не е потвърдена')
+  await expect(page.locator('.push-settings').getByRole('status')).toContainText('Доставката до устройството не е потвърдена')
  }else await expect.poll(()=>state.sessionCalls.some(c=>c.operation==='cancel')).toBe(true)
  expect(state.sessionCalls.filter(c=>c.operation==='prepare')).toHaveLength(1)
  expect(state.sessionCalls.filter(c=>c.operation==='send')).toHaveLength(confirm?1:0)
@@ -558,4 +560,26 @@ for(const lang of ['bg','en'])for(const reason of ['known','unknown','empty','un
  if(['known','empty'].includes(reason))await expect(status).toContainText('providerBodyStatus:'+(reason==='known'?'recognized':'empty'))
  await expect(status).not.toContainText('PRIVATE_')
  expect(sends).toBe(1);expect(cancels).toBe(0);expect(dialogs).toBe(1)
+})
+
+for(const target of ['none','wrong'])test(`session target ${target} disables send without preparing`,async({page})=>{
+ await setup(page,{diagnostic:true,sessionDiagnostic:true})
+ await page.route('**/api/push-operator',r=>r.fulfill({json:{code:'rights:allowed',allowed:true,target:target==='none'?null:{deviceId:'b1000000-0000-0000-0000-000000000099',label:'Other synthetic'},deliveryEnabled:false,phoneDelivery:'unconfirmed'}}))
+ // Remount to read the changed server authority.
+ await page.getByRole('button',{name:'Затвори',exact:true}).click()
+ await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
+ await page.getByRole('tab',{name:'Push известия',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true})).toBeDisabled()
+ await expect(page.locator('.push-settings')).toContainText('Разрешено устройство: '+(target==='none'?'няма':'Other synthetic'))
+ await expect(page.locator('.push-settings')).toContainText('FCM: fcm-wp')
+})
+
+test('session Push refuses changed browser keys before confirmation',async({page})=>{
+ const state=await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
+ await page.route('**/api/push-key-diagnostics',r=>r.fulfill({json:{keys:{p256dh:'match',auth:'mismatch'}}}))
+ let dialogs=0;page.on('dialog',async d=>{dialogs++;await d.dismiss()})
+ await page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true}).click()
+ await expect(page.locator('.push-settings').getByRole('status')).toContainText('device:registration-or-consent')
+ await expect.poll(()=>state.sessionCalls.some(c=>c.operation==='cancel')).toBe(true)
+ expect(dialogs).toBe(0);expect(state.sessionCalls.some(c=>c.operation==='send')).toBe(false)
 })
