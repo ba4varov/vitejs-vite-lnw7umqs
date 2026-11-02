@@ -21,3 +21,15 @@ export async function pushKeySessionMatches(session:AuthSession) {
 export async function pushKeyRequest(session:AuthSession,body:object) {
  return requestPushKeyCheck(session,body,{getSession:restoreSession})
 }
+
+// No retries: a lost response may follow an already consumed provider attempt.
+export async function sessionPushTest(session:AuthSession,body:object) {
+ const active=await restoreSession()
+ if(!active||active.user.id!==session.user.id)throw Error('session:changed')
+ try {
+  const response=await fetch('/api/push-operator',{method:'POST',headers:{Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(55000)})
+  const result=await response.json()
+  if(typeof result.code!=='string'||result.deliveryEnabled!==false||result.phoneDelivery!=='unconfirmed')throw Error()
+  return result
+ }catch {throw Error('network:unknown')}
+}

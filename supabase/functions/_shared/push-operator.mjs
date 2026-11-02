@@ -3,7 +3,7 @@ import {Buffer} from 'node:buffer'
 import {createTestHandler,validVapid,validateDevice} from './push-test.mjs'
 const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(v)
 const reply=(status,error,fields={})=>new Response(JSON.stringify({error,deliveryEnabled:false,...fields}),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
-async function bodyOf(req){
+export async function bodyOf(req){
  const reader=req.body?.getReader();if(!reader)throw Error('INVALID_REQUEST')
  let size=0;const chunks=[];let timer
  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('BODY_TIMEOUT')),2000)})
