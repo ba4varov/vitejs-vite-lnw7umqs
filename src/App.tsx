@@ -264,6 +264,7 @@ const WeatherApp = () => {
   startupTiming.mark('react')
   const initialLocationRef = useRef(createInitialLocation({ navigator, confirmed: loadConfirmedLocation() }))
   const [initialLocationReady, setInitialLocationReady] = useState(false)
+  const [initialLocationStatus, setInitialLocationStatus] = useState('pending')
   const locationRevisionRef = useRef(0)
   const [gpsLabelGeneration, setGpsLabelGeneration] = useState(0)
   const forecastInFlightRef = useRef<{ key: string, id: number } | null>(null)
@@ -967,9 +968,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       startupLifecycle.record('location:decision', { source: selection.source })
       setInitialLocationReady(true)
     }
+    const unsubscribeStatus = initialLocationRef.current.subscribeStatus(setInitialLocationStatus)
+    setInitialLocationStatus(initialLocationRef.current.status)
     const unsubscribe = initialLocationRef.current.subscribe(accept)
     void initialLocationRef.current.start().then(accept)
-    return () => { active = false; unsubscribe() }
+    return () => { active = false; unsubscribe(); unsubscribeStatus() }
   }, [])
 
   const keepLastLocation = () => {
@@ -1159,9 +1162,14 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
       {gpsInaccurate && <p className="search-feedback" role="status">{lang === 'bg' ? 'Автоматичното местоположение не е прието: точността е недостатъчна за прогноза по населено място (нужна е точност до 3 км). Запазваме последното потвърдено място, ако има такова. Избери град или опитай отново.' : 'Automatic location was not accepted: accuracy is insufficient for a city forecast (3 km or better required). Your last confirmed place is kept if available. Choose a city or try again.'}</p>}
       {initialLocationReady && !hasAcceptedLocation && <p className="location-choice" role="status">{lang === 'bg' ? 'Избери град от търсенето или бутоните по-долу.' : 'Choose a city using search or the buttons below.'}</p>}
-      {!hasAcceptedLocation && <button type="button" className="city-btn" onClick={useMyLocation} disabled={gpsBusy}>{lang === 'bg' ? 'Разреши местоположението' : 'Allow location'}</button>}
+      {!hasAcceptedLocation && initialLocationStatus === 'slow' && !gpsBusy && <p className="location-delay" role="status">{lang === 'bg' ? 'Определянето на местоположението се забави. Опитай отново или избери град.' : 'Finding your location is taking longer than expected. Retry or choose a city.'}</p>}
+      {!hasAcceptedLocation && (initialLocationStatus === 'pending' || gpsBusy ? (
+        <p className="location-pending" role="status">{lang === 'bg' ? 'Определяме местоположението…' : 'Determining your location…'}</p>
+      ) : (
+        <button type="button" className="city-btn" onClick={useMyLocation}>{initialLocationStatus === 'allow' ? (lang === 'bg' ? 'Разреши местоположението' : 'Allow location') : (lang === 'bg' ? 'Опитай местоположението отново' : 'Retry location')}</button>
+      ))}
       {gpsDenied && <p className="search-feedback" role="status">{lang === 'bg' ? 'Браузърът е блокирал местоположението. Отвори настройките за този сайт в браузъра и разреши „Местоположение“, после опитай отново. Можеш също да избереш град.' : 'Your browser has blocked location access. Open this site’s browser settings and allow Location, then try again. You can also choose a city.'}</p>}
-      {gpsError && !gpsDenied && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
+      {gpsError && !gpsDenied && initialLocationStatus !== 'pending' && initialLocationStatus !== 'slow' && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
 
       <div className="info-line">{t.info}</div>
 
