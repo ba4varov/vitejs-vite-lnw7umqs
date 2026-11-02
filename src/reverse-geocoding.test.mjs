@@ -31,9 +31,9 @@ test('current-location heading, metadata, and address follow each UI language', 
     return { ok: true, json: async () => responses[language] }
   }
 
-  const bulgarian = await reverseGeocodeLocation(43.2141, 27.9147, 'bg', { fetcher })
-  const english = await reverseGeocodeLocation(43.2141, 27.9147, 'en', { fetcher })
-  const bulgarianAgain = await reverseGeocodeLocation(43.2141, 27.9147, 'bg', { fetcher })
+  const bulgarian = await reverseGeocodeLocation(43.2141, 27.9147, 'bg', { fetcher, accuracy: 25 })
+  const english = await reverseGeocodeLocation(43.2141, 27.9147, 'en', { fetcher, accuracy: 25 })
+  const bulgarianAgain = await reverseGeocodeLocation(43.2141, 27.9147, 'bg', { fetcher, accuracy: 25 })
 
   assert.deepEqual(bulgarian, {
     name: 'Варна', region: 'Област Варна', country: 'България', address: 'булевард „Владислав Варненчик“ 267'
@@ -59,6 +59,18 @@ test('reverse geocoding uses localized neighborhood fallback without changing co
     return { ok: true, json: async () => ({ address: { town: 'Paris', suburb: 'Montmartre', country: 'France' } }) }
   }
 
-  const location = await reverseGeocodeLocation(48.8566, 2.3522, 'en', { fetcher })
+  const location = await reverseGeocodeLocation(48.8566, 2.3522, 'en', { fetcher, accuracy: 25 })
   assert.deepEqual(location, { name: 'Paris', region: null, country: 'France', address: 'Montmartre' })
+})
+
+test('imprecise or unknown accuracy never discloses an address from reverse response', async () => {
+  for (const accuracy of [undefined, 101, 3000, 259471]) {
+    const fetcher = async url => {
+      assert.equal(new URL(url).searchParams.get('zoom'), '10')
+      return { ok: true, json: async () => responses.en }
+    }
+    const location = await reverseGeocodeLocation(43.2141, 27.9147, 'en', { fetcher, accuracy })
+    assert.equal(location.name, 'Varna')
+    assert.equal(location.address, null)
+  }
 })

@@ -9,7 +9,7 @@ async function prepare(page:Page,gpsMs:number,networkMs:number,preferred:boolean
   // Expired synthetic session forces asynchronous profile restoration on each document.
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'fixture',refresh_token:'fixture-refresh',expires_at:1,user:{id:'00000000-0000-0000-0000-000000000002'}}))
   Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>({state:'granted'})}})
-  Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success:any)=>setTimeout(()=>success({coords:{latitude:43.2256,longitude:27.8888}}),gpsMs)}})
+  Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success:any)=>setTimeout(()=>success({coords:{latitude:43.2256,longitude:27.8888,accuracy:25}}),gpsMs)}})
   const w=window as any;w.lifecycleViolations=[];w.sawForecast=false
   document.addEventListener('DOMContentLoaded',()=>{
    new MutationObserver(()=>{

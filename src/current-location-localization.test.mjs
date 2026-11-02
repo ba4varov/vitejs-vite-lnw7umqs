@@ -43,10 +43,10 @@ test('geolocation language refresh requests Nominatim again and parses localized
     return { ok: true, json: async () => ({ address: { city: 'Varna', state: 'Varna', country: 'Bulgaria', road: 'Vladislav Varnenchik Blvd.', house_number: '267' } }) }
   }
   const controller = new AbortController()
-  const data = await reverseGeocodeLocation({ lat: 43.2141, lon: 27.9147 }, 'en', { fetcher, signal: controller.signal })
+  const data = await reverseGeocodeLocation({ lat: 43.2141, lon: 27.9147 }, 'en', { fetcher, signal: controller.signal, accuracy: 25 })
   assert.match(calls[0].url, /accept-language=en/)
   assert.equal(calls[0].signal, controller.signal)
-  assert.deepEqual(locationFromReverseGeocode(data, 'My Location'), {
+  assert.deepEqual(locationFromReverseGeocode(data, 'My Location', 25), {
     name: 'Varna', region: 'Varna', country: 'Bulgaria', exactLocation: 'Vladislav Varnenchik Blvd. 267'
   })
 })

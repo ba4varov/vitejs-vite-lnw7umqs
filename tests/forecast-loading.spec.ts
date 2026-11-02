@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test'
 import { weather } from './forecast-order-fixture'
 import { clickHeaderControl } from './header-navigation'
 
+// These fixtures test an existing forecast, starting from a confirmed city.
+test.beforeEach(async ({page}) => {
+ await page.addInitScript(() => localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual'})))
+})
+
 for (const width of [390, 1440]) for (const lang of ['bg', 'en'] as const) for (const dark of [false, true]) {
   test(`loading lifecycle ${width} ${lang} ${dark}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -96,7 +101,7 @@ for (const scenario of ['initial error', 'geolocation stale response', 'manual s
       await expect(page.locator('.big-temp')).toHaveText('18°C')
     } else {
       if (scenario === 'manual selection wins') await page.getByRole('button', { name: 'София', exact: true }).click()
-      await page.evaluate(() => (window as any).locate({ coords: { latitude: 42, longitude: 24 } }))
+      await page.evaluate(() => (window as any).locate({ coords: { latitude: 42, longitude: 24, accuracy: 25 } }))
       await expect(page.locator('.big-temp')).toHaveText('25°C')
       delayed.splice(0).forEach(resolve => resolve())
       await page.waitForLoadState('networkidle')

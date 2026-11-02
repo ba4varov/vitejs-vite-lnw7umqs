@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { weather } from './forecast-order-fixture'
 import { clickHeaderControl } from './header-navigation'
+
+// These fixtures test an existing forecast, starting from a confirmed city.
+test.beforeEach(async ({page}) => {
+ await page.addInitScript(() => localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual'})))
+})
 for (const width of [390,1440]) for (const lang of ['bg','en']) for (const dark of [false,true]) {
  test(`rain warning ${width} ${lang} ${dark}`, async ({page})=>{
   await page.setViewportSize({width,height:1000})
@@ -61,7 +66,7 @@ test('GPS pending clears the warning and new forecast restores it', async ({page
  })
  await page.locator('.location-btn').click()
  await expect(warning).toHaveCount(0)
- await page.evaluate(()=>(window as any).gpsSuccess({coords:{latitude:42,longitude:23}}))
+ await page.evaluate(()=>(window as any).gpsSuccess({coords:{latitude:42,longitude:23,accuracy:25}}))
  await expect(warning).toBeVisible()
  await expect(warning).toContainText('48')
 })
