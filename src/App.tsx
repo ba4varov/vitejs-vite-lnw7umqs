@@ -262,7 +262,7 @@ const WeatherApp = () => {
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
   startupTiming.mark('react')
-  const initialLocationRef = useRef(createInitialLocation({ navigator }))
+  const initialLocationRef = useRef(createInitialLocation({ navigator, confirmed: loadConfirmedLocation() }))
   const [initialLocationReady, setInitialLocationReady] = useState(false)
   const locationRevisionRef = useRef(0)
   const [gpsLabelGeneration, setGpsLabelGeneration] = useState(0)
@@ -272,6 +272,7 @@ const WeatherApp = () => {
   const explicitGpsRef = useRef(0)
   const [gpsBusy, setGpsBusy] = useState(false)
   const [gpsError, setGpsError] = useState(false)
+  const [gpsDenied, setGpsDenied] = useState(false)
   const backgroundLocationRef = useRef<string | null>(null)
   const [locationSource, setLocationSource] = useState<'default' | 'quick' | 'search' | 'place' | 'geolocation'>('default')
   const [searchInput, setSearchInput] = useState('')
@@ -403,6 +404,7 @@ const WeatherApp = () => {
     explicitGpsRef.current++
     setGpsBusy(false)
     setGpsError(false)
+    setGpsDenied(false)
     setGpsInaccurate(false)
     setInitialLocationReady(true)
   }
@@ -937,13 +939,16 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
   useEffect(() => {
     let active = true
-    void initialLocationRef.current.start().then(selection => {
+    const accept = (selection: any) => {
       if (!active || (selection.source !== 'manual' && locationChoiceRef.current)) return
       if (selection.source === 'manual' && explicitGpsPendingRef.current) return
       if (selection.source === 'place') {
-        if (placesGuardRef.current.isCurrent(initialDefaultTicketRef.current)) choosePlace(selection.place, false)
+        if (selection.confirmed || placesGuardRef.current.isCurrent(initialDefaultTicketRef.current)) choosePlace(selection.place, false)
       }
       else if (selection.source === 'geolocation') {
+        setGpsError(false)
+        setGpsDenied(false)
+        setGpsInaccurate(false)
         setGpsAccuracy(selection.accuracy)
         setLocationSource('geolocation')
         setCity(selection.name || translations[langRef.current].myLocation)
@@ -957,11 +962,14 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         else setLoading(false)
         setGpsInaccurate(selection.reason === 'accuracy')
         setGpsError(selection.reason !== 'accuracy')
+        setGpsDenied(selection.reason === 'denied')
       }
       startupLifecycle.record('location:decision', { source: selection.source })
       setInitialLocationReady(true)
-    })
-    return () => { active = false }
+    }
+    const unsubscribe = initialLocationRef.current.subscribe(accept)
+    void initialLocationRef.current.start().then(accept)
+    return () => { active = false; unsubscribe() }
   }, [])
 
   const keepLastLocation = () => {
@@ -977,6 +985,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     locationRevisionRef.current++
     explicitGpsPendingRef.current = true
     setGpsError(false)
+    setGpsDenied(false)
     setGpsInaccurate(false)
     forecastIntent.current++
     placesGuardRef.current.manualSelection()
@@ -992,9 +1001,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setGpsBusy(false)
       setGpsError(true)
     }, 5000)
-    const fail = () => {
+    const fail = (error?: GeolocationPositionError) => {
       clearTimeout(timer)
-      if (request === explicitGpsRef.current) { explicitGpsRef.current++; keepLastLocation(); explicitGpsPendingRef.current = false; setInitialLocationReady(true); setGpsBusy(false); setGpsError(true) }
+      if (request === explicitGpsRef.current) { explicitGpsRef.current++; keepLastLocation(); explicitGpsPendingRef.current = false; setInitialLocationReady(true); setGpsBusy(false); setGpsError(true); setGpsDenied(error?.code === 1) }
     }
     try { navigator.geolocation.getCurrentPosition(position => {
       clearTimeout(timer)
@@ -1150,7 +1159,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
       {gpsInaccurate && <p className="search-feedback" role="status">{lang === 'bg' ? 'Автоматичното местоположение не е прието: точността е недостатъчна за прогноза по населено място (нужна е точност до 3 км). Запазваме последното потвърдено място, ако има такова. Избери град или опитай отново.' : 'Automatic location was not accepted: accuracy is insufficient for a city forecast (3 km or better required). Your last confirmed place is kept if available. Choose a city or try again.'}</p>}
       {initialLocationReady && !hasAcceptedLocation && <p className="location-choice" role="status">{lang === 'bg' ? 'Избери град от търсенето или бутоните по-долу.' : 'Choose a city using search or the buttons below.'}</p>}
-      {gpsError && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
+      {!hasAcceptedLocation && <button type="button" className="city-btn" onClick={useMyLocation} disabled={gpsBusy}>{lang === 'bg' ? 'Разреши местоположението' : 'Allow location'}</button>}
+      {gpsDenied && <p className="search-feedback" role="status">{lang === 'bg' ? 'Браузърът е блокирал местоположението. Отвори настройките за този сайт в браузъра и разреши „Местоположение“, после опитай отново. Можеш също да избереш град.' : 'Your browser has blocked location access. Open this site’s browser settings and allow Location, then try again. You can also choose a city.'}</p>}
+      {gpsError && !gpsDenied && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
 
       <div className="info-line">{t.info}</div>
 
@@ -1394,10 +1405,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         </main>
       )}
 
-      {hasCurrentForecast && <>
-        <ProjectShowcase lang={lang} />
-        <AdSlot label={lang === 'bg' ? 'Рекламно пространство' : 'Advertising space'} />
-      </>}
+      <ProjectShowcase lang={lang} />
+      {hasCurrentForecast && <AdSlot label={lang === 'bg' ? 'Рекламно пространство' : 'Advertising space'} />}
 
       {hasCurrentForecast && selectedDay && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedDay(null)}>
