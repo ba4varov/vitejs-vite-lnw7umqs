@@ -4,7 +4,24 @@ type ProjectShowcaseProps = {
   lang: string
 }
 
-const ProjectIllustration = ({ project }: { project: string }) => (
+const ProjectIllustration = ({ project }: { project: string }) => {
+  if (project === 'vkus-i-lubov') return (
+    <svg className="project-illustration" viewBox="0 0 120 88" aria-hidden="true" focusable="false">
+      <circle cx="60" cy="49" r="28" />
+      <circle cx="60" cy="49" r="20" />
+      <path className="project-illustration-accent" d="M60 41c-8-10-23 2 0 18 23-16 8-28 0-18Z" />
+      <path d="M17 21v16m8-16v16m-4-16v48m-4-32h8M99 21c-8 8-8 24 0 24V69M47 12c-4 4 4 6 0 10m13-15c-4 4 4 6 0 10m13-5c-4 4 4 6 0 10" />
+    </svg>
+  )
+  if (project === 'rezzervo') return (
+    <svg className="project-illustration" viewBox="0 0 120 88" aria-hidden="true" focusable="false">
+      <path d="M19 41h66v32H19zM16 41l9-19h54l9 19M32 23l-5 18m19-18-2 18m17-18 2 18m11-18 5 18M30 73V55h17v18" />
+      <rect x="56" y="53" width="18" height="12" rx="3" />
+      <path className="project-illustration-accent" d="M93 10c-12 0-20 9-20 20 0 14 20 29 20 29s20-15 20-29c0-11-8-20-20-20Z" />
+      <circle cx="93" cy="29" r="7" />
+    </svg>
+  )
+  return (
   <svg className="project-illustration" viewBox="0 0 120 88" role="img" aria-label={project === 'iskra' ? 'Свързани сърца' : 'Картички с обяви'}>
     {project === 'iskra' ? (
       <>
@@ -24,7 +41,8 @@ const ProjectIllustration = ({ project }: { project: string }) => (
       </>
     )}
   </svg>
-)
+  )
+}
 
 export function ProjectShowcase({ lang }: ProjectShowcaseProps) {
   const locale = lang === 'en' ? 'en' : 'bg'

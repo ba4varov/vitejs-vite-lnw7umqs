@@ -7,6 +7,8 @@ test('project cards expose the approved external destinations', () => {
   assert.deepEqual(PROJECTS.map(({ name, url }) => ({ name, url })), [
     { name: 'Искра', url: 'https://iskra.ba4varov1.workers.dev/' },
     { name: 'NameriGo', url: 'https://nameri-go.vercel.app/' },
+    { name: 'Всичко е ВКУС и ЛЮБОВ', url: 'https://vkus-i-lubov.vercel.app/' },
+    { name: 'Rezzervo', url: 'https://rezzervo.vercel.app/' },
   ])
 })
 
