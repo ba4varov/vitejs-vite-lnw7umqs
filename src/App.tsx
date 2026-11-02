@@ -4,6 +4,7 @@ import type { ConversationContext, PendingClarification } from '../server/weathe
 import { startupTiming, startupLifecycle } from './startup-timing.js'
 import { createInitialLocation } from './initial-location.js'
 import { acceptedPosition, loadConfirmedLocation, saveConfirmedLocation } from './location-accuracy.js'
+import { reportedAccuracyMetres } from './reverse-location-details.js'
 import { createForecastRequests, enrichForecast } from './forecast-sources.js'
 import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
@@ -257,12 +258,14 @@ const WeatherApp = () => {
   const [hasAcceptedLocation, setHasAcceptedLocation] = useState(false)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | undefined>(undefined)
   const [gpsInaccurate, setGpsInaccurate] = useState(false)
+  const [reportedGpsAccuracy, setReportedGpsAccuracy] = useState<number | null>(null)
+  const [approximateLocation, setApproximateLocation] = useState<string | null>(null)
   // Inert until a location is accepted; never use a universal forecast city.
   const [coords, setCoords] = useState({ lat: 0, lon: 0 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
   const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
   startupTiming.mark('react')
-  const initialLocationRef = useRef(createInitialLocation({ navigator }))
+  const initialLocationRef = useRef(createInitialLocation({ navigator, confirmed: loadConfirmedLocation() }))
   const [initialLocationReady, setInitialLocationReady] = useState(false)
   const locationRevisionRef = useRef(0)
   const [gpsLabelGeneration, setGpsLabelGeneration] = useState(0)
@@ -272,6 +275,7 @@ const WeatherApp = () => {
   const explicitGpsRef = useRef(0)
   const [gpsBusy, setGpsBusy] = useState(false)
   const [gpsError, setGpsError] = useState(false)
+  const [gpsDenied, setGpsDenied] = useState(false)
   const backgroundLocationRef = useRef<string | null>(null)
   const [locationSource, setLocationSource] = useState<'default' | 'quick' | 'search' | 'place' | 'geolocation'>('default')
   const [searchInput, setSearchInput] = useState('')
@@ -397,6 +401,7 @@ const WeatherApp = () => {
   }
 
   const finalizeManualLocation = () => {
+    setApproximateLocation(null)
     initialLocationRef.current.manual()
     locationRevisionRef.current++
     explicitGpsPendingRef.current = false
@@ -404,6 +409,7 @@ const WeatherApp = () => {
     setGpsBusy(false)
     setGpsError(false)
     setGpsInaccurate(false)
+    setGpsDenied(false)
     setInitialLocationReady(true)
   }
 
@@ -937,13 +943,18 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
   useEffect(() => {
     let active = true
-    void initialLocationRef.current.start().then(selection => {
+    const accept = (selection: any) => {
       if (!active || (selection.source !== 'manual' && locationChoiceRef.current)) return
       if (selection.source === 'manual' && explicitGpsPendingRef.current) return
+      if (selection.source === 'geolocation' || selection.source === 'fallback') setReportedGpsAccuracy(reportedAccuracyMetres(initialLocationRef.current.reportedAccuracy))
       if (selection.source === 'place') {
-        if (placesGuardRef.current.isCurrent(initialDefaultTicketRef.current)) choosePlace(selection.place, false)
+        if (selection.confirmed || placesGuardRef.current.isCurrent(initialDefaultTicketRef.current)) choosePlace(selection.place, false)
       }
       else if (selection.source === 'geolocation') {
+        setGpsError(false)
+        setGpsDenied(false)
+        setGpsInaccurate(false)
+        setApproximateLocation(null)
         setGpsAccuracy(selection.accuracy)
         setLocationSource('geolocation')
         setCity(selection.name || translations[langRef.current].myLocation)
@@ -957,11 +968,14 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         else setLoading(false)
         setGpsInaccurate(selection.reason === 'accuracy')
         setGpsError(selection.reason !== 'accuracy')
+        setGpsDenied(selection.reason === 'denied')
       }
       startupLifecycle.record('location:decision', { source: selection.source })
       setInitialLocationReady(true)
-    })
-    return () => { active = false }
+    }
+    const unsubscribe = initialLocationRef.current.subscribe(accept)
+    void initialLocationRef.current.start().then(accept)
+    return () => { active = false; unsubscribe() }
   }, [])
 
   const keepLastLocation = () => {
@@ -973,11 +987,13 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
   const useMyLocation = () => {
     if (!navigator.geolocation?.getCurrentPosition) { setGpsError(true); return }
+    setApproximateLocation(null)
     initialLocationRef.current.manual()
     locationRevisionRef.current++
     explicitGpsPendingRef.current = true
     setGpsError(false)
     setGpsInaccurate(false)
+    setGpsDenied(false)
     forecastIntent.current++
     placesGuardRef.current.manualSelection()
     locationChoiceRef.current = true
@@ -992,9 +1008,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setGpsBusy(false)
       setGpsError(true)
     }, 5000)
-    const fail = () => {
+    const fail = (error?: GeolocationPositionError) => {
       clearTimeout(timer)
-      if (request === explicitGpsRef.current) { explicitGpsRef.current++; keepLastLocation(); explicitGpsPendingRef.current = false; setInitialLocationReady(true); setGpsBusy(false); setGpsError(true) }
+      if (request === explicitGpsRef.current) { explicitGpsRef.current++; keepLastLocation(); explicitGpsPendingRef.current = false; setInitialLocationReady(true); setGpsBusy(false); setGpsError(true); setGpsDenied(error?.code === 1) }
     }
     try { navigator.geolocation.getCurrentPosition(position => {
       clearTimeout(timer)
@@ -1002,6 +1018,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       explicitGpsRef.current++
       explicitGpsPendingRef.current = false
       setInitialLocationReady(true)
+      setReportedGpsAccuracy(reportedAccuracyMetres(position.coords.accuracy))
       const lat = position.coords.latitude, lon = position.coords.longitude
       if (!acceptedPosition(position.coords)) { keepLastLocation(); setGpsBusy(false); setGpsInaccurate(true); return }
       setGpsAccuracy(position.coords.accuracy)
@@ -1023,6 +1040,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
   useEffect(() => {
     if (locationSource !== 'geolocation') return
+    setApproximateLocation(null)
     const controller = new AbortController()
     startupTiming.mark('reverse:start')
     const revision = locationRevisionRef.current
@@ -1035,7 +1053,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setCity(localized.name)
       setPlaceDetails({ region: localized.region, country: localized.country })
       setExactLocation(localized.exactLocation)
-    }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) setCity(t.myLocation) })
+      setApproximateLocation(localized.approximateLocation)
+    }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) { setCity(t.myLocation); setExactLocation(null); setApproximateLocation(null) } })
     return () => controller.abort()
   }, [lang, coords.lat, coords.lon, locationSource, gpsLabelGeneration, gpsAccuracy])
 
@@ -1148,9 +1167,12 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         }</p>}
       </div>
 
+      {reportedGpsAccuracy !== null && <p className="search-feedback" data-testid="gps-accuracy" role="status">{lang === 'bg' ? `Последна отчетена GPS точност: ${reportedGpsAccuracy} м.` : `Last reported GPS accuracy: ${reportedGpsAccuracy} m.`} {reportedGpsAccuracy > 3000 ? (lang === 'bg' ? 'Резултатът е отхвърлен за прогноза.' : 'This fix was rejected for forecasts.') : reportedGpsAccuracy > 100 ? (lang === 'bg' ? 'Показваме само град: точността не е достатъчна за надежден квартал или уличен адрес.' : 'City only: accuracy is insufficient for a reliable neighborhood or street address.') : (lang === 'bg' ? 'Това е оценка на браузъра, а не гаранция за точен адрес.' : 'This is a browser estimate, not a guarantee of an exact address.')}</p>}
       {gpsInaccurate && <p className="search-feedback" role="status">{lang === 'bg' ? 'Автоматичното местоположение не е прието: точността е недостатъчна за прогноза по населено място (нужна е точност до 3 км). Запазваме последното потвърдено място, ако има такова. Избери град или опитай отново.' : 'Automatic location was not accepted: accuracy is insufficient for a city forecast (3 km or better required). Your last confirmed place is kept if available. Choose a city or try again.'}</p>}
       {initialLocationReady && !hasAcceptedLocation && <p className="location-choice" role="status">{lang === 'bg' ? 'Избери град от търсенето или бутоните по-долу.' : 'Choose a city using search or the buttons below.'}</p>}
-      {gpsError && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
+      {!hasAcceptedLocation && <button type="button" className="city-btn" onClick={useMyLocation} disabled={gpsBusy}>{lang === 'bg' ? 'Разреши местоположението' : 'Allow location'}</button>}
+      {gpsDenied && <p className="search-feedback" role="status">{lang === 'bg' ? 'Браузърът е блокирал местоположението. Отвори настройките за този сайт в браузъра и разреши „Местоположение“, после опитай отново. Можеш също да избереш град.' : 'Your browser has blocked location access. Open this site’s browser settings and allow Location, then try again. You can also choose a city.'} <button type="button" onClick={useMyLocation} disabled={gpsBusy}>{lang === 'bg' ? 'Опитай отново' : 'Try again'}</button></p>}
+      {gpsError && !gpsDenied && <p className="search-feedback" role="status">{lang === 'bg' ? 'Местоположението не е достъпно. Опитай отново или избери град.' : 'Location is unavailable. Try again or choose a city.'}</p>}
 
       <div className="info-line">{t.info}</div>
 
@@ -1247,10 +1269,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                   <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
                     <span>📍 {city}</span>
                     {exactLocation && (
-                      <span style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span data-testid="street-location" style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{opacity: 0.5, margin: '0 4px'}}>|</span> 🎯 {exactLocation}
                       </span>
                     )}
+                    {approximateLocation && <span data-testid="approximate-location" style={{ fontSize: '1rem', fontWeight: 'normal' }}>{lang === 'bg' ? 'Приблизително местоположение' : 'Approximate location'}: {approximateLocation}</span>}
                     <button type="button" onClick={toggleFavorite} className="star-btn" title={t.favorite} aria-label={t.favorite} aria-pressed={!!currentFavorite} style={{ marginLeft: '4px' }}>
                       {currentFavorite ? '⭐' : '☆'}
                     </button>
