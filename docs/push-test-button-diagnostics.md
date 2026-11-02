@@ -23,3 +23,11 @@ These defects are reproducible client paths. Zero preparation/attempt/delivery r
 11. Finally releases local UI locks. Server one-attempt authorization and all existing protective checks remain unchanged. No automatic send retries are introduced.
 
 Unmount makes the component unavailable by definition; this change does not persist diagnostics or credentials outside it. Cancellation failure cannot revoke a consumed attempt and is not retried.
+
+## Validation
+
+- Complete Chromium Push suite: 68 passed. After the final diagnostic-category filtering change, the focused BG/EN session suite passed 24/24, including provider HTTP refusal and untrusted diagnostic bodies.
+- Browser fixtures cover missing registration, explicit dismissal, suppressed confirmation (no dialog displayed), token rotation while registration is pending (zero prepare/send), registration timeout with late completion, HTTP 403, malformed HTTP 503, lost prepare response and lost send response (one send, no replay).
+- `npm test`: 2164 total, 2153 passed, 0 failed, 1 skipped, 10 pre-existing TODO.
+- `npm run build`, `npm run typecheck`, `npm run lint`, `git diff --check`: passed. Lint retains two existing no-unsafe-finally warnings in scripts/push-node-operator.mjs.
+- No changes to server/API, Supabase files, dependencies, VAPID, Vercel configuration, or the disabled test flag. No real phone delivery or Production deployment was attempted.

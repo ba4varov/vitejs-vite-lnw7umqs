@@ -3,7 +3,7 @@ import {renewPush,pushRenewalMessages} from './push-renewal.js'
 import {checkPushKeys,pushKeyMessages} from './push-key-diagnostics.js'
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
-import {sessionPushTest,pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
+import {sessionPushTest,pushTestDiagnostic,pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages,pushEnrollmentMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
@@ -50,8 +50,8 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
    const sending=permitId;permitId=undefined // Never cancel or replay an attempt with unknown outcome.
    testMessage('attempt:sending','Еднократната заявка се изпраща; доставката не е потвърдена.','Sending the single request; delivery is unconfirmed.')
    const result=await sessionPushTest(session,{operation:'send',permitId:sending,confirmation:`SEND ONE ${session.user.id} 5ff76543-ea64-4721-9846-3859621e954f`})
-   if(current())setMessage(`${result.code}${result.code==='fcm:accepted'?(bg?' — FCM прие заявката':' — FCM accepted the request'):''}${Number.isInteger(result.diagnostic?.providerStatus)&&result.diagnostic.providerStatus>=100&&result.diagnostic.providerStatus<=599?' · HTTP '+result.diagnostic.providerStatus:''} — ${bg?'Доставката до телефона не е потвърдена. Няма автоматично повторение.':'Phone delivery is unconfirmed. No automatic retry.'}`)
-  }catch(e){if(current())setMessage((/^(?:session|network|device|rights|vapid|request|configuration|attempt|database|fcm):[a-z-]+(?: · HTTP [1-5][0-9]{2})?$/.test((e as Error).message)?(e as Error).message:'attempt:unknown')+(bg?' — Тестът не приключи успешно; резултатът не е потвърден. Няма автоматично повторение.':' — Test did not complete successfully; outcome is unconfirmed. No automatic retry.'))}
+   if(current())setMessage(`${result.code}${result.code==='fcm:accepted'?(bg?' — FCM прие заявката':' — FCM accepted the request'):''}${pushTestDiagnostic(result)} — ${bg?'Доставката до телефона не е потвърдена. Няма автоматично повторение.':'Phone delivery is unconfirmed. No automatic retry.'}`)
+  }catch(e){if(current())setMessage((/^(?:session|network|device|rights|vapid|request|configuration|attempt|database|fcm):[a-z-]+(?: · HTTP [1-5][0-9]{2})?$/.test((e as Error).message)?(e as Error).message:'attempt:unknown')+pushTestDiagnostic(e)+(bg?' — Тестът не приключи успешно; резултатът не е потвърден. Няма автоматично повторение.':' — Test did not complete successfully; outcome is unconfirmed. No automatic retry.'))}
   finally{if(permitId)try{await sessionPushTest(session,{operation:'cancel',permitId})}catch{if(live.current)setMessage(previous=>previous+(bg?' · device:cancel-unconfirmed — Освобождаването на разрешението не е потвърдено. Няма повторение.':' · device:cancel-unconfirmed — Permit cancellation is unconfirmed. No retry.'))}testLock.current=false;if(live.current)setBusy(false)}
  }
  const renewalLock=useRef(false)

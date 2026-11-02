@@ -30,6 +30,12 @@ export const safePushTestCode=(value:unknown):string => typeof value==='string'&
  'request:http','request:response','network:unknown'
 ]).has(value)?value:'attempt:unknown'
 
+export function pushTestDiagnostic(result:any):string {
+ const category=result?.diagnostic?.category,status=result?.diagnostic?.providerStatus
+ const categories=['accepted','subscription_expired','provider_auth_rejected','rate_limited','provider_unavailable','redirect_refused','request_rejected','provider_rejected','tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed','transport_uncertain','dns_failed','preparation_failed','database_uncertain','gate_cleanup_failed']
+ return (categories.includes(category)?' · '+category:'')+(Number.isInteger(status)&&status>=100&&status<=599?' · provider HTTP '+status:'')
+}
+
 // No retries: a lost response may follow an already consumed provider attempt.
 export async function sessionPushTest(session:AuthSession,body:object) {
  const active=await restoreSession()
@@ -39,7 +45,7 @@ export async function sessionPushTest(session:AuthSession,body:object) {
   response=await fetch('/api/push-operator',{method:'POST',headers:{Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(55000)})
  }catch {throw Error('network:unknown')}
  const result=await response.json().catch(()=>null)
- if(!response.ok)throw Error(`${safePushTestCode(result?.code)==='attempt:unknown'?'request:http':safePushTestCode(result?.code)} · HTTP ${response.status}`)
+ if(!response.ok)throw Object.assign(Error(`${typeof result?.code==='string'&&safePushTestCode(result.code)===result.code?result.code:'request:http'} · HTTP ${response.status}`),{diagnostic:result?.diagnostic})
  if(!result||safePushTestCode(result.code)!==result.code||result.deliveryEnabled!==false||result.phoneDelivery!=='unconfirmed')throw Error('request:response')
  return result
 }

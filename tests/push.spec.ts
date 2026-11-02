@@ -359,7 +359,7 @@ for(const confirm of [false,true])test(`session Push requires immediate confirma
  expect(state.sessionCalls.every(c=>!Object.hasOwn(c,'userId')&&!Object.hasOwn(c,'deviceId'))).toBe(true)
 })
 
-for(const lang of ['bg','en'])for(const scenario of ['registration','cancel','http','malformed','lost','refresh','pending','suppressed','send-lost'])test(`session Push diagnostic regression ${scenario} ${lang}`,async({page})=>{
+for(const lang of ['bg','en'])for(const scenario of ['registration','cancel','http','malformed','lost','refresh','pending','suppressed','send-lost','provider','unsafe'])test(`session Push diagnostic regression ${scenario} ${lang}`,async({page})=>{
  const state=await setup(page,{diagnostic:true,sessionDiagnostic:true})
  await choose(page)
  if(lang==='en'){
@@ -378,6 +378,8 @@ for(const lang of ['bg','en'])for(const scenario of ['registration','cancel','ht
   if(operation==='send'){sends++;if(scenario==='send-lost')return r.abort('connectionclosed')}
   if(operation==='cancel')cancels++
   if(operation!=='prepare')return r.fallback()
+  if(scenario==='provider')return r.fulfill({status:502,json:{code:'fcm:rejected',diagnostic:{category:'provider_auth_rejected',providerStatus:403}}})
+  if(scenario==='unsafe')return r.fulfill({status:503,json:{code:'private-token',diagnostic:{category:'private-endpoint',providerStatus:'private-key'}}})
   if(scenario==='http')return r.fulfill({status:403,json:{code:'rights:denied'}})
   if(scenario==='malformed')return r.fulfill({status:503,body:'private server error'})
   if(scenario==='lost')return r.abort('connectionclosed')
@@ -401,7 +403,7 @@ for(const lang of ['bg','en'])for(const scenario of ['registration','cancel','ht
    await page.evaluate(()=>(window as any).finishRegistration())
   }
  }else{
-  const codes:Record<string,string>={registration:'device:missing-subscription',cancel:'confirmation:cancelled',http:'rights:denied · HTTP 403',malformed:'request:http · HTTP 503',lost:'network:unknown',suppressed:'confirmation:cancelled','send-lost':'network:unknown'}
+  const codes:Record<string,string>={registration:'device:missing-subscription',cancel:'confirmation:cancelled',http:'rights:denied · HTTP 403',malformed:'request:http · HTTP 503',lost:'network:unknown',suppressed:'confirmation:cancelled','send-lost':'network:unknown',provider:'fcm:rejected · HTTP 502 · provider_auth_rejected · provider HTTP 403',unsafe:'request:http · HTTP 503'}
   await expect(status).toContainText(codes[scenario])
  }
  await expect(status).not.toContainText('private')
