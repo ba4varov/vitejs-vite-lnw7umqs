@@ -22,14 +22,24 @@ export async function pushKeyRequest(session:AuthSession,body:object) {
  return requestPushKeyCheck(session,body,{getSession:restoreSession})
 }
 
+// Fixed vocabulary only: never expose arbitrary server strings or provider details.
+export const safePushTestCode=(value:unknown):string => typeof value==='string'&&new Set([
+ 'configuration:disabled','configuration:missing','request:method','request:input','rights:origin','rights:denied','rights:allowed','rights:permit-refused',
+ 'session:missing','session:rejected','session:changed','database:access-unavailable','vapid:configuration','vapid:subscription-invalid',
+ 'device:ready','device:closed','device:registration-or-consent','fcm:accepted','fcm:rejected','attempt:unknown','attempt:refused',
+ 'request:http','request:response','network:unknown'
+]).has(value)?value:'attempt:unknown'
+
 // No retries: a lost response may follow an already consumed provider attempt.
 export async function sessionPushTest(session:AuthSession,body:object) {
  const active=await restoreSession()
  if(!active||active.user.id!==session.user.id)throw Error('session:changed')
+ let response:Response
  try {
-  const response=await fetch('/api/push-operator',{method:'POST',headers:{Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(55000)})
-  const result=await response.json()
-  if(typeof result.code!=='string'||result.deliveryEnabled!==false||result.phoneDelivery!=='unconfirmed')throw Error()
-  return result
+  response=await fetch('/api/push-operator',{method:'POST',headers:{Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(55000)})
  }catch {throw Error('network:unknown')}
+ const result=await response.json().catch(()=>null)
+ if(!response.ok)throw Error(`${safePushTestCode(result?.code)==='attempt:unknown'?'request:http':safePushTestCode(result?.code)} · HTTP ${response.status}`)
+ if(!result||safePushTestCode(result.code)!==result.code||result.deliveryEnabled!==false||result.phoneDelivery!=='unconfirmed')throw Error('request:response')
+ return result
 }

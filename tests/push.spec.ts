@@ -10,7 +10,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   scope.setTestPushPermission=(value:string)=>{permissionValue=value}
   scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
   scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},getKey:(name:string)=>name==='p256dh'?Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer:new Uint8Array(16).fill(1).buffer,unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
-  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},showNotification:async()=>{scope.localNotifications++},pushManager:{getSubscription:async()=>subscription}}))})
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},showNotification:async()=>{scope.localNotifications++},pushManager:{getSubscription:async()=>subscription}}))})
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
   Object.defineProperty(navigator.serviceWorker,'register',{value:async()=>({pushManager:{
@@ -357,4 +357,57 @@ for(const confirm of [false,true])test(`session Push requires immediate confirma
  expect(state.sessionCalls.filter(c=>c.operation==='prepare')).toHaveLength(1)
  expect(state.sessionCalls.filter(c=>c.operation==='send')).toHaveLength(confirm?1:0)
  expect(state.sessionCalls.every(c=>!Object.hasOwn(c,'userId')&&!Object.hasOwn(c,'deviceId'))).toBe(true)
+})
+
+for(const lang of ['bg','en'])for(const scenario of ['registration','cancel','http','malformed','lost','refresh','pending','suppressed','send-lost'])test(`session Push diagnostic regression ${scenario} ${lang}`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,sessionDiagnostic:true})
+ await choose(page)
+ if(lang==='en'){
+  await page.locator('.push-settings').getByLabel('Име на това устройство').fill('')
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+ }
+ await page.evaluate(()=>{(window as any).setTestPushPermission('granted');(window as any).diagnosticSubscription('match')})
+ let dialogs=0,sends=0,cancels=0
+ page.on('dialog',async d=>{dialogs++;if(scenario==='send-lost')await d.accept();else await d.dismiss()})
+ if(scenario==='suppressed')await page.evaluate(()=>{window.confirm=()=>false})
+ await page.route('**/api/push-operator',async r=>{
+  const operation=r.request().postDataJSON().operation
+  if(operation==='send'){sends++;if(scenario==='send-lost')return r.abort('connectionclosed')}
+  if(operation==='cancel')cancels++
+  if(operation!=='prepare')return r.fallback()
+  if(scenario==='http')return r.fulfill({status:403,json:{code:'rights:denied'}})
+  if(scenario==='malformed')return r.fulfill({status:503,body:'private server error'})
+  if(scenario==='lost')return r.abort('connectionclosed')
+  return r.fallback()
+ })
+ if(scenario==='registration')await page.evaluate(()=>(window as any).diagnosticSubscription('missing'))
+ if(['refresh','pending'].includes(scenario))await page.evaluate(()=>{
+  const original=navigator.serviceWorker.getRegistration.bind(navigator.serviceWorker)
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:()=>new Promise(resolve=>{(window as any).finishRegistration=async()=>resolve(await original('/'))})})
+ })
+ await page.getByRole('button',{name:lang==='bg'?'Изпрати тестово Push известие':'Send test Push notification',exact:true}).click()
+ const status=page.locator('.push-settings').getByRole('status')
+ if(['refresh','pending'].includes(scenario)){
+  await expect(status).toContainText('device:checking')
+  if(scenario==='refresh'){
+   await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('meteo-pulse-auth')!);s.access_token='rotated-token';s.refresh_token='rotated-refresh';localStorage.setItem('meteo-pulse-auth',JSON.stringify(s));window.dispatchEvent(new StorageEvent('storage',{key:'meteo-pulse-auth'}))})
+   await expect(status).toContainText('session:changed')
+   await page.evaluate(()=>(window as any).finishRegistration())
+  }else{
+   await expect(status).toContainText('device:unavailable',{timeout:15000})
+   await page.evaluate(()=>(window as any).finishRegistration())
+  }
+ }else{
+  const codes:Record<string,string>={registration:'device:missing-subscription',cancel:'confirmation:cancelled',http:'rights:denied · HTTP 403',malformed:'request:http · HTTP 503',lost:'network:unknown',suppressed:'confirmation:cancelled','send-lost':'network:unknown'}
+  await expect(status).toContainText(codes[scenario])
+ }
+ await expect(status).not.toContainText('private')
+ expect(dialogs).toBe(['cancel','send-lost'].includes(scenario)?1:0)
+ expect(sends).toBe(scenario==='send-lost'?1:0)
+ if(scenario==='cancel')await expect.poll(()=>cancels).toBe(1)
+ if(['registration','refresh','pending'].includes(scenario))expect(state.sessionCalls.filter(c=>c.operation==='prepare')).toHaveLength(0)
+ expect(await page.evaluate(()=>[(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0])
 })
