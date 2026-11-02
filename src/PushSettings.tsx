@@ -2,8 +2,8 @@ import {checkLocalNotification} from './push-local-test.js'
 import {renewPush,pushRenewalMessages} from './push-renewal.js'
 import {checkPushKeys,pushKeyMessages} from './push-key-diagnostics.js'
 import {useEffect,useRef,useState} from 'react'
-import type {AuthSession} from './auth-client'
-import {sessionPushTest,pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
+import {subscribeSession,type AuthSession} from './auth-client'
+import {sessionPushTest,pushTestDiagnostic,pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages,pushEnrollmentMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
@@ -16,37 +16,81 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const [keyChecks,setKeyChecks]=useState<Record<string,{p256dh:string;auth:string}>>({})
  const [keyStage,setKeyStage]=useState('')
  const [testAllowed,setTestAllowed]=useState(false)
+ const [testAccess,setTestAccess]=useState('session:checking')
  const testLock=useRef(false)
- useEffect(()=>{let active=true;setTestAllowed(false);void sessionPushTest(session,{operation:'access'}).then(r=>{if(active)setTestAllowed(r.allowed===true)}).catch(()=>{});return()=>{active=false}},[session.user.id,session.access_token])
+ const testMessage=(code:string,bgText:string,enText:string)=>{if(live.current)setMessage(`${code} — ${bg?bgText:enText} ${bg?'Няма автоматично повторение.':'No automatic retry.'}`)}
+ useEffect(()=>{let active=true;setTestAllowed(false);setTestAccess('session:checking');void sessionPushTest(session,{operation:'access'}).then(r=>{if(active){setTestAllowed(r.allowed===true);setTestAccess(r.allowed===true?'rights:allowed':'rights:denied')}}).catch(e=>{if(active)setTestAccess(/^(?:session|network|rights|configuration|database|request):[a-z-]+(?: · HTTP [1-5][0-9]{2})?$/.test(e.message)?e.message:'attempt:unknown')});return()=>{active=false}},[session.user.id,session.access_token])
  const localTest=async()=>{setBusy(true);try{const code=await checkLocalNotification();if(live.current)setMessage(code+(code==='local:requested'?(bg?' — Браузърът прие локалното показване. Потвърди визуално известието; това не проверява FCM.':' — Browser accepted local display. Confirm visually; this does not test FCM.') : (bg?' — Провери разрешението и Service Worker на това устройство.':' — Check permission and Service Worker on this device.')))}finally{if(live.current)setBusy(false)}}
  const serverTest=async()=>{
-  if(testLock.current||busy||dirty)return
-  testLock.current=true;setBusy(true)
+  if(testLock.current||busy||dirty){testMessage('attempt:blocked','Друга операция е активна или има незапазени настройки.','Another operation is active or preferences are unsaved.');return}
+  testLock.current=true;setBusy(true);testMessage('device:checking','Проверка на разрешението и регистрацията…','Checking permission and registration…')
   const epoch=diagnosticEpoch.current
-  const current=()=>live.current&&epoch===diagnosticEpoch.current
+  const current=()=>{const valid=live.current&&epoch===diagnosticEpoch.current;if(!valid)testMessage('session:changed','Акаунтът е сменен или изгледът е затворен. Тестът е прекъснат; резултатът не е потвърден.','Account changed or view closed. Test interrupted; outcome is unconfirmed.');return valid}
   let permitId:string|undefined
   try{
    const device=data?.devices.find(d=>d.id==='5ff76543-ea64-4721-9846-3859621e954f')
-   if(!device||Notification.permission!=='granted'||await checkPushRegistration({device,key:data?.publicKey})!=='match')throw Error('device:local-registration-or-permission')
+   if(!device){testMessage('device:missing','Redmi устройството липсва.','The Redmi device is missing.');return}
+   if(support!=='supported'||Notification.permission!=='granted'){testMessage('device:permission','Браузърът не поддържа Push или липсва разрешение.','Push support or notification permission is missing.');return}
+   let timer:ReturnType<typeof setTimeout>|undefined
+   const registration=await Promise.race([checkPushRegistration({device,key:data?.publicKey}),new Promise<string>(resolve=>{timer=setTimeout(()=>resolve('unavailable'),10000)})]).finally(()=>clearTimeout(timer))
    if(!current())return
-   const prepared=await sessionPushTest(session,{operation:'prepare',category:data!.preferences.categories[0],requestId:crypto.randomUUID()})
+   if(registration!=='match'){testMessage('device:'+registration,pushRegistrationMessages.bg[registration],pushRegistrationMessages.en[registration]);return}
+   testMessage('session:preparing','Проверка на сесията и подготовка на разрешение…','Checking session and preparing authorization…')
+   if(!current())return
+   const prepared=await sessionPushTest(session,{operation:'prepare',category:data!.preferences.categories[0],requestId:crypto.randomUUID()},current)
    permitId=prepared.permitId
    if(prepared.code!=='device:ready'||!permitId)throw Error(prepared.code)
-   if(!current()||!await pushKeySessionMatches(session))return
-   if(!window.confirm(bg?'Изпрати точно ЕДНО реално Push известие до Redmi Note 13 Pro сега? При неизвестен резултат няма повторение. Приемането от FCM не доказва доставка на телефона.':'Send exactly ONE real Push to Redmi Note 13 Pro now? Unknown results will not be retried. FCM acceptance does not prove phone delivery.'))return
+   if(!current())return
+   testMessage('session:checking','Повторна проверка на сесията…','Rechecking session…')
+   if(!await pushKeySessionMatches(session)){testMessage('session:changed','Сесията вече не съвпада. Тестът е прекъснат.','Session no longer matches. Test interrupted.');return}
+   if(!current())return
+   // A refresh is allowed; authority and registration must still be current.
+   const authorize=async()=>{
+    if(!current())throw Error('session:changed')
+    const access=await sessionPushTest(session,{operation:'access'},current)
+    if(access.allowed!==true)throw Error('rights:denied')
+    const fresh=await pushRequest(session)
+    if(!current())throw Error('session:changed')
+    const target=fresh.devices.find(d=>d.id===device.id)
+    if(!target||!fresh.preferences.enabled||!fresh.preferences.cities.length||!fresh.preferences.categories.includes(data!.preferences.categories[0])||fresh.publicKey!==data!.publicKey)throw Error('device:registration-or-consent')
+    let deadline:ReturnType<typeof setTimeout>|undefined
+    const registration=await Promise.race([checkPushRegistration({device:target,key:fresh.publicKey}),new Promise<string>(resolve=>{deadline=setTimeout(()=>resolve('unavailable'),10000)})]).finally(()=>clearTimeout(deadline))
+    if(registration!=='match'||Notification.permission!=='granted')throw Error('device:registration-or-consent')
+    if(!await pushKeySessionMatches(session)||!current())throw Error('session:changed')
+   }
+   await authorize()
+   if(!current())return
+   testMessage('confirmation:waiting','Очаква се отделно потвърждение. Без него не се изпраща.','Waiting for separate confirmation. Nothing is sent without it.')
+   if(!window.confirm(bg?'Изпрати точно ЕДНО реално Push известие до Redmi Note 13 Pro сега? При неизвестен резултат няма повторение. Приемането от FCM не доказва доставка на телефона.':'Send exactly ONE real Push to Redmi Note 13 Pro now? Unknown results will not be retried. FCM acceptance does not prove phone delivery.')){testMessage('confirmation:cancelled','Потвърждение не е получено. Няма изпращане.','Confirmation was not received. Nothing sent.');return}
+   if(!current())return
+   testMessage('session:checking','Окончателна проверка на сесията, правата и регистрацията…','Final session, rights and registration check…')
+   await authorize()
    if(!current())return
    const sending=permitId;permitId=undefined // Never cancel or replay an attempt with unknown outcome.
-   const result=await sessionPushTest(session,{operation:'send',permitId:sending,confirmation:`SEND ONE ${session.user.id} 5ff76543-ea64-4721-9846-3859621e954f`})
-   if(current())setMessage(`${result.code}${result.code==='fcm:accepted'?(bg?' — FCM прие заявката':' — FCM accepted the request'):''}${result.diagnostic?.category?' · '+result.diagnostic.category:''}${result.diagnostic?.providerStatus?' · HTTP '+result.diagnostic.providerStatus:''} — ${bg?'Доставката до телефона не е потвърдена. Няма автоматично повторение.':'Phone delivery is unconfirmed. No automatic retry.'}`)
-  }catch(e){if(current())setMessage((/^(?:session|network|device|rights|vapid|request|configuration|attempt|database):[a-z-]+$/.test((e as Error).message)?(e as Error).message:'attempt:unknown')+(bg?' — Няма автоматично повторение.':' — No automatic retry.'))}
-  finally{if(permitId)void sessionPushTest(session,{operation:'cancel',permitId}).catch(()=>{});testLock.current=false;if(live.current)setBusy(false)}
+   testMessage('attempt:sending','Еднократната заявка се изпраща; доставката не е потвърдена.','Sending the single request; delivery is unconfirmed.')
+   const result=await sessionPushTest(session,{operation:'send',permitId:sending,confirmation:`SEND ONE ${session.user.id} 5ff76543-ea64-4721-9846-3859621e954f`},current)
+   if(current())setMessage(`${result.code}${result.code==='fcm:accepted'?(bg?' — FCM прие заявката':' — FCM accepted the request'):''}${pushTestDiagnostic(result)} — ${bg?'Доставката до телефона не е потвърдена. Няма автоматично повторение.':'Phone delivery is unconfirmed. No automatic retry.'}`)
+  }catch(e){if(current())setMessage((/^(?:session|network|device|rights|vapid|request|configuration|attempt|database|fcm):[a-z-]+(?: · HTTP [1-5][0-9]{2})?$/.test((e as Error).message)?(e as Error).message:'attempt:unknown')+pushTestDiagnostic(e)+(bg?' — Тестът не приключи успешно; резултатът не е потвърден. Няма автоматично повторение.':' — Test did not complete successfully; outcome is unconfirmed. No automatic retry.'))}
+  finally{if(permitId)try{await sessionPushTest(session,{operation:'cancel',permitId})}catch{if(live.current)setMessage(previous=>previous+(bg?' · device:cancel-unconfirmed — Освобождаването на разрешението не е потвърдено. Няма повторение.':' · device:cancel-unconfirmed — Permit cancellation is unconfirmed. No retry.'))}testLock.current=false;if(live.current)setBusy(false)}
  }
  const renewalLock=useRef(false)
  const diagnosticEpoch=useRef(0)
- useEffect(()=>{diagnosticEpoch.current++;setChecks({});setKeyChecks({});setKeyStage('');return()=>{diagnosticEpoch.current++}},[session.user.id,session.access_token])
  const live=useRef(true)
+ // Identity changes invalidate synchronously, even if React batches A → B → A.
+ // Token rotations for the same identity do not change the operation epoch.
+ useEffect(()=>{
+  live.current=true
+  const unsubscribe=subscribeSession(active=>{
+   if(active?.user.id!==session.user.id){
+    diagnosticEpoch.current++
+    if(testLock.current)setMessage(bg?'session:changed — Акаунтът е сменен или сесията е прекратена. Няма автоматично повторение.':'session:changed — Account changed or signed out. No automatic retry.')
+   }
+  })
+  return()=>{live.current=false;diagnosticEpoch.current++;unsubscribe()}
+ },[session.user.id])
+ useEffect(()=>{setChecks({});setKeyChecks({});setKeyStage('')},[session.user.id])
  const apply=(d:PushSnapshot)=>{if(live.current){setData(d);setDraft(d.preferences)}}
- useEffect(()=>{live.current=true;void pushRequest(session).then(apply).catch(()=>{if(live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{live.current=false}},[session.user.id,session.access_token])
+ useEffect(()=>{let active=true;void pushRequest(session).then(d=>{if(active)apply(d)}).catch(()=>{if(active&&live.current)setMessage(bg?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')});return()=>{active=false}},[session.user.id])
  useEffect(()=>{let active=true;if(support==='supported')void preparePushWorker().then(r=>{if(active)setWorker(r)}).catch(()=>{if(active)setMessage(bg?'Service Worker е недостъпен.':'Service Worker is unavailable.')});return()=>{active=false}},[support])
  const fail=(error:any)=>setMessage(error.message==='KEY_ROTATION_REQUIRED'?(bg?'Ключът е обновен. Отпиши това устройство от списъка или изчисти известията за сайта в браузъра, после го регистрирай отново.':'The key has changed. Remove this device from the list or reset this site’s notifications in browser settings, then register it again.'):error.message==='DENIED'?(bg?'Разрешението е отказано. Можеш да го промениш от настройките на браузъра.':'Permission denied. Change it in browser settings.'):error.message==='DISMISSED'?(bg?'Разрешението не е дадено. Няма регистрирано устройство.':'Permission was not granted. No device registered.'):(bg?'Промяната не е потвърдена. Обнови и опитай отново.':'Change was not confirmed. Refresh and retry.'))
  const save=async(p:PushPreferences)=>{setBusy(true);setMessage('');try{apply(await pushRequest(session,'PATCH',p));setMessage(bg?'Push настройките са запазени. Доставката остава изключена.':'Push preferences saved. Delivery remains disabled.')}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}
@@ -100,8 +144,10 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   {support==='supported'&&Notification.permission==='denied'&&<p>{bg?'Разрешението е отказано. За ново включване промени настройките за известия на този сайт в браузъра.':'Permission is denied. To enable notifications again, change this site’s notification settings in your browser.'}</p>}
   <button type="button" disabled={busy||support!=='supported'} onClick={()=>void localTest()}>{bg?'Провери известията':'Check notifications'}</button>
   <p>{bg?'Локална проверка на текущото устройство без заявка до Push доставчик. След теста провери визуално дали известието е показано.':'Local check on this device without a Push provider request. After the test, visually check that the notification appeared.'}</p>
+  {!testAllowed&&<p>{testAccess} — {bg?'Проверява се достъпът до сървърния тест или тестът е недостъпен. Нищо не е изпратено.':'Server test access is being checked or the test is unavailable. Nothing has been sent.'}</p>}
   {testAllowed&&<>
    <button type="button" disabled={busy||dirty||support!=='supported'||!data?.devices.some(d=>d.id==='5ff76543-ea64-4721-9846-3859621e954f')} onClick={()=>void serverTest()}>{bg?'Изпрати тестово Push известие':'Send test Push notification'}</button>
+   {(busy||dirty||support!=='supported'||!data?.devices.some(d=>d.id==='5ff76543-ea64-4721-9846-3859621e954f'))&&<p>{bg?'Тестовият бутон е недостъпен: ':'Test button unavailable: '}{busy?(bg?'изпълнява се операция.':'an operation is in progress.'):dirty?(bg?'има незапазени настройки.':'preferences are unsaved.'):support!=='supported'?(bg?'браузърът не поддържа Push.':'browser does not support Push.'):(bg?'Redmi устройството не е заредено.':'Redmi device is not loaded.')}</p>}
    <p>{bg?'Само Redmi Note 13 Pro. Изисква отделно административно разрешение и потвърждение непосредствено преди изпращане. „FCM прие заявката“ не означава „известието пристигна на телефона“.':'Redmi Note 13 Pro only. Requires separate administrative authorization and confirmation immediately before sending. “FCM accepted the request” does not mean “the notification arrived on the phone”.'}</p>
   </>}
   {data&&<>

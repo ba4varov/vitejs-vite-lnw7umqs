@@ -10,7 +10,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   scope.setTestPushPermission=(value:string)=>{permissionValue=value}
   scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
   scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},getKey:(name:string)=>name==='p256dh'?Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer:new Uint8Array(16).fill(1).buffer,unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
-  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},showNotification:async()=>{scope.localNotifications++},pushManager:{getSubscription:async()=>subscription}}))})
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},showNotification:async()=>{scope.localNotifications++},pushManager:{getSubscription:async()=>subscription}}))})
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
   Object.defineProperty(navigator.serviceWorker,'register',{value:async()=>({pushManager:{
@@ -357,4 +357,176 @@ for(const confirm of [false,true])test(`session Push requires immediate confirma
  expect(state.sessionCalls.filter(c=>c.operation==='prepare')).toHaveLength(1)
  expect(state.sessionCalls.filter(c=>c.operation==='send')).toHaveLength(confirm?1:0)
  expect(state.sessionCalls.every(c=>!Object.hasOwn(c,'userId')&&!Object.hasOwn(c,'deviceId'))).toBe(true)
+})
+
+for(const lang of ['bg','en'])for(const scenario of ['registration','cancel','http','malformed','lost','refresh','pending','suppressed','send-lost','provider','unsafe'])test(`session Push diagnostic regression ${scenario} ${lang}`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,sessionDiagnostic:true})
+ await choose(page)
+ if(lang==='en'){
+  await page.locator('.push-settings').getByLabel('Име на това устройство').fill('')
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+ }
+ await page.evaluate(()=>{(window as any).setTestPushPermission('granted');(window as any).diagnosticSubscription('match')})
+ let dialogs=0,sends=0,cancels=0
+ page.on('dialog',async d=>{dialogs++;if(scenario==='send-lost')await d.accept();else await d.dismiss()})
+ if(scenario==='suppressed')await page.evaluate(()=>{window.confirm=()=>false})
+ await page.route('**/api/push-operator',async r=>{
+  const operation=r.request().postDataJSON().operation
+  if(operation==='send'){sends++;if(scenario==='send-lost')return r.abort('connectionclosed')}
+  if(operation==='cancel')cancels++
+  if(operation!=='prepare')return r.fallback()
+  if(scenario==='provider')return r.fulfill({status:502,json:{code:'fcm:rejected',diagnostic:{category:'provider_auth_rejected',providerStatus:403}}})
+  if(scenario==='unsafe')return r.fulfill({status:503,json:{code:'private-token',diagnostic:{category:'private-endpoint',providerStatus:'private-key'}}})
+  if(scenario==='http')return r.fulfill({status:403,json:{code:'rights:denied'}})
+  if(scenario==='malformed')return r.fulfill({status:503,body:'private server error'})
+  if(scenario==='lost')return r.abort('connectionclosed')
+  return r.fallback()
+ })
+ if(scenario==='registration')await page.evaluate(()=>(window as any).diagnosticSubscription('missing'))
+ if(['refresh','pending'].includes(scenario))await page.evaluate(()=>{
+  const original=navigator.serviceWorker.getRegistration.bind(navigator.serviceWorker)
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:()=>{Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:original});return new Promise(resolve=>{(window as any).finishRegistration=async()=>resolve(await original('/'))})}})
+ })
+ await page.getByRole('button',{name:lang==='bg'?'Изпрати тестово Push известие':'Send test Push notification',exact:true}).click()
+ const status=page.locator('.push-settings').getByRole('status')
+ if(['refresh','pending'].includes(scenario)){
+  await expect(status).toContainText('device:checking')
+  if(scenario==='refresh'){
+   await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('meteo-pulse-auth')!);s.access_token='rotated-token';s.refresh_token='rotated-refresh';localStorage.setItem('meteo-pulse-auth',JSON.stringify(s));window.dispatchEvent(new StorageEvent('storage',{key:'meteo-pulse-auth'}))})
+   await page.evaluate(()=>(window as any).finishRegistration())
+   await expect(status).toContainText('confirmation:cancelled')
+  }else{
+   await expect(status).toContainText('device:unavailable',{timeout:15000})
+   await page.evaluate(()=>(window as any).finishRegistration())
+  }
+ }else{
+  const codes:Record<string,string>={registration:'device:missing-subscription',cancel:'confirmation:cancelled',http:'rights:denied · HTTP 403',malformed:'request:http · HTTP 503',lost:'network:unknown',suppressed:'confirmation:cancelled','send-lost':'network:unknown',provider:'fcm:rejected · HTTP 502 · provider_auth_rejected · provider HTTP 403',unsafe:'request:http · HTTP 503'}
+  await expect(status).toContainText(codes[scenario])
+ }
+ await expect(status).not.toContainText('private')
+ expect(dialogs).toBe(['cancel','send-lost','refresh'].includes(scenario)?1:0)
+ expect(sends).toBe(scenario==='send-lost'?1:0)
+ if(scenario==='cancel')await expect.poll(()=>cancels).toBe(1)
+ if(['registration','pending'].includes(scenario))expect(state.sessionCalls.filter(c=>c.operation==='prepare')).toHaveLength(0)
+ expect(await page.evaluate(()=>[(window as any).pushSubscribes,(window as any).pushUnsubscribes])).toEqual([0,0])
+})
+
+for(const lang of ['bg','en'])for(const stage of ['before-prepare','after-prepare','before-send'])test(`Push same-account refresh continues ${stage} ${lang}`,async({page})=>{
+ await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
+ if(lang==='en'){
+  await page.locator('.push-settings').getByLabel('Име на това устройство').fill('')
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+ }
+ await page.evaluate(stage=>{
+  const w:any=window;w.setTestPushPermission('granted');w.diagnosticSubscription('match')
+  w.pushPanel=document.querySelector('.push-settings');w.rotations=0
+  w.rotatePushSession=()=>{const s=JSON.parse(localStorage.getItem('meteo-pulse-auth')!);s.access_token='synthetic-rotated';s.refresh_token='synthetic-refresh-rotated';localStorage.setItem('meteo-pulse-auth',JSON.stringify(s));window.dispatchEvent(new StorageEvent('storage',{key:'meteo-pulse-auth'}));w.rotations++}
+  if(stage==='before-prepare'){
+   const original=navigator.serviceWorker.getRegistration.bind(navigator.serviceWorker)
+   Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:async()=>{Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:original});w.rotatePushSession();return original('/')}})
+  }
+  if(stage==='before-send'){const confirm=window.confirm;window.confirm=message=>{const answer=confirm(message);if(answer)w.rotatePushSession();return answer}}
+ },stage)
+ const requests:{operation:string;token:string|null}[]=[];let dialogs=0
+ page.on('dialog',async d=>{dialogs++;await d.accept()})
+ await page.route('**/api/push-operator',async r=>{
+  const operation=r.request().postDataJSON().operation;requests.push({operation,token:r.request().headers().authorization})
+  if(operation==='prepare'&&stage==='after-prepare')await page.evaluate(()=>(window as any).rotatePushSession())
+  return r.fallback()
+ })
+ await page.getByRole('button',{name:lang==='bg'?'Изпрати тестово Push известие':'Send test Push notification',exact:true}).click()
+ await expect(page.locator('.push-settings').getByRole('status')).toContainText('fcm:accepted')
+ expect(requests.filter(r=>r.operation==='prepare')).toHaveLength(1)
+ expect(requests.filter(r=>r.operation==='send')).toEqual([{operation:'send',token:'Bearer synthetic-rotated'}])
+ if(stage==='before-prepare')expect(requests.find(r=>r.operation==='prepare')?.token).toBe('Bearer synthetic-rotated')
+ expect(dialogs).toBe(1)
+ expect(await page.evaluate(()=>({same:(window as any).pushPanel===document.querySelector('.push-settings'),rotations:(window as any).rotations}))).toEqual({same:true,rotations:1})
+ expect(requests.filter(r=>r.operation==='cancel')).toHaveLength(0)
+})
+
+for(const change of ['account','logout','roundtrip'])for(const stage of ['before-prepare','after-prepare','before-send'])test(`Push identity invalidation ${change} ${stage}`,async({page})=>{
+ await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
+ await page.evaluate(({change,stage})=>{
+  const w:any=window;w.setTestPushPermission('granted');w.diagnosticSubscription('match')
+  w.changePushIdentity=()=>{
+   const original=localStorage.getItem('meteo-pulse-auth')!,s=JSON.parse(original)
+   if(change==='logout')localStorage.removeItem('meteo-pulse-auth')
+   else {s.user.id='00000000-0000-0000-0000-000000000099';s.access_token='synthetic-other';s.refresh_token='synthetic-other-refresh';localStorage.setItem('meteo-pulse-auth',JSON.stringify(s))}
+   window.dispatchEvent(new StorageEvent('storage',{key:'meteo-pulse-auth'}))
+   if(change==='roundtrip'){localStorage.setItem('meteo-pulse-auth',original);window.dispatchEvent(new StorageEvent('storage',{key:'meteo-pulse-auth'}))}
+  }
+  if(stage==='before-prepare'){
+   const original=navigator.serviceWorker.getRegistration.bind(navigator.serviceWorker)
+   Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:async()=>{Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:original});w.changePushIdentity();return original('/')}})
+  }
+  if(stage==='before-send'){const confirm=window.confirm;window.confirm=message=>{const answer=confirm(message);if(answer)w.changePushIdentity();return answer}}
+ },{change,stage})
+ const calls:string[]=[];let dialogs=0
+ page.on('dialog',async d=>{dialogs++;await d.accept()})
+ await page.route('**/api/push-operator',async r=>{
+  const operation=r.request().postDataJSON().operation;calls.push(operation)
+  if(operation==='prepare'&&stage==='after-prepare')await page.evaluate(()=>(window as any).changePushIdentity())
+  return r.fallback()
+ })
+ await page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true}).click()
+ if(change==='logout')await expect(page.locator('.push-settings')).toHaveCount(0)
+ else await expect(page.locator('.push-settings').getByRole('button',{name:'Изпрати тестово Push известие',exact:true})).toBeEnabled()
+ // Drain the pending handler via a terminal state or the unused-permit cancellation.
+ if(change==='roundtrip')await expect(page.locator('.push-settings').getByRole('status')).toContainText('session:changed')
+ if(stage!=='before-prepare'&&change==='roundtrip')await expect.poll(()=>calls.includes('cancel')).toBe(true)
+ expect(calls.filter(c=>c==='send')).toHaveLength(0)
+ expect(calls.filter(c=>c==='prepare')).toHaveLength(stage==='before-prepare'?0:1)
+ expect(dialogs).toBe(stage==='before-send'?1:0)
+})
+
+test('Push automatic auth refresh publishes the same account without remount or replay',async({page})=>{
+ await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
+ let refreshes=0;const calls:{operation:string;authorization:string|undefined}[]=[]
+ await page.route('**/auth/v1/token**',r=>{refreshes++;return r.fulfill({json:{access_token:'synthetic-auto-new',refresh_token:'synthetic-auto-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}})})
+ await page.route('**/api/push-operator',r=>{calls.push({operation:r.request().postDataJSON().operation,authorization:r.request().headers().authorization});return r.fallback()})
+ await page.evaluate(()=>{
+  const w:any=window;w.setTestPushPermission('granted');w.diagnosticSubscription('match');w.pushPanel=document.querySelector('.push-settings')
+  const original=navigator.serviceWorker.getRegistration.bind(navigator.serviceWorker)
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:async()=>{
+   Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:original})
+   const s=JSON.parse(localStorage.getItem('meteo-pulse-auth')!);s.expires_at=Math.floor(Date.now()/1000)-1
+   localStorage.setItem('meteo-pulse-auth',JSON.stringify(s));window.dispatchEvent(new StorageEvent('storage',{key:'meteo-pulse-auth'}))
+   return original('/')
+  }})
+ })
+ page.on('dialog',d=>d.accept())
+ await page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true}).click()
+ await expect(page.locator('.push-settings').getByRole('status')).toContainText('fcm:accepted')
+ expect(refreshes).toBe(1)
+ expect(calls.filter(c=>c.operation==='prepare')).toEqual([{operation:'prepare',authorization:'Bearer synthetic-auto-new'}])
+ expect(calls.filter(c=>c.operation==='send')).toEqual([{operation:'send',authorization:'Bearer synthetic-auto-new'}])
+ expect(await page.evaluate(()=>(window as any).pushPanel===document.querySelector('.push-settings'))).toBe(true)
+})
+
+for(const refusal of ['rights','consent','registration'])test(`Push final revalidation stops revoked ${refusal}`,async({page})=>{
+ await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
+ await page.evaluate(()=>{const w:any=window;w.setTestPushPermission('granted');w.diagnosticSubscription('match');w.pushConfirmed=false;const confirm=window.confirm;window.confirm=message=>{const answer=confirm(message);w.pushConfirmed=answer;return answer}})
+ const operations:string[]=[]
+ await page.route('**/api/push-operator',async r=>{
+  const operation=r.request().postDataJSON().operation;operations.push(operation)
+  if(refusal==='rights'&&operation==='access'&&await page.evaluate(()=>(window as any).pushConfirmed))return r.fulfill({status:403,json:{code:'rights:denied',deliveryEnabled:false,phoneDelivery:'unconfirmed'}})
+  return r.fallback()
+ })
+ if(refusal==='consent')await page.route('**/api/push',async r=>{
+  if(r.request().method()!=='GET'||!await page.evaluate(()=>(window as any).pushConfirmed))return r.fallback()
+  // Synthetic denied snapshot; never forward to a hosted account API.
+  return r.fulfill({json:{contractVersion:1,pro:false,preferences:{enabled:false,cities:[],categories:[]},devices:[],registrationEnabled:true,publicKey,deliveryEnabled:false}})
+ })
+ if(refusal==='registration')await page.evaluate(()=>{const confirm=window.confirm;window.confirm=message=>{const answer=confirm(message);if(answer)(window as any).diagnosticSubscription('device');return answer}})
+ let dialogs=0;page.on('dialog',async d=>{dialogs++;await d.accept()})
+ await page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true}).click()
+ await expect(page.locator('.push-settings').getByRole('status')).toContainText(refusal==='rights'?'rights:denied':'device:registration-or-consent')
+ await expect.poll(()=>operations.includes('cancel')).toBe(true)
+ expect(dialogs).toBe(1);expect(operations.filter(x=>x==='prepare')).toHaveLength(1);expect(operations.filter(x=>x==='send')).toHaveLength(0)
 })
