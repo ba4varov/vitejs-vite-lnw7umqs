@@ -4,7 +4,7 @@ import type { ConversationContext, PendingClarification } from '../server/weathe
 import { startupTiming, startupLifecycle } from './startup-timing.js'
 import { createInitialLocation } from './initial-location.js'
 import { acceptedPosition, loadConfirmedLocation, saveConfirmedLocation } from './location-accuracy.js'
-import { createForecastRequests, enrichForecast } from './forecast-sources.js'
+import { createForecastRequests, enrichForecast, forecastFreshness, FORECAST_REFRESH_MS } from './forecast-sources.js'
 import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
@@ -298,7 +298,17 @@ const WeatherApp = () => {
   const { weather, hourly, daily: forecast } = useMemo(() => enrichForecast(baseWeather, baseHourly, baseForecast, currentSources), [baseWeather, baseHourly, baseForecast, currentSources])
   const validLocationRef = useRef(weatherCoords)
   validLocationRef.current = weatherCoords
-  const hasCurrentForecast = Boolean(weather && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon)
+  const [snapshotTime, setSnapshotTime] = useState<number | null>(null)
+  const [clock, setClock] = useState(Date.now)
+  useEffect(() => {
+    const tick = () => setClock(Date.now())
+    const timer = setInterval(tick, 30_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick) }
+  }, [])
+  const freshness = forecastFreshness(snapshotTime, Math.max(clock, Date.now()))
+  const forecastIsFresh = freshness.fresh && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon
+  const hasCurrentForecast = Boolean(weather && freshness.usable && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon)
   const lifecycleInstanceRef = useRef<number | null>(null)
   const lifecycleViewRef = useRef('')
   useEffect(() => {
@@ -767,9 +777,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       if (!request.current() || requestId !== weatherRequestIdRef.current) return
 
       // Validate the structure before publishing any part of a new snapshot.
-      if (!data.current || !Array.isArray(data.hourly?.time) || !Array.isArray(data.daily?.time) ||
-          ['weather_code', 'temperature_2m', 'apparent_temperature', 'precipitation', 'wind_speed_10m', 'surface_pressure', 'relative_humidity_2m', 'visibility', 'dew_point_2m', 'cloud_cover'].some(field => !Array.isArray(data.hourly[field])) ||
-          ['weather_code', 'temperature_2m_min', 'temperature_2m_max', 'precipitation_sum', 'precipitation_probability_max', 'wind_speed_10m_max', 'uv_index_max', 'apparent_temperature_max'].some(field => !Array.isArray(data.daily[field]))) throw new Error('Incomplete main forecast')
+      if (data.error || !data.current || !Number.isFinite(data.current.weather_code) || !Array.isArray(data.hourly?.time) || !data.hourly.time.length || !Array.isArray(data.daily?.time) || data.daily.time.length < 15 ||
+          ['weather_code', 'temperature_2m', 'apparent_temperature', 'precipitation', 'wind_speed_10m', 'surface_pressure', 'relative_humidity_2m', 'visibility', 'dew_point_2m', 'cloud_cover'].some(field => (!Array.isArray(data.hourly[field]) || data.hourly[field].length !== data.hourly.time.length)) ||
+          ['weather_code', 'temperature_2m_min', 'temperature_2m_max', 'precipitation_sum', 'precipitation_probability_max', 'wind_speed_10m_max', 'uv_index_max', 'apparent_temperature_max'].some(field => (!Array.isArray(data.daily[field]) || data.daily[field].length !== data.daily.time.length))) throw new Error('Incomplete main forecast')
       const cur = decodeWeatherCode(data.current.weather_code)
       
       const nextWeather = {
@@ -881,7 +891,10 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setWeatherCoords({ lat, lon })
       setLoading(false)
       setForecastReady(viewIntent)
-      setLastUpdated(new Date())
+      const receivedAt = new Date()
+      setLastUpdated(receivedAt)
+      setSnapshotTime(receivedAt.getTime())
+      setClock(receivedAt.getTime())
 
       // Извикване на AI функцията с реални данни
       fetchAiAdvice({
@@ -902,10 +915,13 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
       }
 
-    } catch {
+    } catch (failure: any) {
       if (requestId !== weatherRequestIdRef.current || locationKeyRef.current !== key) return
       // Upstream errors can contain request URLs. Keep coordinates out of logs.
-      setError(sameLocation ? (langRef.current === 'bg' ? 'Прогнозата не се обнови. Показваме последните валидни данни.' : 'Forecast update failed. Showing the last valid data.') : t.error)
+      const bg = langRef.current === 'bg'
+      setError([503, 429].includes(failure?.status)
+        ? (bg ? 'Доставчикът на прогнозата е временно недостъпен или ограничава заявките. Изчакайте поне 15 минути преди нов опит.' : 'The forecast provider is temporarily unavailable or rate limiting requests. Wait at least 15 minutes before trying again.')
+        : (bg ? 'Не е получена валидна прогноза. Опитайте отново по-късно.' : 'No valid forecast was received. Please try again later.'))
       setLoading(false)
     } finally {
       if (forecastInFlightRef.current?.id === requestId) forecastInFlightRef.current = null
@@ -932,7 +948,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setSelectedDay(null)
       setSelectedHour(null)
       fetchWeather(coords.lat, coords.lon)
-      interval = setInterval(() => fetchWeather(coords.lat, coords.lon, true), 15 * 60 * 1000)
+      interval = setInterval(() => fetchWeather(coords.lat, coords.lon, true), FORECAST_REFRESH_MS)
     })
     return () => { active = false; clearInterval(interval); weatherRequestIdRef.current++; forecastInFlightRef.current = null; requestsRef.current.cancel() }
   }, [initialLocationReady, hasAcceptedLocation, coords.lat, coords.lon])
@@ -1054,7 +1070,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   }, [hasAcceptedLocation, coords.lat, coords.lon, city, placeDetails, locationSource, gpsAccuracy])
 
   const activeAlerts = [];
-  if (weather) {
+  if (weather && forecastIsFresh) {
     if (weather.temp >= 35) activeAlerts.push({ icon: '🔥', text: (t as any).highTemp });
     if (weather.temp <= -5) activeAlerts.push({ icon: '❄️', text: (t as any).lowTemp });
     if (weather.windSpeed >= 65) activeAlerts.push({ icon: '⚠️', text: (t as any).highWind });
@@ -1110,7 +1126,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <h1><a className="brand-home" href={import.meta.env.BASE_URL} aria-label={lang === 'bg' ? 'Метео Пулс — начална страница' : 'Meteo Pulse — home'}>{t.title}</a></h1>
           <p className="subtitle" style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '-4px', fontWeight: 'normal' }}>{t.subtitle}</p>
         </div>
-        <HeaderNavigation lang={lang} notifications={<WeatherNotifications locationKey={`${Math.round(coords.lat*10)}:${Math.round(coords.lon*10)}`} key={session?.user.id||'guest'} lang={lang} session={session} forecast={plannerLocation?.lat===coords.lat && plannerLocation?.lon===coords.lon ? notificationForecast : null} city={city} />}>
+        <HeaderNavigation lang={lang} notifications={<WeatherNotifications locationKey={`${Math.round(coords.lat*10)}:${Math.round(coords.lon*10)}`} key={session?.user.id||'guest'} lang={lang} session={session} forecast={forecastIsFresh && plannerLocation?.lat===coords.lat && plannerLocation?.lon===coords.lon ? notificationForecast : null} city={city} />}>
           <AuthPanel lang={lang} ref={plannerAuth} />
           <AdminLink lang={lang} />
           <button className="lang-btn" aria-label={lang === 'bg' ? 'Switch to English' : 'Превключи на български'} onClick={toggleLanguage}>
@@ -1188,7 +1204,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {placesError && <p className="places-error" role="alert">{placesErrorText(placesError, lang)} <button disabled={placesBusy} onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
 
-      {!hasCurrentForecast && (!initialLocationReady || hasAcceptedLocation) && (loading || !error) && (
+      {snapshotTime !== null && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon && !freshness.fresh && <p role="status" className="forecast-update-error">
+        {lang === 'bg' ? 'Последна валидна прогноза: ' : 'Last valid forecast: '}{new Date(snapshotTime).toLocaleString(lang === 'bg' ? 'bg-BG' : 'en-GB')}.{' '}
+        {lang === 'bg' ? (freshness.usable ? 'Данните не са текущи. Предупрежденията и съветите са скрити.' : 'Данните са изтекли и са скрити.') : (freshness.usable ? 'Data is not current. Warnings and advice are hidden.' : 'Data has expired and is hidden.')}
+      </p>}
+      {!hasCurrentForecast && (!initialLocationReady || hasAcceptedLocation) && (loading || (!error && snapshotTime === null)) && (
         <section className="forecast-loading" role="status" aria-live="polite" aria-busy="true">
           <div className="card skeleton-current">
             <div className="skeleton-heading"><span aria-hidden="true">🌤️</span><div><h2>{t.loading}</h2><p>{initialLocationReady ? `${t.loadingForecast} ${city}` : (lang === 'bg' ? 'Определяме началното местоположение…' : 'Choosing your starting location…')}</p></div></div>
@@ -1200,9 +1220,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         </section>
       )}
 
-      {error && !loading && !hasCurrentForecast && (
+      {(error || (snapshotTime !== null && !freshness.usable)) && !loading && !hasCurrentForecast && (
         <div className="card center-text">
-          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error}</p>
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>⚠️ {error || (lang === 'bg' ? 'Прогнозата трябва да бъде обновена.' : 'The forecast needs updating.')}</p>
           <button className="search-btn" onClick={() => fetchWeather(coords.lat, coords.lon)}>{t.tryAgain}</button>
         </div>
       )}
@@ -1211,7 +1231,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         <main ref={forecastDashboardRef} className="forecast-dashboard">
           {error && <p className="forecast-update-error" role="status">{error} <button type="button" onClick={() => fetchWeather(coords.lat, coords.lon, true)}>{t.tryAgain}</button></p>}
           {loading && <div className="forecast-refresh" role="status" aria-live="polite">↻ {t.refreshing}</div>}
-          <RainWarning forecast={gpsBusy ? null : notificationForecast} city={city} lang={lang} updated={lastUpdated} />
+          <RainWarning forecast={gpsBusy || !forecastIsFresh ? null : notificationForecast} city={city} lang={lang} updated={lastUpdated} />
           {activeAlerts.length > 0 && (
             <div className="alerts-container">
               {activeAlerts.map((alert, idx) => (
@@ -1275,7 +1295,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
                   )}
                   
                  {/* Тук се появява AI съветът от Gemini */}
-                  {aiAdvice?.trim() && <WeatherAdvice key={`${weatherRequestIdRef.current}:${aiAdvice}`} advice={aiAdvice} lang={lang} />}
+                  {forecastIsFresh && aiAdvice?.trim() && <WeatherAdvice key={`${weatherRequestIdRef.current}:${aiAdvice}`} advice={aiAdvice} lang={lang} />}
 
                   <div className="big-temp">{formatWeatherValue(weather.temp, '°C')}</div>
                   <div className="mobile-weather-summary">
@@ -1384,7 +1404,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           </ForecastSectionOrder>
 
           <Chart hourly={hourly} darkMode={darkMode} t={t} lang={lang} />
-          <WeatherPlanner onSignIn={() => plannerAuth.current?.openSignIn()} lang={lang} session={session} forecast={plannerForecast} city={city} />
+          <WeatherPlanner onSignIn={() => plannerAuth.current?.openSignIn()} lang={lang} session={session} forecast={forecastIsFresh ? plannerForecast : null} city={city} />
 
           <section className="card map-section">
             <h3>🌍 {t.interactiveMap}</h3>
