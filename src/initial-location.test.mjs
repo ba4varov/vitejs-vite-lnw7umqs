@@ -95,14 +95,14 @@ test('a stalled account default stays bounded and cannot start a prompt after th
  assert.equal(s.chooser.defaultResolved(null), false); assert.equal(s.callbacks.length, 0)
 })
 
-for (const confirmed of [null, { name: 'Varna', lat: 43.22, lon: 27.89, source: 'geolocation' }]) test(`granted GPS stays pending beyond startup deadline (saved=${!!confirmed})`, async () => {
+for (const confirmed of [null, { name: 'Varna', lat: 43.22, lon: 27.89, source: 'geolocation' }]) test(`granted GPS offers retry beyond startup deadline (saved=${!!confirmed})`, async () => {
  const s = setup('granted', { confirmed }), statuses = []
  s.chooser.subscribeStatus(status => statuses.push(status))
  assert.equal(s.chooser.status, 'pending')
  const result = s.chooser.start(); await flush()
  assert.equal(s.callbacks.length, 1)
  s.timers[0].callback(); await result
- assert.equal(s.chooser.status, 'pending')
+ assert.equal(s.chooser.status, 'slow')
  s.callbacks[0].error({ code: 3 })
  assert.equal(s.chooser.status, 'retry')
  assert.equal(statuses.includes('allow'), false)
@@ -111,7 +111,7 @@ for (const state of ['granted', 'denied', 'prompt']) test(`delayed permission ${
  const s = setup(); let release
  s.nav.permissions.query = () => new Promise(done => { release = done })
  const result = s.chooser.start(); await flush(); s.timers[0].callback(); await result
- assert.equal(s.chooser.status, 'pending')
+ assert.equal(s.chooser.status, 'slow')
  release({ state }); await flush()
  assert.equal(s.chooser.status, state === 'prompt' ? 'allow' : 'retry')
  assert.equal(s.callbacks.length, 0)
@@ -122,4 +122,28 @@ test('late GPS and manual ownership update status without duplicate requests', a
  assert.equal(s.chooser.status, 'retry')
  s.callbacks[0].success(fix)
  assert.equal(s.updates.length, 0); assert.equal(s.callbacks.length, 1)
+})
+
+test('never resolving Permissions API releases startup and offers bounded retry without requests', async () => {
+ const s = setup('granted'), statuses = []
+ s.nav.permissions.query = () => new Promise(() => {})
+ s.chooser.subscribeStatus(status => statuses.push(status))
+ const result = s.chooser.start(); await flush()
+ assert.equal(s.chooser.status, 'pending')
+ s.timers[0].callback()
+ assert.deepEqual(await result, { source: 'fallback' })
+ assert.equal(s.chooser.status, 'slow')
+ assert.equal(s.chooser.start(), result)
+ await flush(); assert.equal(s.callbacks.length, 0)
+ assert.equal(statuses.includes('allow'), false)
+ s.chooser.manual(); assert.equal(s.chooser.status, 'retry')
+})
+for (const manual of [false, true]) test(`slow GPS preserves late result ownership (manual=${manual})`, async () => {
+ const s = setup('granted'); const result = s.chooser.start(); await flush()
+ s.timers[0].callback(); await result
+ assert.equal(s.chooser.status, 'slow'); assert.equal(s.callbacks.length, 1)
+ if (manual) s.chooser.manual()
+ s.callbacks[0].success(fix)
+ assert.equal(s.updates.length, manual ? 0 : 1)
+ assert.equal(s.chooser.status, 'retry')
 })

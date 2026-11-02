@@ -11,9 +11,10 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
   const listeners = new Set()
   const statusListeners = new Set()
   // The forecast deadline does not end a browser permission/GPS operation.
-  // Keep its UI pending even when a confirmed fallback owns the forecast.
+  // Expose a retry after the deadline without cancelling a possible late fix.
   const status = () => {
-    if (!closed && (!settled || (!permission && !gpsDone) || (requested && !gpsDone))) return 'pending'
+    if (!closed && !settled) return 'pending'
+    if (!closed && ((!permission && !gpsDone) || (requested && !gpsDone))) return 'slow'
     return !closed && permission === 'prompt' && !requested ? 'allow' : 'retry'
   }
   const notifyStatus = () => { for (const listener of statusListeners) listener(status()) }
