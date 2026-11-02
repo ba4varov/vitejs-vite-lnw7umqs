@@ -2,15 +2,15 @@ import { clickHeaderControl } from './header-navigation'
 import {test,expect} from '@playwright/test'
 const publicKey=Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url')
 const preferences={enabled:false,cities:[],categories:[]}
-async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false,diagnostic=false,publicKeyAvailable=true}:{permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean;diagnostic?:boolean;publicKeyAvailable?:boolean}={}) {
+async function setup(page:any,{permission='granted',registrationEnabled=true,pro=false,failure=false,missingMigration=false,diagnostic=false,publicKeyAvailable=true,sessionDiagnostic=false}:{permission?:string;registrationEnabled?:boolean;pro?:boolean;failure?:boolean;missingMigration?:boolean;diagnostic?:boolean;publicKeyAvailable?:boolean;sessionDiagnostic?:boolean}={}) {
  await page.addInitScript(({permission,publicKey}:any)=>{
   localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'isolated-token',refresh_token:'isolated-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002',email:'push@example.invalid'}}))
-  const scope:any=window;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
+  const scope:any=window;scope.localNotifications=0;scope.pushPrompts=0;scope.pushUnsubscribes=0;scope.pushSubscribes=0
   let permissionValue='default',subscription:any=null
   scope.setTestPushPermission=(value:string)=>{permissionValue=value}
   scope.stalePushSubscription=()=>{subscription={options:{applicationServerKey:new Uint8Array(65).buffer},unsubscribe:async()=>{scope.pushUnsubscribes++;return true}}}
   scope.diagnosticSubscription=(kind:string)=>{scope.diagnosticWorkerMissing=kind==='worker';subscription=kind==='missing'?null:{endpoint:kind==='device'?'https://fcm.googleapis.com/wp/other':'https://fcm.googleapis.com/wp/isolated',options:{applicationServerKey:kind==='vapid'?new Uint8Array(65).buffer:Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer},getKey:(name:string)=>name==='p256dh'?Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)).buffer:new Uint8Array(16).fill(1).buffer,unsubscribe:()=>{throw Error('Unexpected unsubscribe')},toJSON:()=>{throw Error('Unexpected serialization')}}}
-  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},pushManager:{getSubscription:async()=>subscription}}))})
+  Object.defineProperty(navigator.serviceWorker,'getRegistration',{value:async()=>(scope.renewalRegistration||(scope.diagnosticWorkerMissing?undefined:{scope:location.origin+'/',active:{scriptURL:location.origin+'/push-sw.js'},showNotification:async()=>{scope.localNotifications++},pushManager:{getSubscription:async()=>subscription}}))})
   Object.defineProperty(Notification,'permission',{get:()=>permissionValue})
   Notification.requestPermission=()=>{scope.pushPrompts++;permissionValue=permission;return Promise.resolve(permission as NotificationPermission)}
   Object.defineProperty(navigator.serviceWorker,'register',{value:async()=>({pushManager:{
@@ -25,7 +25,13 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
  await page.route('**/api/activity',(r:any)=>r.fulfill({json:{enabled:false}}))
  await page.route('**/api/alerts',(r:any)=>r.fulfill({json:{contractVersion:2,pro,enabled:[],alerts:[]}}))
  const hash=await import('node:crypto').then(c=>c.createHash('sha256').update('https://fcm.googleapis.com/wp/isolated').digest('hex'))
- const calls:any[]=[];let prefs:any={...preferences},devices:any[]=diagnostic?[{id:'00000000-0000-0000-0000-000000000003',label:'Note 13 Pro',fingerprint:hash,createdAt:'2026-10-14T00:00:00Z'}]:[]
+ const sessionCalls:any[]=[]
+ await page.route('**/api/push-operator',async(r:any)=>{
+  const body=r.request().postDataJSON();sessionCalls.push(body)
+  const result=body.operation==='access'?{code:'rights:allowed',allowed:sessionDiagnostic}:body.operation==='prepare'?{code:'device:ready',permitId:'b0000000-0000-0000-0000-000000000002',expiresAt:new Date(Date.now()+120000).toISOString()}:body.operation==='cancel'?{code:'device:closed'}:{code:'fcm:accepted',diagnostic:{category:'accepted',providerStatus:201}}
+  return r.fulfill({json:{...result,deliveryEnabled:false,phoneDelivery:'unconfirmed'}})
+ })
+ const calls:any[]=[];let prefs:any={...preferences},devices:any[]=diagnostic?[{id:sessionDiagnostic?'5ff76543-ea64-4721-9846-3859621e954f':'00000000-0000-0000-0000-000000000003',label:'Note 13 Pro',fingerprint:hash,createdAt:'2026-10-14T00:00:00Z'}]:[]
  await page.route('**/api/push',async(r:any)=>{
   const method=r.request().method(),body=r.request().postDataJSON();calls.push({method,body})
   if(missingMigration)return r.fulfill({status:503,json:{error:'PUSH_UNAVAILABLE'}})
@@ -41,7 +47,7 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
  await page.goto('/');await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:'Push известия',exact:true}).click()
  await expect(page.locator('.push-settings')).toBeVisible()
- return {calls,preferences:()=>prefs}
+ return {calls,sessionCalls,preferences:()=>prefs}
 }
 for(const width of [390,1440])for(const lang of ['bg','en'])test(`push section visible without SQL migration ${width} ${lang}`,async({page})=>{
  await page.setViewportSize({width,height:1000});const state=await setup(page,{missingMigration:true})
@@ -52,7 +58,8 @@ for(const width of [390,1440])for(const lang of ['bg','en'])test(`push section v
  await expect(panel.getByRole('heading',{level:3})).toHaveText(lang==='bg'?'Push известия при затворен сайт':'Push notifications when the site is closed')
  await expect(panel.getByRole('status')).toHaveText(lang==='bg'?'Push настройките временно не могат да бъдат заредени. Затвори и опитай отново.':'Push preferences temporarily cannot be loaded. Close and try again.')
  await expect(panel).toContainText(lang==='bg'?'автоматичната доставка е изключена':'automatic delivery is disabled')
- await expect(panel.getByRole('button')).toHaveCount(0)
+ await expect(panel.getByRole('button')).toHaveCount(1)
+ await expect(panel.getByRole('button')).toHaveText(lang==='bg'?'Провери известията':'Check notifications')
  await expect(page.locator('.notification-settings')).toBeAttached()
  expect(state.calls.every(c=>c.method==='GET')).toBe(true)
  expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
@@ -323,4 +330,31 @@ for(const scenario of ['success','cancel','mismatch','lost-response','subscribe-
  expect(calls.filter(c=>c.method==='POST')).toHaveLength(['success','lost-response'].includes(scenario)?1:0)
  expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
  if(scenario==='success'){await expect(panel).toContainText('Note 13 Pro');await expect(panel).toContainText('Renewed device')}
+})
+
+
+test('local notification button uses only showNotification and leaves all server state alone',async({page})=>{
+ const state=await setup(page)
+ await page.evaluate(()=>(window as any).setTestPushPermission('granted'))
+ const before=state.calls.length,sessionBefore=state.sessionCalls.length
+ await page.getByRole('button',{name:'Провери известията',exact:true}).click()
+ await expect(page.locator('.push-settings').getByRole('status')).toContainText('local:requested')
+ expect(await page.evaluate(()=>(window as any).localNotifications)).toBe(1)
+ expect(state.calls.length).toBe(before);expect(state.sessionCalls.length).toBe(sessionBefore)
+ expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
+ await expect(page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true})).toHaveCount(0)
+})
+for(const confirm of [false,true])test(`session Push requires immediate confirmation, answer ${confirm}`,async({page})=>{
+ const state=await setup(page,{diagnostic:true,sessionDiagnostic:true})
+ await choose(page)
+ await page.evaluate(()=>{(window as any).setTestPushPermission('granted');(window as any).diagnosticSubscription('match')})
+ page.on('dialog',dialog=>confirm?dialog.accept():dialog.dismiss())
+ await page.getByRole('button',{name:'Изпрати тестово Push известие',exact:true}).click()
+ if(confirm){
+  await expect(page.locator('.push-settings').getByRole('status')).toContainText('fcm:accepted')
+  await expect(page.locator('.push-settings').getByRole('status')).toContainText('Доставката до телефона не е потвърдена')
+ }else await expect.poll(()=>state.sessionCalls.some(c=>c.operation==='cancel')).toBe(true)
+ expect(state.sessionCalls.filter(c=>c.operation==='prepare')).toHaveLength(1)
+ expect(state.sessionCalls.filter(c=>c.operation==='send')).toHaveLength(confirm?1:0)
+ expect(state.sessionCalls.every(c=>!Object.hasOwn(c,'userId')&&!Object.hasOwn(c,'deviceId'))).toBe(true)
 })

@@ -6,15 +6,17 @@ import {mkdir,rm,readFile,writeFile,cp} from 'node:fs/promises'
 import {resolve,dirname} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
+const sessionMode=process.argv.includes('--session')
+const entrypoint='api/push-operator.ts'
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..')
-const here=resolve(root,'work/push-node-build'),site=resolve(here,'source'),buildWork=resolve(here,'build'),bundle=resolve(here,'lambda')
+const here=resolve(root,sessionMode?'work/push-session-build':'work/push-node-build'),site=resolve(here,'source'),buildWork=resolve(here,'build'),bundle=resolve(here,'lambda')
 const builder=resolve(process.env.PUSH_NODE_BUILDER_DIR??resolve(root,'tests/push-node-build'))
 const require=createRequire(resolve(builder,'package.json'))
 const {build}=require('@vercel/node'),{FileFsRef}=require('@vercel/build-utils')
 assert.equal(require('@vercel/node/package.json').version,'23.0.0')
 assert.match(process.version,/^v24\./)
 await rm(here,{recursive:true,force:true})
-const names=['api/push-operator.ts','server/push-node-operator.js','server/push-node-transport.js',
+const names=[entrypoint,'server/push-session-test.js','server/push-node-operator.js','server/push-node-transport.js',
  'supabase/functions/_shared/push-operator.mjs','supabase/functions/_shared/push-test.mjs','supabase/functions/_shared/push-provider.mjs']
 const files={}
 for(const name of names){
@@ -24,7 +26,7 @@ for(const name of names){
 await writeFile(resolve(site,'package.json'),JSON.stringify({name:'isolated-weather-node-build',private:true,type:'module',dependencies:{'web-push':'3.6.7','ipaddr.js':'2.5.0'}}))
 files['package.json']=new FileFsRef({fsPath:resolve(site,'package.json')})
 await cp(resolve(root,'node_modules'),resolve(buildWork,'node_modules'),{recursive:true})
-const result=await build({files,entrypoint:'api/push-operator.ts',workPath:buildWork,
+const result=await build({files,entrypoint,workPath:buildWork,
  config:{projectSettings:{nodeVersion:'24.x',installCommand:'',buildCommand:'true'}},meta:{},considerBuildCommand:true})
 assert.equal(result.output.type,'Lambda');assert.equal(result.output.runtime,'nodejs24.x')
 const builtNames=Object.keys(result.output.files)
@@ -35,7 +37,7 @@ for(const [name,ref] of Object.entries(result.output.files)){
  assert.ok(['FileFsRef','FileBlob'].includes(ref.type));await mkdir(dirname(destination),{recursive:true})
  await writeFile(destination,ref.type==='FileBlob'?ref.data:await readFile(ref.fsPath))
 }
-const entry=builtNames.find(n=>n==='api/push-operator.js'||n==='api/push-operator.ts')
+const entry=builtNames.find(n=>n===entrypoint.replace(/\.ts$/,'.js')||n===entrypoint)
 assert.ok(entry,'Emitted entrypoint exists')
 // A fresh child with an explicit synthetic environment cannot inherit real credentials.
 const probe=resolve(here,'probe.mjs')
@@ -46,10 +48,10 @@ Object.assign(process.env,{SUPABASE_URL:'https://'+'a'.repeat(20)+'.supabase.co'
 let network=0;globalThis.fetch=async()=>{network++;throw Error('NETWORK_FORBIDDEN')};
 const module=await import(pathToFileURL(process.argv[2]));
 const handler=module.default?.fetch??module.default?.default?.fetch;assert.equal(typeof handler,'function');
-for(const platform of [{VERCEL:'1',VERCEL_ENV:'production',PUSH_NODE_OPERATOR_ENABLED:'false'},{VERCEL:'1',VERCEL_ENV:'preview',PUSH_NODE_OPERATOR_ENABLED:'true'},{VERCEL:'1',VERCEL_ENV:'development',PUSH_NODE_OPERATOR_ENABLED:'true'}]){
+for(const platform of [{VERCEL:'1',VERCEL_ENV:'production',PUSH_NODE_OPERATOR_ENABLED:'false',PUSH_SESSION_TEST_ENABLED:'false'},{VERCEL:'1',VERCEL_ENV:'preview',PUSH_NODE_OPERATOR_ENABLED:'true',PUSH_SESSION_TEST_ENABLED:'true'},{VERCEL:'1',VERCEL_ENV:'development',PUSH_NODE_OPERATOR_ENABLED:'true',PUSH_SESSION_TEST_ENABLED:'true'}]){
  Object.assign(process.env,platform);
- const response=await handler(new Request('https://weather.fixture.invalid/api/push-operator',{method:'POST',body:'{}'}));
- assert.equal(response.status,503);assert.equal((await response.json()).error,'PUSH_NODE_DISABLED');assert.equal(network,0);
+ const response=await handler(new Request('https://weather.fixture.invalid/api/push-operator',{method:'POST',headers:${JSON.stringify(sessionMode?{origin:'https://weather.fixture.invalid'}:{})},body:'{}'}));
+ assert.equal(response.status,503);assert.equal((await response.json())[${JSON.stringify(sessionMode?'code':'error')}],${JSON.stringify(sessionMode?'configuration:disabled':'PUSH_NODE_DISABLED')});assert.equal(network,0);
 }
 console.log(JSON.stringify({builtHandlerExecuted:true,previewWithSyntheticSecretsRefused:true,networkCalls:network}));
 `)

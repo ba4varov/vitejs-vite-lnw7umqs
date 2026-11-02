@@ -14,6 +14,7 @@ concurrency:
 
 # No deployment job/environment, project link, Supabase access or repository secrets.
 env:
+  PUSH_SESSION_TEST_ENABLED: 'false'
   PUSH_NODE_OPERATOR_ENABLED: 'false'
   PUSH_TEST_DELIVERY_ENABLED: 'false'
 
@@ -41,12 +42,16 @@ jobs:
       - name: Install the locked official builder in an isolated test directory
         run: npm ci --prefix tests/push-node-build --ignore-scripts --no-audit --no-fund
       - name: Build and execute a local Node Lambda with synthetic configuration
-        run: node scripts/verify-push-node-build.mjs
+        run: |
+          node scripts/verify-push-node-build.mjs
+          node scripts/verify-push-node-build.mjs --session
       - name: Confirm checks changed no dependencies or Supabase files
         run: git diff --exit-code -- package.json package-lock.json tests/push-node-build supabase
       - name: Upload safe local build evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: disabled-node-push-build-evidence
-          path: work/push-node-build/evidence.json
+          path: |
+            work/push-node-build/evidence.json
+            work/push-session-build/evidence.json
           if-no-files-found: error

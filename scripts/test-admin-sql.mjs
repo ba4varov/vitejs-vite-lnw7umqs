@@ -59,6 +59,8 @@ try {
   // One psql session preserves temporary before/after snapshots of an existing device.
   console.log(sql(['tests/sql/push-operator-before.sql','supabase/migrations/20261013050000_push_operator.sql','tests/sql/push-operator.sql']
     .map(path=>readFileSync(new URL(path,root),'utf8')).join('\n')))
+  sql(readFileSync(new URL('supabase/migrations/20261102042416_push_session_scope.sql',root),'utf8'))
+  console.log(sql(readFileSync(new URL('tests/sql/push-session-scope.sql',root),'utf8')))
   sql(readFileSync(new URL('supabase/migrations/20261014060000_push_key_diagnostics.sql',root),'utf8'))
   console.log(sql(readFileSync(new URL('tests/sql/push-key-diagnostics.sql',root),'utf8')))
   // Clear SQL test subject so PostgREST uses JWT claims, just as Supabase does.

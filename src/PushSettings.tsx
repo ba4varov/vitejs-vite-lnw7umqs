@@ -1,8 +1,9 @@
+import {checkLocalNotification} from './push-local-test.js'
 import {renewPush,pushRenewalMessages} from './push-renewal.js'
 import {checkPushKeys,pushKeyMessages} from './push-key-diagnostics.js'
 import {useEffect,useRef,useState} from 'react'
 import type {AuthSession} from './auth-client'
-import {pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
+import {sessionPushTest,pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages,pushEnrollmentMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 const personal=['walk','garden','sport']
@@ -14,6 +15,32 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const [checks,setChecks]=useState<Record<string,string>>({})
  const [keyChecks,setKeyChecks]=useState<Record<string,{p256dh:string;auth:string}>>({})
  const [keyStage,setKeyStage]=useState('')
+ const [testAllowed,setTestAllowed]=useState(false)
+ const testLock=useRef(false)
+ useEffect(()=>{let active=true;setTestAllowed(false);void sessionPushTest(session,{operation:'access'}).then(r=>{if(active)setTestAllowed(r.allowed===true)}).catch(()=>{});return()=>{active=false}},[session.user.id,session.access_token])
+ const localTest=async()=>{setBusy(true);try{const code=await checkLocalNotification();if(live.current)setMessage(code+(code==='local:requested'?(bg?' — Браузърът прие локалното показване. Потвърди визуално известието; това не проверява FCM.':' — Browser accepted local display. Confirm visually; this does not test FCM.') : (bg?' — Провери разрешението и Service Worker на това устройство.':' — Check permission and Service Worker on this device.')))}finally{if(live.current)setBusy(false)}}
+ const serverTest=async()=>{
+  if(testLock.current||busy||dirty)return
+  testLock.current=true;setBusy(true)
+  const epoch=diagnosticEpoch.current
+  const current=()=>live.current&&epoch===diagnosticEpoch.current
+  let permitId:string|undefined
+  try{
+   const device=data?.devices.find(d=>d.id==='5ff76543-ea64-4721-9846-3859621e954f')
+   if(!device||Notification.permission!=='granted'||await checkPushRegistration({device,key:data?.publicKey})!=='match')throw Error('device:local-registration-or-permission')
+   if(!current())return
+   const prepared=await sessionPushTest(session,{operation:'prepare',category:data!.preferences.categories[0],requestId:crypto.randomUUID()})
+   permitId=prepared.permitId
+   if(prepared.code!=='device:ready'||!permitId)throw Error(prepared.code)
+   if(!current()||!await pushKeySessionMatches(session))return
+   if(!window.confirm(bg?'Изпрати точно ЕДНО реално Push известие до Redmi Note 13 Pro сега? При неизвестен резултат няма повторение. Приемането от FCM не доказва доставка на телефона.':'Send exactly ONE real Push to Redmi Note 13 Pro now? Unknown results will not be retried. FCM acceptance does not prove phone delivery.'))return
+   if(!current())return
+   const sending=permitId;permitId=undefined // Never cancel or replay an attempt with unknown outcome.
+   const result=await sessionPushTest(session,{operation:'send',permitId:sending,confirmation:`SEND ONE ${session.user.id} 5ff76543-ea64-4721-9846-3859621e954f`})
+   if(current())setMessage(`${result.code}${result.code==='fcm:accepted'?(bg?' — FCM прие заявката':' — FCM accepted the request'):''}${result.diagnostic?.category?' · '+result.diagnostic.category:''}${result.diagnostic?.providerStatus?' · HTTP '+result.diagnostic.providerStatus:''} — ${bg?'Доставката до телефона не е потвърдена. Няма автоматично повторение.':'Phone delivery is unconfirmed. No automatic retry.'}`)
+  }catch(e){if(current())setMessage((/^(?:session|network|device|rights|vapid|request|configuration|attempt|database):[a-z-]+$/.test((e as Error).message)?(e as Error).message:'attempt:unknown')+(bg?' — Няма автоматично повторение.':' — No automatic retry.'))}
+  finally{if(permitId)void sessionPushTest(session,{operation:'cancel',permitId}).catch(()=>{});testLock.current=false;if(live.current)setBusy(false)}
+ }
  const renewalLock=useRef(false)
  const diagnosticEpoch=useRef(0)
  useEffect(()=>{diagnosticEpoch.current++;setChecks({});setKeyChecks({});setKeyStage('');return()=>{diagnosticEpoch.current++}},[session.user.id,session.access_token])
@@ -71,6 +98,12 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   {!data&&!message&&<p role="status">{bg?'Зареждане на Push настройките…':'Loading Push preferences…'}</p>}
   {message&&<p role="status">{message}</p>}
   {support==='supported'&&Notification.permission==='denied'&&<p>{bg?'Разрешението е отказано. За ново включване промени настройките за известия на този сайт в браузъра.':'Permission is denied. To enable notifications again, change this site’s notification settings in your browser.'}</p>}
+  <button type="button" disabled={busy||support!=='supported'} onClick={()=>void localTest()}>{bg?'Провери известията':'Check notifications'}</button>
+  <p>{bg?'Локална проверка на текущото устройство без заявка до Push доставчик. След теста провери визуално дали известието е показано.':'Local check on this device without a Push provider request. After the test, visually check that the notification appeared.'}</p>
+  {testAllowed&&<>
+   <button type="button" disabled={busy||dirty||support!=='supported'||!data?.devices.some(d=>d.id==='5ff76543-ea64-4721-9846-3859621e954f')} onClick={()=>void serverTest()}>{bg?'Изпрати тестово Push известие':'Send test Push notification'}</button>
+   <p>{bg?'Само Redmi Note 13 Pro. Изисква отделно административно разрешение и потвърждение непосредствено преди изпращане. „FCM прие заявката“ не означава „известието пристигна на телефона“.':'Redmi Note 13 Pro only. Requires separate administrative authorization and confirmation immediately before sending. “FCM accepted the request” does not mean “the notification arrived on the phone”.'}</p>
+  </>}
   {data&&<>
    <fieldset disabled={busy}><legend>{bg?'Градове и категории за бъдеща доставка':'Cities and categories for future delivery'}</legend>
     <p>{bg?'До 5 града. Предупрежденията за опасно време са безплатни и ориентировъчни по прогноза. Персоналните препоръки изискват текущ Pro достъп.':'Up to 5 cities. Dangerous weather forecast warnings are free and indicative. Personal recommendations require current Pro access.'}</p>
