@@ -81,3 +81,53 @@ Production HAR/traffic count here proving that this app caused it, that request
 size triggers it, or that unexpected remounts occurred. Synthetic tests demonstrate
 client behavior, not upstream capacity. No load tests, Supabase/Vercel changes,
 merge, or Production deployment were performed.
+
+## PR #128 update on main containing #129 (2026-11-02)
+
+Integrated main `fcaa1c39fa24cae6c644438663f730ec3b549daa` into the existing
+`codex/forecast-provider-resilience` branch without conflicts. This is a branch
+update, not a pull-request merge. The initial-location implementation, its unit
+tests and the complete startup GPS browser suite are byte-identical to main.
+The #129 permission/deadline/retry UI changes in App are retained; no GPS or CSS
+implementation was changed in this update.
+
+Validation on the combined branch:
+
+- Full `npm test`: 2,213 pass, 0 fail, 1 skipped, 10 TODO. Unchanged main in an
+  isolated worktree: 2,203 pass, 0 fail, 1 skipped, the same 10 parser TODOs.
+- Build, lint, typecheck and diff whitespace checks pass. Lint retains the two
+  existing `no-unsafe-finally` warnings in `scripts/push-node-operator.mjs`.
+- Nine fully mocked forecast-resilience browser cases cover both HTTP 503/429,
+  manual/city cooldown, scheduled recovery, actual 38°C heat alerts disappearing
+  at stale age and returning on recovery, retained timestamp, expiry, invalid
+  data, overlapping refresh ticks and stale location completion. The additional
+  longer Retry-After case suppresses two scheduled ticks while the snapshot still
+  expires, then recovers at the deadline. Cross-origin Retry-After must be exposed
+  by the provider through CORS to be readable; otherwise the 15-minute minimum
+  still applies. The browser fixture explicitly exposes that header.
+- All ten mobile Chrome permission cases from #129 and the saved-location /
+  stalled-permission startup case pass on both revisions.
+- A 20-case targeted GPS/refresh comparison gives identical results on both
+  revisions: 14 pass and 6 fail. Existing failures are `startup fast 390 bg false`,
+  both `259 km startup fix` languages, `accurate GPS on reload`, and both widths
+  of `quiet refresh failure and recovery`. They expect automatic GPS although
+  their fixture persists a manually confirmed city; failure occurs before refresh
+  behavior. Three other refresh/in-flight cases pass on both revisions.
+- The older `initial error` browser case passed on main but expected immediate
+  retry after 503. Updated that test for the intentional cooldown contract: a
+  manual click remains blocked, then the existing scheduled refresh recovers at
+  15 minutes. The updated case passes; no production behavior was relaxed.
+- The broad 163-case forecast layout/loading matrix was started on both revisions
+  and stopped after repeated fixture failures, so it is NOT a complete green
+  browser matrix. Eight loading-lifecycle failures (expecting `.forecast-refresh`
+  during a quiet refresh), `geolocation stale response` and `manual selection wins`
+  reproduce on main. All four completed 320px order cases also fail on unchanged main (the fixture
+  starts without a confirmed location). The combined branch had 15 completed
+  failures, 3 interrupted and 145 unrun cases; the baseline matrix had 10
+  failures, 1 pass, 3 interrupted and 149 unrun cases before the separate rerun.
+
+Readiness: the focused #128/#129 compatibility checks show no new implementation
+regression. Full browser-suite sign-off remains blocked by existing fixture/test
+problems; keep the PR in Draft pending review of those known failures. No live
+provider/load tests, remote database changes, pull-request merge or Production
+deployment were performed.
