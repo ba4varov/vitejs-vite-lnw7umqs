@@ -4,7 +4,7 @@ import { clickHeaderControl } from './header-navigation'
 import fs from 'node:fs/promises'
 
 test.use({ hasTouch: true })
-type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'|'unconfirmed'|'unconfirmed-denied'
+type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'|'unconfirmed'|'unconfirmed-denied'|'unconfirmed-stalled'
 const gps={latitude:43.2256,longitude:27.8888,accuracy:25}
 const sofia={id:'00000000-0000-0000-0000-000000000010',name:'Sofia',latitude:42.6977,longitude:23.3219,geoname_id:null,country_code:null,admin1_id:null}
 async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
@@ -29,7 +29,7 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
     if(JSON.stringify(w.forecastHistory.at(-1))!==JSON.stringify(value))w.forecastHistory.push(value)
    }).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['src']})
   })
-  Object.defineProperty(navigator,'permissions',{configurable:true,value:mode==='no-permissions'?undefined:{query:()=>mode==='stalled-permission'?new Promise(()=>{}):Promise.resolve({state:(mode==='denied'||mode==='unconfirmed-denied')?'denied':mode==='no-permissions'?'prompt':'granted'})}})
+  Object.defineProperty(navigator,'permissions',{configurable:true,value:mode==='no-permissions'?undefined:{query:()=>mode==='unconfirmed-stalled'?new Promise(resolve=>{w.releasePermission=resolve}):mode==='stalled-permission'?new Promise(()=>{}):Promise.resolve({state:(mode==='denied'||mode==='unconfirmed-denied')?'denied':mode==='no-permissions'?'prompt':'granted'})}})
   Object.defineProperty(navigator,'geolocation',{configurable:true,value:mode==='missing'?undefined:{getCurrentPosition:(success:any,error:any,options:any)=>{w.gpsCalls.push({success,error,options})}}})
  },{mode,lang})
  await page.route('**/*',async route=>{
@@ -287,3 +287,63 @@ for(const width of [390,1440]) {
   expect(Math.abs(await page.evaluate(()=>scrollY)-offset)).toBeLessThanOrEqual(2)
  })
 }
+
+test.describe('mobile Chrome permission startup', () => {
+ test.use({isMobile:true, userAgent:'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'})
+
+for (const outcome of ['success', 'timeout', 'denied', 'manual']) test(`mobile Chrome granted GPS permission UI: ${outcome}`, async ({page}) => {
+ const s = await setup(page, 'unconfirmed', 'bg', 390)
+ const allow = page.getByRole('button', {name:'Разреши местоположението', exact:true})
+ const pending = page.locator('.location-pending')
+ // Observe every mutation, including a transient permission button flash.
+ await page.evaluate(() => {
+  const w = window as any; w.allowFlashes = 0
+  new MutationObserver(() => {
+   if ([...document.querySelectorAll('button')].some(b => b.textContent === 'Разреши местоположението')) w.allowFlashes++
+  }).observe(document.body, {childList:true, subtree:true, characterData:true})
+ })
+ await expect(pending).toHaveText('Определяме местоположението…')
+ await expect(allow).toHaveCount(0)
+ await expect.poll(() => page.evaluate(() => (window as any).gpsCalls.length)).toBe(1)
+ await page.clock.fastForward(5000)
+ await expect(pending).toBeVisible(); await expect(allow).toHaveCount(0)
+ expect(s.weatherCalls()).toHaveLength(0)
+ if (outcome === 'success') {
+  await s.locate(); await expect(page.locator('.big-temp')).toHaveText('13°C')
+ } else if (outcome === 'manual') {
+  await page.locator('.city-row .city-btn').nth(1).click(); await s.locate()
+  await expect(page.locator('.big-temp')).toHaveText('17°C')
+ } else {
+  await page.evaluate(code => (window as any).gpsCalls[0].error({code}), outcome === 'denied' ? 1 : 3)
+  await expect(page.getByRole('button', {name:'Опитай местоположението отново', exact:true})).toBeVisible()
+  if (outcome === 'denied') await expect(page.getByRole('status').filter({hasText:'Браузърът е блокирал'})).toBeVisible()
+  expect(s.weatherCalls()).toHaveLength(0)
+ }
+ await expect(pending).toHaveCount(0)
+ expect(await page.evaluate(() => (window as any).allowFlashes)).toBe(0)
+})
+
+test('mobile Chrome denied access without saved location offers retry and city selection', async ({page}) => {
+ const s = await setup(page, 'unconfirmed-denied', 'bg', 390)
+ await expect(page.getByRole('button', {name:'Разреши местоположението', exact:true})).toHaveCount(0)
+ await expect(page.getByRole('button', {name:'Опитай местоположението отново', exact:true})).toBeVisible()
+ expect(await page.evaluate(() => (window as any).gpsCalls.length)).toBe(0)
+ await page.locator('.city-row .city-btn').nth(1).click()
+ await expect(page.locator('.big-temp')).toHaveText('17°C')
+ expect(s.weatherCalls()).toHaveLength(1)
+})
+
+for (const permission of ['granted','prompt']) test(`mobile Chrome slow permission query after deadline: ${permission}`, async ({page}) => {
+ const s = await setup(page, 'unconfirmed-stalled', 'bg', 390)
+ await expect(page.locator('.location-pending')).toBeVisible()
+ await page.clock.fastForward(5000)
+ await expect(page.locator('.location-pending')).toBeVisible()
+ await expect(page.getByRole('button', {name:'Разреши местоположението', exact:true})).toHaveCount(0)
+ await page.evaluate(state => (window as any).releasePermission({state}), permission)
+ await expect(page.locator('.location-pending')).toHaveCount(0)
+ await expect(page.getByRole('button', {name:permission === 'granted' ? 'Опитай местоположението отново' : 'Разреши местоположението', exact:true})).toBeVisible()
+ expect(await page.evaluate(() => (window as any).gpsCalls.length)).toBe(0)
+ expect(s.weatherCalls()).toHaveLength(0)
+})
+
+})

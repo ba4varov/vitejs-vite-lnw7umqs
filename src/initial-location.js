@@ -9,6 +9,14 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
   let started = false, settled = false, defaultsDone = true, gpsDone = false
   let gps = null, timer, resolve, reason, permission, requested = false, lateAllowed = false, closed = false
   const listeners = new Set()
+  const statusListeners = new Set()
+  // The forecast deadline does not end a browser permission/GPS operation.
+  // Keep its UI pending even when a confirmed fallback owns the forecast.
+  const status = () => {
+    if (!closed && (!settled || (!permission && !gpsDone) || (requested && !gpsDone))) return 'pending'
+    return !closed && permission === 'prompt' && !requested ? 'allow' : 'retry'
+  }
+  const notifyStatus = () => { for (const listener of statusListeners) listener(status()) }
   const result = new Promise(done => { resolve = done })
   const fallback = () => reason ? { source: 'fallback', reason } : { source: 'fallback' }
   const finish = selection => {
@@ -17,12 +25,14 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
     cancel(timer)
     startupTiming.mark('location:ready')
     resolve(selection)
+    notifyStatus()
     return true
   }
   const deliver = selection => {
     if (closed) return
     if (!settled) { finish(selection); closed = true }
     else if (lateAllowed) { lateAllowed = false; closed = true; for (const listener of listeners) listener(selection) }
+    notifyStatus()
   }
   const complete = () => { if (defaultsDone && gpsDone) deliver(gps || fallback()) }
   const request = () => {
@@ -55,6 +65,8 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
   }
   return {
     get settled() { return settled },
+    get status() { return status() },
+    subscribeStatus(listener) { statusListeners.add(listener); return () => statusListeners.delete(listener) },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
     waitForDefault() { if (!settled) { defaultsDone = false; startupTiming.mark('default:start') } },
     defaultResolved(place) {
@@ -66,7 +78,7 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
       complete()
       return true
     },
-    manual() { closed = true; lateAllowed = false; finish({ source: 'manual' }) },
+    manual() { closed = true; lateAllowed = false; finish({ source: 'manual' }); notifyStatus() },
     start() {
       if (started || settled) return result
       started = true
@@ -85,9 +97,10 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
       // standard geolocation permission flow. A stalled query remains bounded.
       Promise.resolve().then(() => browser?.permissions?.query({ name: 'geolocation' })).catch(() => null).then(status => {
         startupTiming.mark('permission:end')
-        if (settled || closed) return
+        if (closed) return
         permission = status?.state || 'prompt'
-        request()
+        if (!settled) request()
+        notifyStatus()
       })
       return result
     },
