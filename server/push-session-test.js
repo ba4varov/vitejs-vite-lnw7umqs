@@ -4,7 +4,6 @@ import {createOperatorHandler,bodyOf} from '../supabase/functions/_shared/push-o
 import {preparePush,validVapid} from '../supabase/functions/_shared/push-test.mjs'
 import {isFcmEndpoint,prepareNodeAttempt} from './push-node-transport.js'
 
-export const testDevice='5ff76543-ea64-4721-9846-3859621e954f'
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(v)
 const reply=(status,code,extra={})=>Response.json({code,deliveryEnabled:false,phoneDelivery:'unconfirmed',...extra},{status,headers:{'Cache-Control':'private, no-store','Vary':'Authorization'}})
 
@@ -28,16 +27,23 @@ export function createSessionPushHandler({env=process.env,fetcher=fetch,resolver
   let body
   try{body=await bodyOf(request)}catch{return reply(400,'request:input')}
   const exact=keys=>Object.keys(body).length===keys.length&&Object.keys(body).every(k=>keys.includes(k))
-  if(body.operation==='access'&&exact(['operation']))return reply(200,'rights:allowed',{allowed:true})
+  let target
+  try{target=await client.rpc('push_session_target',{actor_id:actor.id})}catch{return reply(503,'database:target-unavailable')}
+  const targetId=uuid(target?.deviceId)&&target.userId===actor.id?target.deviceId:null
+  if(body.operation==='access'&&exact(['operation']))return reply(200,'rights:allowed',{allowed:true,target:targetId?{deviceId:targetId,label:typeof target.label==='string'?target.label.slice(0,80):''}:null})
+  if(!targetId&&body.operation!=='cancel')return reply(409,'device:not-authorized')
   if(body.operation==='prepare'){
    if(!exact(['operation','category','requestId'])||!uuid(body.requestId)||!['rain','storm','wind','cold','heat','walk','garden','sport'].includes(body.category))return reply(400,'request:input')
-   body={...body,userId:actor.id,deviceId:testDevice}
+   body={...body,userId:actor.id,deviceId:targetId}
   }else if(!['send','cancel'].includes(body.operation)||!uuid(body.permitId)||!exact(body.operation==='send'?['operation','permitId','confirmation']:['operation','permitId']))return reply(400,'request:input')
   const vapid={publicKey:env.PUSH_VAPID_PUBLIC_KEY,privateKey:env.PUSH_NODE_VAPID_PRIVATE_KEY,subject:env.PUSH_VAPID_SUBJECT}
   if(!validVapid(vapid.publicKey,vapid.privateKey,vapid.subject))return reply(503,'vapid:configuration')
   // Ephemeral internal adapter credential: never configured, persisted or returned to a browser.
   const internal=randomBytes(32).toString('base64url')
   const rpc=async(name,args)=>{
+   if(name==='prepare_push_operator')return client.rpc('prepare_push_session',{actor_id:actor.id,test_category:args.test_category,request_id:args.request_id})
+   // Server independently checks that this permit belongs to the current DB target.
+   if(name==='arm_push_operator'&&await client.rpc('push_session_scope',{actor_id:actor.id,permit_id:args.permit_id,target_device:targetId})!==true)return false
    if(['arm_push_operator','cancel_push_operator'].includes(name))return client.rpc('push_session_permit',{action:name==='arm_push_operator'?'arm':'cancel',actor_id:actor.id,permit_id:args.permit_id,confirmation:args.confirmation??null})
    return client.rpc(name,args)
   }

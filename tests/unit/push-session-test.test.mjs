@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import webpush from 'web-push'
-import {createSessionPushHandler,testDevice} from '../../server/push-session-test.js'
+import {createSessionPushHandler} from '../../server/push-session-test.js'
 import {checkLocalNotification} from '../../src/push-local-test.js'
 
+const testDevice='b1000000-0000-0000-0000-000000000001'
 const actor='b0000000-0000-0000-0000-000000000001',permit='b0000000-0000-0000-0000-000000000002'
 const vapid=webpush.generateVAPIDKeys(),subscriber=webpush.generateVAPIDKeys()
 const env={VERCEL:'1',VERCEL_ENV:'production',PUSH_SESSION_TEST_ENABLED:'true',SUPABASE_URL:`https://${'a'.repeat(20)}.supabase.co`,SUPABASE_SERVICE_ROLE_KEY:'synthetic_service_key',PUSH_VAPID_PUBLIC_KEY:vapid.publicKey,PUSH_NODE_VAPID_PRIVATE_KEY:vapid.privateKey,PUSH_VAPID_SUBJECT:'mailto:fixture@example.invalid'}
@@ -18,15 +19,17 @@ function fixture({failure,status=201,configuration=env,diagnostic={}}={}){
   if(name==='user')return Response.json({id:actor},{status:failure==='session'?401:200})
   const args=JSON.parse(options.body)
   if(name==='push_operator_access')return Response.json(failure!=='rights')
-  if(name==='prepare_push_operator'){
-   assert.equal(args.target_device,testDevice);assert.equal(args.target_user,actor)
+  if(name==='push_session_target')return Response.json(failure==='target'?null:{deviceId:testDevice,userId:failure==='target-owner'?permit:actor,label:'Desktop Chrome (synthetic)'})
+  if(name==='push_session_scope')return Response.json(!['scope','wrong-device'].includes(failure))
+  if(name==='prepare_push_session'){
+   assert.equal(args.actor_id,actor);assert.equal(Object.hasOwn(args,'target_device'),false);assert.equal(Object.hasOwn(args,'target_user'),false)
    if(['expired','consent','cooldown'].includes(failure))return new Response(null,{status:409})
    return Response.json({permitId:permit,userId:actor,deviceId:testDevice,category:'wind',expiresAt:new Date(Date.now()+120000).toISOString()})
   }
   if(name==='inspect_push_operator')return Response.json({...claim,...(failure==='vapid'?{publicKey:subscriber.publicKey}:{})})
   if(name==='push_session_permit'){
    assert.equal(args.actor_id,actor);assert.equal(args.permit_id,permit)
-   if(failure==='scope')return Response.json(false)
+   if(['scope','registration','expired','missing-permit'].includes(failure))return Response.json(false)
    if(args.action==='cancel')return Response.json(true)
    const ok=!state.armed&&args.confirmation===send.confirmation
    if(ok)state.armed=true
@@ -120,5 +123,21 @@ test('session adapter preserves safe FCM 400 reason/body fields, excludes raw da
   assert.equal(result.diagnostic.providerBodyStatus,['recognized','empty','unknown_format'].includes(diagnostic.providerBodyStatus)?diagnostic.providerBodyStatus:undefined)
   for(const sensitive of ['SENSITIVE_UNTRUSTED_PROVIDER_DATA',vapid.privateKey,env.SUPABASE_SERVICE_ROLE_KEY,'fcm.googleapis.com','synthetic.jwt.signature'])assert.equal(JSON.stringify(result).includes(sensitive),false)
   await f.handler(request(send));assert.equal(f.state.sends,1)
+ }
+})
+
+test('DB target defaults closed, and access exposes only the allowed device identity',async()=>{
+ for(const failure of ['target','target-owner']){
+  const closed=fixture({failure})
+  for(const body of [prepare,send])assert.equal((await (await closed.handler(request(body))).json()).code,'device:not-authorized')
+  assert.equal(closed.state.sends,0)
+ }
+ const f=fixture(),access=await (await f.handler(request({operation:'access'}))).json()
+ assert.deepEqual(access.target,{deviceId:testDevice,label:'Desktop Chrome (synthetic)'})
+ assert.equal(JSON.stringify(access).includes('endpoint'),false)
+})
+test('wrong target, changed registration, expired or missing permit never reach provider',async()=>{
+ for(const failure of ['wrong-device','registration','expired','missing-permit']){
+  const f=fixture({failure});assert.equal((await f.handler(request(send))).status,409);assert.equal(f.state.sends,0)
  }
 })
