@@ -530,3 +530,32 @@ for(const refusal of ['rights','consent','registration'])test(`Push final revali
  await expect.poll(()=>operations.includes('cancel')).toBe(true)
  expect(dialogs).toBe(1);expect(operations.filter(x=>x==='prepare')).toHaveLength(1);expect(operations.filter(x=>x==='send')).toHaveLength(0)
 })
+
+for(const lang of ['bg','en'])for(const reason of ['known','unknown','empty','unsafe'])test(`FCM 400 safe provider diagnostic ${reason} ${lang}`,async({page})=>{
+ await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
+ if(lang==='en'){
+  await page.locator('.push-settings').getByLabel('Име на това устройство').fill('')
+  await page.getByRole('button',{name:'Затвори',exact:true}).click()
+  await clickHeaderControl(page,page.locator('button.lang-btn'))
+  await clickHeaderControl(page,page.locator('.auth-nav').getByRole('button',{name:'My profile',exact:true}))
+  await page.getByRole('tab',{name:'Push notifications',exact:true}).click()
+ }
+ await page.evaluate(()=>{(window as any).setTestPushPermission('granted');(window as any).diagnosticSubscription('match')})
+ let sends=0,cancels=0,dialogs=0
+ page.on('dialog',async d=>{dialogs++;await d.accept()})
+ await page.route('**/api/push-operator',r=>{
+  const operation=r.request().postDataJSON().operation
+  if(operation==='cancel')cancels++
+  if(operation!=='send')return r.fallback()
+  sends++
+  return r.fulfill({status:502,json:{code:'fcm:rejected',deliveryEnabled:false,phoneDelivery:'unconfirmed',diagnostic:{category:'request_rejected',providerStatus:400,providerBodyStatus:reason==='known'?'recognized':reason==='empty'?'empty':reason==='unsafe'?'PRIVATE_ENDPOINT':'unknown_format',...(reason==='known'?{providerReason:'fcm_unauthorized_registration'}:reason==='unsafe'?{providerReason:'PRIVATE_TOKEN'}:{}),raw:'PRIVATE_FCM_BODY',authorization:'PRIVATE_AUTH',endpoint:'PRIVATE_ENDPOINT'}}})
+ })
+ await page.getByRole('button',{name:lang==='bg'?'Изпрати тестово Push известие':'Send test Push notification',exact:true}).click()
+ const status=page.locator('.push-settings').getByRole('status')
+ await expect(status).toContainText('fcm:rejected · HTTP 502 · request_rejected · provider HTTP 400')
+ if(reason==='known')await expect(status).toContainText('providerReason:fcm_unauthorized_registration')
+ else await expect(status).toContainText(lang==='bg'?'Точната причина за отказа не е установена.':'The exact rejection reason is unknown.')
+ if(['known','empty'].includes(reason))await expect(status).toContainText('providerBodyStatus:'+(reason==='known'?'recognized':'empty'))
+ await expect(status).not.toContainText('PRIVATE_')
+ expect(sends).toBe(1);expect(cancels).toBe(0);expect(dialogs).toBe(1)
+})

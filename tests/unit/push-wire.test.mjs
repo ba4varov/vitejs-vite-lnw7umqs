@@ -116,3 +116,40 @@ test('native Deno TLS writes valid encrypted FCM wire requests and reads bounded
  assert.deepEqual(JSON.parse(stdout),{results:[{status:201},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_invalid_argument',providerBodyStatus:'recognized'},{status:400,providerReason:'fcm_unauthorized_registration',providerBodyStatus:'recognized'},{status:400,providerBodyStatus:'empty'}],wrongNameRejected:true})
  assert.equal(requests.length,5)
 }))
+
+// Exercise the actual Production native Node sender against the independent
+// JWT verifier and receiver-side RFC 8291 decryption above. Local TLS only.
+test('Node 24 native transport preserves standards-valid generated FCM wire bytes without replay',async()=>fixture(async({requests,port,cert})=>{
+ const {createNodeTransport}=await import('../../server/push-node-transport.js')
+ const prepare=createNodeTransport({port,ca:cert,allowedAddress:(ip,family)=>ip==='127.0.0.1'&&family===4})
+ for(const path of ['/wp/isolated','/fcm/send/isolated']){
+  const details=preparePush({...device,endpoint:'https://fcm.googleapis.com'+path},config,id)
+  const once=await prepare(details,async()=>[{address:'127.0.0.1',family:4}])
+  assert.equal((await once()).status,201)
+  await assert.rejects(once(),/ATTEMPT_ALREADY_CONSUMED/)
+  assert.deepEqual(requests.at(-1).body,details.body)
+  for(const [name,value] of Object.entries(details.headers))assert.equal(requests.at(-1).headers[name.toLowerCase()],String(value))
+ }
+ assert.equal(requests.length,2)
+}))
+
+test('independent verifier rejects malformed VAPID, wrong audience/key, and corrupt or incomplete payload',async()=>{
+ const webpush=(await import('web-push')).default
+ const {validVapid}=await import('../../supabase/functions/_shared/push-test.mjs')
+ const details=preparePush(device,config,id)
+ const make=(headers=details.headers)=>{
+  const lower=Object.fromEntries(Object.entries(headers).map(([k,v])=>[k.toLowerCase(),String(v)]))
+  return {method:'POST',url:'/wp/isolated',headers:{...lower,host:'fcm.googleapis.com'},rawHeaders:Object.entries(lower).flat(),socket:{servername:'fcm.googleapis.com',alpnProtocol:'http/1.1'}}
+ }
+ validate(make(),details.body)
+ const badAudience=webpush.getVapidHeaders('https://wrong.example.invalid',config.subject,keys.publicKey,keys.privateKey,'aes128gcm').Authorization
+ const wrongKey=webpush.getVapidHeaders('https://fcm.googleapis.com',config.subject,receiverKeys.publicKey,receiverKeys.privateKey,'aes128gcm').Authorization
+ for(const Authorization of ['vapid malformed',badAudience,wrongKey])assert.throws(()=>validate(make({...details.headers,Authorization}),details.body))
+ assert.equal(validVapid(keys.publicKey,receiverKeys.privateKey,config.subject),false)
+ const corrupt=Buffer.from(details.body);corrupt[90]^=1
+ for(const body of [details.body.subarray(0,10),details.body.subarray(0,-1),corrupt]){
+  assert.throws(()=>validate(make({...details.headers,'Content-Length':body.length}),body))
+ }
+ const differentReceiver=preparePush({...device,p256dh:fixtureKeys(3).publicKey},config,id)
+ assert.throws(()=>validate(make(differentReceiver.headers),differentReceiver.body))
+})

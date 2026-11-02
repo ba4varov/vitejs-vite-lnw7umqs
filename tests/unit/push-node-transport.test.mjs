@@ -52,6 +52,9 @@ try{
     if(scenario==='large'){res.writeHead(400,{'content-length':65536});res.end(Buffer.alloc(65536,65));return}
     if(scenario==='chunked-large'){res.writeHead(400);res.write(Buffer.alloc(800,65));res.end(Buffer.alloc(800,65));return}
     if(scenario==='encoded'){res.writeHead(400,{'content-encoding':'gzip'});res.end('not decoded');return}
+    if(scenario==='phrase-empty'){res.writeHead(400,'UnauthorizedRegistration',{'content-length':0});res.end();return}
+    if(scenario==='bad-json'){res.writeHead(400,{'content-type':'application/json'});res.end('{'+privateSentinel);return}
+    if(scenario==='empty'){res.writeHead(400,{'content-length':0});res.end();return}
     if(scenario==='private'){res.writeHead(400);res.end(privateSentinel);return}
     if(scenario==='rejected'){res.writeHead(400,{'content-type':'text/plain'});res.end('INVALID_ARGUMENT');return}
     if(scenario==='throttled'){res.writeHead(429,{'retry-after':'120'});res.end();return}
@@ -96,6 +99,15 @@ try{
   mutable.endpoint='https://evil.invalid/';mutable.body.fill(0);mutable.headers.Authorization='changed';rows[0].address='127.0.0.2'
   assert.equal((await once()).status,201);assert.equal(observed.selected,1);assert.equal(observed.decoy,0);assert.equal(observed.wire,true)
  })
+ await check('FCM exact status phrase survives empty body, malformed JSON remains unknown; one attempt',async()=>{
+  for(const scenario of ['phrase-empty','bad-json','empty']){
+   const value=await attempt(scenario)
+   assert.equal(value.result.status,400);assert.equal(observed.selected,1)
+   assert.equal(value.result.providerBodyStatus,scenario==='bad-json'?'unknown_format':'empty')
+   assert.equal(value.result.providerReason,scenario==='phrase-empty'?'fcm_unauthorized_registration':undefined)
+   assert.equal(JSON.stringify(value).includes(privateSentinel),false)
+  }
+ })
  await check('reference web-push.sendNotification uses same generated request bytes and headers',async()=>{
   reset('accepted');let pins=0
   const agent=new Agent({ca,keepAlive:false,lookup:(_h,o,cb)=>{pins++;if(o?.all)cb(null,[{address:'127.0.0.1',family:4}]);else cb(null,'127.0.0.1',4)}})
@@ -121,7 +133,7 @@ try{
   assert.equal((await attempt('redirect')).result.status,307);assert.equal(observed.selected,1);assert.equal(observed.redirectConnections,0)
  })
  await check('bounded provider diagnostics retain known status and expose fixed fields only',async()=>{
-  for(const [scenario,bodyStatus] of [['large','too_large'],['chunked-large','too_large'],['encoded','unsupported_encoding'],['body-hang','timeout'],['incomplete','incomplete'],['private','unknown_format'],['rejected','recognized']]){
+  for(const [scenario,bodyStatus] of [['large','too_large'],['chunked-large','too_large'],['encoded','unsupported_encoding'],['body-hang','timeout'],['incomplete','incomplete'],['private','unknown_format'],['phrase-empty','empty'],['bad-json','unknown_format'],['empty','empty'],['rejected','recognized']]){
    const value=await attempt(scenario)
    assert.equal(value.result.status,400);assert.equal(value.result.providerBodyStatus,bodyStatus);assert.equal(observed.selected,1)
    assert.equal(JSON.stringify(value).includes(privateSentinel),false)

@@ -30,10 +30,15 @@ export const safePushTestCode=(value:unknown):string => typeof value==='string'&
  'request:http','request:response','network:unknown'
 ]).has(value)?value:'attempt:unknown'
 
-export function pushTestDiagnostic(result:any):string {
+export function pushTestDiagnostic(result:any,lang:'bg'|'en'='en'):string {
  const category=result?.diagnostic?.category,status=result?.diagnostic?.providerStatus
+ const reason=result?.diagnostic?.providerReason,body=result?.diagnostic?.providerBodyStatus
+ const reasons=['fcm_invalid_argument','fcm_unauthenticated','fcm_permission_denied','fcm_not_found','fcm_resource_exhausted','fcm_internal','fcm_unavailable','fcm_unregistered','fcm_sender_id_mismatch','fcm_quota_exceeded','fcm_third_party_auth_error','fcm_invalid_registration','fcm_unauthorized_registration','fcm_invalid_ttl','fcm_vapid_subscription_mismatch']
+ const bodyStatuses=['recognized','empty','unknown_format','incomplete','timeout','too_large','unsupported_encoding','invalid_framing','read_failed']
+ const knownReason=typeof reason==='string'&&reasons.includes(reason)
+ const providerFailure=Number.isInteger(status)&&status>=400&&status<=599
  const categories=['accepted','subscription_expired','provider_auth_rejected','rate_limited','provider_unavailable','redirect_refused','request_rejected','provider_rejected','tls_failed','connect_failed','write_failed','response_failed','response_limit','invalid_response','invalid_headers','request_limit','timeout','transport_failed','transport_uncertain','dns_failed','preparation_failed','database_uncertain','gate_cleanup_failed']
- return (categories.includes(category)?' · '+category:'')+(Number.isInteger(status)&&status>=100&&status<=599?' · provider HTTP '+status:'')
+ return (categories.includes(category)?' · '+category:'')+(Number.isInteger(status)&&status>=100&&status<=599?' · provider HTTP '+status:'')+(knownReason?' · providerReason:'+reason+' — '+(lang==='bg'?'Разпознат код от доставчика.':'Recognized provider code.'):'')+(typeof body==='string'&&bodyStatuses.includes(body)?' · providerBodyStatus:'+body:'')+(providerFailure&&!knownReason?' · '+(lang==='bg'?'Точната причина за отказа не е установена.':'The exact rejection reason is unknown.'):'')
 }
 
 // No retries: a lost response may follow an already consumed provider attempt.

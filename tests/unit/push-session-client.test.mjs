@@ -34,3 +34,19 @@ test('lost send response remains unknown with no automatic retry',async t=>{
  await assert.rejects(f.client.sessionPushTest(originalSession,{operation:'send'}),/network:unknown/)
  assert.equal(calls,1)
 })
+
+test('safe provider fields survive HTTP failure and UI diagnostics never echo arbitrary data',async t=>{
+ const f=await fixture(t,async()=>originalSession)
+ for(const lang of ['bg','en'])for(const bodyStatus of ['recognized','empty','unknown_format','incomplete','timeout','too_large','unsupported_encoding','invalid_framing','read_failed']){
+  const diagnostic={category:'request_rejected',providerStatus:400,providerBodyStatus:bodyStatus,...(bodyStatus==='recognized'?{providerReason:'fcm_unauthorized_registration'}:{}),raw:'PRIVATE_FCM_TEXT'}
+  t.mock.method(globalThis,'fetch',async()=>Response.json({code:'fcm:rejected',diagnostic},{status:502}))
+  let error;try{await f.client.sessionPushTest(originalSession,{operation:'send'})}catch(e){error=e}
+  assert.match(error.message,/fcm:rejected.*HTTP 502/)
+  const text=f.client.pushTestDiagnostic(error,lang)
+  assert.ok(text.includes('provider HTTP 400'));assert.ok(text.includes('providerBodyStatus:'+bodyStatus))
+  assert.ok(text.includes(bodyStatus==='recognized'?'providerReason:fcm_unauthorized_registration':lang==='bg'?'Точната причина за отказа не е установена.':'The exact rejection reason is unknown.'))
+  assert.equal(text.includes('PRIVATE_FCM_TEXT'),false)
+ }
+ const malicious={diagnostic:{category:'PRIVATE_CATEGORY',providerStatus:'PRIVATE_STATUS',providerReason:'PRIVATE_TOKEN',providerBodyStatus:'PRIVATE_ENDPOINT'}}
+ for(const lang of ['bg','en'])assert.equal(f.client.pushTestDiagnostic(malicious,lang),'')
+})

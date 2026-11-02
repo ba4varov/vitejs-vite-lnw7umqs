@@ -10,7 +10,7 @@ const env={VERCEL:'1',VERCEL_ENV:'production',PUSH_SESSION_TEST_ENABLED:'true',S
 const send={operation:'send',permitId:permit,confirmation:`SEND ONE ${actor} ${testDevice}`}
 const prepare={operation:'prepare',category:'wind',requestId:permit}
 const request=(body,headers={})=>new Request('https://fixture.invalid/api/push-operator',{method:'POST',headers:{origin:'https://fixture.invalid',authorization:'Bearer synthetic.jwt.signature',...headers},body:JSON.stringify(body)})
-function fixture({failure,status=201,configuration=env}={}){
+function fixture({failure,status=201,configuration=env,diagnostic={}}={}){
  const state={calls:[],sends:0,armed:false,burned:false,finishes:[]}
  const claim={claimId:permit,endpoint:'https://fcm.googleapis.com/wp/SYNTHETIC',publicKey:vapid.publicKey,p256dh:subscriber.publicKey,auth:Buffer.alloc(16,9).toString('base64url')}
  const fetcher=async(url,options)=>{
@@ -51,7 +51,7 @@ function fixture({failure,status=201,configuration=env}={}){
  },prepareTransport:async()=>async()=>{
   assert.equal(state.burned,true);state.sends++
   if(failure==='network')throw Error('SENSITIVE_UNTRUSTED_PROVIDER_DATA')
-  return {status,retryAfter:'900',raw:'SENSITIVE_UNTRUSTED_PROVIDER_DATA'}
+  return {status,...diagnostic,retryAfter:'900',raw:'SENSITIVE_UNTRUSTED_PROVIDER_DATA'}
  }})
  return {handler,state}
 }
@@ -102,4 +102,23 @@ test('local notification uses only the active worker; no permission request or p
  scope.Notification.permission='denied';assert.equal(await checkLocalNotification(scope),'local:permission-required');assert.equal(displayed,1)
  scope.Notification.permission='granted';registration.active.scriptURL='https://fixture.invalid/other.js';assert.equal(await checkLocalNotification(scope),'local:worker-unavailable')
  registration.active.scriptURL='https://fixture.invalid/push-sw.js';registration.showNotification=async()=>{throw Error('SECRET')};assert.equal(await checkLocalNotification(scope),'local:failed')
+})
+
+
+test('session adapter preserves safe FCM 400 reason/body fields, excludes raw data and never replays',async()=>{
+ for(const diagnostic of [
+  {providerReason:'fcm_unauthorized_registration',providerBodyStatus:'recognized'},
+  {providerBodyStatus:'empty'},
+  {providerBodyStatus:'unknown_format'},
+  {providerReason:'SENSITIVE_UNTRUSTED_PROVIDER_DATA',providerBodyStatus:'SENSITIVE_UNTRUSTED_PROVIDER_DATA'},
+ ]){
+  const f=fixture({status:400,diagnostic})
+  const response=await f.handler(request(send)),result=await response.json()
+  assert.equal(response.status,502);assert.equal(result.code,'fcm:rejected')
+  assert.equal(result.diagnostic.providerStatus,400);assert.equal(result.diagnostic.category,'request_rejected')
+  assert.equal(result.diagnostic.providerReason,diagnostic.providerReason==='fcm_unauthorized_registration'?diagnostic.providerReason:undefined)
+  assert.equal(result.diagnostic.providerBodyStatus,['recognized','empty','unknown_format'].includes(diagnostic.providerBodyStatus)?diagnostic.providerBodyStatus:undefined)
+  for(const sensitive of ['SENSITIVE_UNTRUSTED_PROVIDER_DATA',vapid.privateKey,env.SUPABASE_SERVICE_ROLE_KEY,'fcm.googleapis.com','synthetic.jwt.signature'])assert.equal(JSON.stringify(result).includes(sensitive),false)
+  await f.handler(request(send));assert.equal(f.state.sends,1)
+ }
 })

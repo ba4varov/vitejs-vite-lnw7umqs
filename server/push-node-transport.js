@@ -107,7 +107,9 @@ export function createNodeTransport({validEndpoint=isFcmEndpoint,allowedAddress=
       }
       if(interimBytes+res.rawHeaders.reduce((n,text)=>n+Buffer.byteLength(text)+2,64)>4096){res.destroy();finish(undefined,{providerBodyStatus:'too_large'});return}
       const encoding=res.headers['content-encoding'],length=res.headers['content-length']
-      const common={}
+      // FCM may use an exact allowlisted HTTP reason phrase with an empty body.
+      const phraseReason=providerPhraseReason(res.statusMessage)
+      const common=phraseReason?{providerReason:phraseReason}:{}
       if(encoding&&encoding!=='identity'){res.destroy();finish(undefined,{...common,providerBodyStatus:'unsupported_encoding'});return}
       if(typeof length==='string'&&Number(length)>1024){res.destroy();finish(undefined,{...common,providerBodyStatus:'too_large'});return}
       let chunks=[],bytes=0,complete=false
@@ -121,7 +123,7 @@ export function createNodeTransport({validEndpoint=isFcmEndpoint,allowedAddress=
       res.on('end',()=>{
        if(complete)return
        const diagnostic=classifyBody(Buffer.concat(chunks),res.headers['content-type']);chunks=[]
-       complete=true;finish(undefined,diagnostic)
+       complete=true;finish(undefined,{...common,...diagnostic})
       })
       res.on('aborted',()=>diagnostic('incomplete'))
       res.on('error',()=>diagnostic('read_failed'))
