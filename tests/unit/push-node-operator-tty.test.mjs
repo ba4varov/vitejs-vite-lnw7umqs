@@ -44,13 +44,22 @@ finally:
  if child.poll() is None: child.kill();child.wait()
  os.close(master)
 `
-function cli(session,valid,{confirmation=['CANCEL\r'],send=false,inputSession=session,preflight=null,inputOperator=[operator+'\r']}={}){
+function cli(session,valid,{confirmation=['CANCEL\r'],send=false,inputSession=session,preflight=null,inputOperator=[operator+'\r'],verifyHiddenBlocks=false}={}){
  const dir=mkdtempSync(join(tmpdir(),'meteo-cli-'))
  try{
   const preload=join(dir,'mock-fetch.mjs')
   writeFileSync(preload,`
 import assert from 'node:assert/strict'
 const calls=[]
+// Observe the same data events as the CLI without printing any input. A single
+// PTY write is not by itself proof of a single Node data event.
+const expectedBlocks=${JSON.stringify(verifyHiddenBlocks?[...inputOperator,...inputSession]:[])}
+let observedBlocks=0,wholeBlocks=true
+if(expectedBlocks.length)process.stdin.on('data',chunk=>{
+ if(observedBlocks>=expectedBlocks.length)return
+ wholeBlocks=wholeBlocks&&chunk.equals(Buffer.from(expectedBlocks[observedBlocks]))
+ observedBlocks++
+})
 globalThis.fetch=async(url,options)=>{
  assert.ok(url==='https://ba4varov-wheater.vercel.app/api/push-operator')
  assert.ok(options.headers.authorization===${JSON.stringify('Bearer '+operator+'.'+session)},'CLI must preserve the entered JWT')
@@ -66,13 +75,14 @@ globalThis.fetch=async(url,options)=>{
  }
  return new Response(JSON.stringify(body.operation==='prepare'?{error:'PUSH_TEST_READY',permitId:'${id}',userId:'${id}',deviceId:'${device}',category:'wind'}:body.operation==='send'?{error:'PUSH_TEST_ACCEPTED',diagnostic:{category:'accepted',providerStatus:201}}:{error:'PUSH_TEST_CLOSED'}))
 }
-process.on('exit',()=>{assert.deepEqual(calls,${JSON.stringify(preflight?['prepare']:valid?(send?['prepare','send','cancel']:['prepare','cancel']):[])});console.log('CLI_FIXTURE_OK')})
+process.on('exit',()=>{if(expectedBlocks.length){assert.ok(wholeBlocks&&observedBlocks===expectedBlocks.length,'Each hidden paste and Enter must arrive as its own complete data block');console.log('CLI_WHOLE_BLOCKS_OK')}assert.deepEqual(calls,${JSON.stringify(preflight?['prepare']:valid?(send?['prepare','send','cancel']:['prepare','cancel']):[])});console.log('CLI_FIXTURE_OK')})
 `)
   const result=spawnSync('python3',['-c',harness,JSON.stringify({cmd:[process.execPath,'--import',preload,'scripts/push-node-operator.mjs',id,device],operator:inputOperator,jwt:Array.isArray(inputSession)?inputSession:[inputSession+'\r'],confirmation})],{encoding:'utf8',timeout:15000})
   assert.equal(result.status,0,'PTY harness must complete')
   const observed=JSON.parse(result.stdout)
   assert.ok(!observed.output.includes(operator)&&!observed.output.includes(session),'Hidden credentials must not echo')
   assert.match(observed.output,/CLI_FIXTURE_OK/)
+  if(verifyHiddenBlocks)assert.match(observed.output,/CLI_WHOLE_BLOCKS_OK/)
   assert.equal(observed.pending,0,'Input must wait for the explicit final Enter or Ctrl+C')
   return observed
  }finally{rmSync(dir,{recursive:true,force:true})}
@@ -163,4 +173,19 @@ test('incomplete ANSI marker followed by Enter stops locally rather than swallow
   assert.equal(result.code,1)
   assert.match(result.output,/Локално въвеждане:/)
  }
+})
+
+
+// An array item is emitted by one os.write, never a character loop. The preload
+// additionally verifies that the CLI sees each payload in one data event and
+// Enter in a separate event. Both fields must complete before mocked prepare.
+for(const bracketed of [false,true])test(`single PTY write per hidden token, separate Enter: ${bracketed?'bracketed':'plain'} paste`,()=>{
+ const paste=value=>[bracketed?'\x1b[200~'+value+'\x1b[201~':value,'\r']
+ const result=cli(jwt,true,{inputOperator:paste(operator),inputSession:paste(jwt),verifyHiddenBlocks:true})
+ assert.equal(result.code,0)
+ assert.equal(result.prompts,3)
+ assert.match(result.output,/USER_UUID: /)
+ assert.match(result.output,/DEVICE_UUID: /)
+ assert.match(result.output,/въведете точно: SEND ONE/)
+ assert.match(result.output,/Няма опит за изпращане/)
 })
