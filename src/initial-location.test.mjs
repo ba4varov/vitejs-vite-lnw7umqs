@@ -75,3 +75,17 @@ test('missing GPS and stalled Permissions API cannot hang startup or start late 
  const result = s.chooser.start(); await flush(); s.timers[0].callback(); assert.equal((await result).source, 'fallback')
  release({ state: 'prompt' }); await flush(); assert.equal(s.callbacks.length, 0)
 })
+
+test('accuracy observation records metres without changing accepted election payload or request count', async () => {
+ const s=setup('prompt');const result=s.chooser.start();await flush()
+ s.callbacks[0].success(fix)
+ assert.equal(s.chooser.reportedAccuracy,25)
+ assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89,accuracy:25})
+ assert.equal(s.callbacks.length,1)
+})
+test('rejected fix exposes its accuracy for local diagnostics without electing its coordinates', async () => {
+ const s=setup('prompt');const result=s.chooser.start();await flush()
+ s.callbacks[0].success({coords:{...fix.coords,accuracy:259471}})
+ assert.equal(s.chooser.reportedAccuracy,259471)
+ assert.deepEqual(await result,{source:'fallback',reason:'accuracy'})
+})

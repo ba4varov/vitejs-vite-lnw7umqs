@@ -1,4 +1,5 @@
 import { acceptableAccuracy, MAX_ADDRESS_ACCURACY } from './location-accuracy.js'
+import { reverseLocationDetails } from './reverse-location-details.js'
 const closeCoordinate = (left, right) => Math.abs(Number(left) - Number(right)) <= 0.0001
 
 export function quickCityAtCoordinates(quickCities, coords) {
@@ -15,14 +16,13 @@ export async function localizeCurrentLocation(current, language, quickCities, lo
 export function locationFromReverseGeocode(data, fallbackName, accuracy) {
   const address = data?.address || {}
   const name = address.city || address.town || address.village || address.county || fallbackName
-  const street = address.road || address.pedestrian || address.street
-  const exactParts = street ? [street, address.house_number].filter(Boolean) :
-    [address.suburb || address.neighbourhood || address.city_district].filter(Boolean)
+  const detail = reverseLocationDetails(address, accuracy)
   return {
     name,
     region: address.state || address.county,
     country: address.country,
-    exactLocation: acceptableAccuracy(accuracy, MAX_ADDRESS_ACCURACY) && exactParts.length ? exactParts.join(' ') : null
+    exactLocation: detail.street,
+    approximateLocation: detail.neighborhood
   }
 }
 

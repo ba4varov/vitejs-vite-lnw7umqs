@@ -8,6 +8,7 @@ export const INITIAL_LOCATION_TIMEOUT = 4500
 export function createInitialLocation({ navigator: browser, confirmed = null, timeout = INITIAL_LOCATION_TIMEOUT, schedule = setTimeout, cancel = clearTimeout } = {}) {
   let started = false, settled = false, defaultsDone = true, gpsDone = false
   let gps = null, timer, resolve, reason, permission, requested = false, lateAllowed = false, closed = false
+  let reportedAccuracy
   const listeners = new Set()
   const result = new Promise(done => { resolve = done })
   const fallback = () => reason ? { source: 'fallback', reason } : { source: 'fallback' }
@@ -46,6 +47,7 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
       browser.geolocation.getCurrentPosition(position => {
         if (gpsDone || closed) return
         startupTiming.mark('gps:end')
+        reportedAccuracy = position?.coords?.accuracy
         gpsDone = true
         if (!acceptedPosition(position?.coords)) reason = 'accuracy'
         else gps = { source: 'geolocation', lat: position.coords.latitude, lon: position.coords.longitude, accuracy: position.coords.accuracy }
@@ -55,6 +57,7 @@ export function createInitialLocation({ navigator: browser, confirmed = null, ti
   }
   return {
     get settled() { return settled },
+    get reportedAccuracy() { return reportedAccuracy },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
     waitForDefault() { if (!settled) { defaultsDone = false; startupTiming.mark('default:start') } },
     defaultResolved(place) {

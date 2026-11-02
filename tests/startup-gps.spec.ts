@@ -335,3 +335,34 @@ for (const lang of ['bg','en']) test(`first visit refusal preserves manual choic
  await page.getByRole('button',{name:lang==='bg'?'Разреши местоположението':'Allow location',exact:true}).click()
  await s.locate(1);await expect(page.locator('.big-temp')).toHaveText('13°C')
 })
+
+for (const lang of ['bg','en']) test(`street, approximate district, city-only and coarse rejection diagnostics ${lang}`, async ({page}) => {
+ const s=await setup(page,'unconfirmed-prompt',lang)
+ let address:any={city:lang==='bg'?'Варна':'Varna',road:'Test Road',house_number:'12',suburb:lang==='bg'?'Трошево':'Troshevo'}
+ await page.route('**/reverse?**',route=>route.fulfill({json:{address}}))
+ await s.locate(0,{...gps,accuracy:25})
+ await expect(page.getByTestId('street-location')).toContainText('Test Road 12')
+ await expect(page.getByTestId('approximate-location')).toContainText(lang==='bg'?'Приблизително местоположение: Трошево':'Approximate location: Troshevo')
+ await expect(page.getByTestId('gps-accuracy')).toContainText('25')
+ const diagnostic=await page.getByTestId('gps-accuracy').textContent()
+ expect(diagnostic).not.toContain(String(gps.latitude));expect(diagnostic).not.toContain(String(gps.longitude))
+ // Precise GPS can identify the provider's district without an available street.
+ address={city:address.city,suburb:address.suburb}
+ await page.getByRole('button',{name:lang==='bg'?'Използвай моето местоположение':'Use my location',exact:true}).click()
+ await s.locate(1,{...gps,accuracy:50})
+ await expect(page.getByTestId('street-location')).toHaveCount(0)
+ await expect(page.getByTestId('approximate-location')).toBeVisible()
+ // A 250m city fix cannot justify a district merely because the nearest-feature
+ // response happens to include a suburb. Keep the existing conservative gate.
+ await page.getByRole('button',{name:lang==='bg'?'Използвай моето местоположение':'Use my location',exact:true}).click()
+ await s.locate(2,{...gps,accuracy:250})
+ await expect(page.getByTestId('approximate-location')).toHaveCount(0)
+ await expect(page.getByTestId('street-location')).toHaveCount(0)
+ await expect(page.getByTestId('gps-accuracy')).toContainText(lang==='bg'?'Показваме само град':'City only')
+ const before=s.weatherCalls().length
+ await page.getByRole('button',{name:lang==='bg'?'Използвай моето местоположение':'Use my location',exact:true}).click()
+ await s.locate(3,{latitude:43.57,longitude:27.83,accuracy:259471})
+ await expect(page.getByTestId('gps-accuracy')).toContainText('259471')
+ await expect(page.locator('.big-temp')).toHaveText('13°C')
+ expect(s.weatherCalls()).toHaveLength(before)
+})
