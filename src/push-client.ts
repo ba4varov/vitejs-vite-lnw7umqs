@@ -1,5 +1,5 @@
 import {requestPushKeyCheck} from './push-key-request.js'
-import {restoreSession,type AuthSession} from './auth-client'
+import {accountSession,restoreSession,type AuthSession} from './auth-client'
 export type PushCity={name:string;latitude:number;longitude:number;zone:string}
 export type PushPreferences={enabled:boolean;cities:PushCity[];categories:string[]}
 export type PushDevice={id:string;label:string;fingerprint:string;createdAt:string}
@@ -37,9 +37,10 @@ export function pushTestDiagnostic(result:any):string {
 }
 
 // No retries: a lost response may follow an already consumed provider attempt.
-export async function sessionPushTest(session:AuthSession,body:object) {
- const active=await restoreSession()
- if(!active||active.user.id!==session.user.id)throw Error('session:changed')
+export async function sessionPushTest(session:AuthSession,body:object,isCurrent:()=>boolean=()=>true) {
+ const active=await accountSession(session.user.id)
+ // Recheck lifecycle after restoring: refresh may publish logout/account changes.
+ if(!active||active.user.id!==session.user.id||!isCurrent())throw Error('session:changed')
  let response:Response
  try {
   response=await fetch('/api/push-operator',{method:'POST',headers:{Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(55000)})
