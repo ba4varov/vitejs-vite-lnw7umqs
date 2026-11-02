@@ -3,8 +3,7 @@ import { weather } from './forecast-order-fixture'
 import { clickHeaderControl } from './header-navigation'
 import fs from 'node:fs/promises'
 
-test.use({ hasTouch: true })
-type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'|'unconfirmed'|'unconfirmed-denied'
+type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'|'unconfirmed'|'unconfirmed-denied'|'unconfirmed-prompt'|'unconfirmed-no-permissions'
 const gps={latitude:43.2256,longitude:27.8888,accuracy:25}
 const sofia={id:'00000000-0000-0000-0000-000000000010',name:'Sofia',latitude:42.6977,longitude:23.3219,geoname_id:null,country_code:null,admin1_id:null}
 async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
@@ -18,7 +17,7 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
  await page.addInitScript(({mode,lang})=>{
   localStorage.setItem('meteoPulseLanguage',lang)
   // Existing startup matrix exercises fallback to a previously confirmed city.
-  if (!mode.startsWith('unconfirmed') && !localStorage.getItem('meteoPulseConfirmedLocationV1')) localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual'}))
+  if (!mode.startsWith('unconfirmed') && !localStorage.getItem('meteoPulseConfirmedLocationV1')) localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'geolocation',accuracy:25}))
   if(mode==='default'||mode==='saved-varna')localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'gps-fixture-token',refresh_token:'gps-fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002'}}))
   const w=window as any;w.gpsCalls=[];w.forecastHistory=[]
   window.addEventListener('DOMContentLoaded',()=>{
@@ -29,7 +28,7 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
     if(JSON.stringify(w.forecastHistory.at(-1))!==JSON.stringify(value))w.forecastHistory.push(value)
    }).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['src']})
   })
-  Object.defineProperty(navigator,'permissions',{configurable:true,value:mode==='no-permissions'?undefined:{query:()=>mode==='stalled-permission'?new Promise(()=>{}):Promise.resolve({state:(mode==='denied'||mode==='unconfirmed-denied')?'denied':mode==='no-permissions'?'prompt':'granted'})}})
+  Object.defineProperty(navigator,'permissions',{configurable:true,value:(mode==='no-permissions'||mode==='unconfirmed-no-permissions')?undefined:{query:()=>mode==='stalled-permission'?new Promise(()=>{}):Promise.resolve({state:(mode==='denied'||mode==='unconfirmed-denied')?'denied':mode==='unconfirmed-prompt'?'prompt':'granted'})}})
   Object.defineProperty(navigator,'geolocation',{configurable:true,value:mode==='missing'?undefined:{getCurrentPosition:(success:any,error:any,options:any)=>{w.gpsCalls.push({success,error,options})}}})
  },{mode,lang})
  await page.route('**/*',async route=>{
@@ -52,12 +51,12 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
 for(const width of [390,1440])for(const lang of ['bg','en'])for(const dark of [false,true])for(const mode of ['fast','slow','denied','missing','late','manual','default'] as Mode[]){
  test(`startup ${mode} ${width} ${lang} ${dark}`,async({page},info)=>{
   const s=await setup(page,mode,lang,width,dark)
-  const gpsMode=['fast','slow','late','manual','default'].includes(mode)
+  const gpsMode=['fast','slow','late','manual'].includes(mode)
   if(gpsMode){await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1);expect(s.calls).toHaveLength(0);await expect(page.locator('.main-card')).toHaveCount(0)}
   if(mode==='slow'){await page.clock.fastForward(3800);expect(s.calls).toHaveLength(0)}
   if(mode==='fast'||mode==='slow')await s.locate()
   if(mode==='manual'){await page.locator('.city-row .city-btn').nth(1).click();await s.locate()}
-  if(mode==='default'){await s.locate();await page.clock.fastForward(500);expect(s.calls).toHaveLength(0);s.releaseDefault()}
+  if(mode==='default'){await page.clock.fastForward(500);expect(s.calls).toHaveLength(0);s.releaseDefault()}
   if(mode==='late')await page.clock.fastForward(5000)
   const temperature=mode==='fast'||mode==='slow'?'13°C':mode==='manual'||mode==='default'?'17°C':'12°C'
   await expect(page.locator('.big-temp')).toHaveText(temperature)
@@ -136,9 +135,9 @@ for(const width of [390,1440]) {
  })
  test(`saved Varna cannot overwrite a newer explicit GPS action ${width}`,async({page})=>{
   const s=await setup(page,'saved-varna','en',width)
-  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
-  await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(1)
-  await expect(page.locator('.big-temp')).toHaveText('13°C');s.releaseDefault();await s.locate(0,{latitude:43.2141,longitude:27.9147,accuracy:25})
+  expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
+  await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(0)
+  await expect(page.locator('.big-temp')).toHaveText('13°C');s.releaseDefault()
   await page.clock.fastForward(5000);await expect(page.locator('.big-temp')).toHaveText('13°C')
   await expect(page.locator('.main-card h2')).toContainText('Troshevo');expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(gps.latitude))
  })
@@ -185,7 +184,7 @@ for (const lang of ['bg','en']) test(`259 km startup fix requires manual choice 
  await page.locator('.city-row .city-btn').nth(1).click()
  await expect(page.locator('.big-temp')).toHaveText('17°C')
  await page.reload({waitUntil:'domcontentloaded'})
- await s.locate(0,{latitude:43.57,longitude:27.83,accuracy:259471})
+ expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
  await expect(page.locator('.big-temp')).toHaveText('17°C')
  expect(s.weatherCalls().every(call=>call.lat===String(sofia.latitude))).toBe(true)
 })
@@ -208,12 +207,15 @@ test('permission denial without history offers a city; explicit inaccurate GPS k
  await expect(page.locator('.main-card h2')).toContainText('Sofia')
 })
 
-test('accurate GPS on reload follows travel rather than pinning the last city', async ({page}) => {
+test('manual city survives reload without GPS; explicit GPS follows travel', async ({page}) => {
  const s=await setup(page,'unconfirmed','en',1440)
  await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
  await page.locator('.city-row .city-btn').nth(1).click()
  await expect(page.locator('.big-temp')).toHaveText('17°C')
  await page.reload({waitUntil:'domcontentloaded'})
+ await expect(page.locator('.main-card h2')).toContainText('Sofia')
+ expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
+ await page.getByRole('button',{name:'Use my location',exact:true}).click()
  await s.locate(0,{latitude:48.8566,longitude:2.3522,accuracy:25})
  await expect.poll(()=>s.weatherCalls().at(-1)?.lat).toBe('48.8566')
  await expect(page.locator('.big-temp')).toHaveText('12°C')
@@ -254,11 +256,11 @@ for(const width of [390,1440]) {
   const history=await page.evaluate(()=>(window as any).forecastHistory)
   expect([...new Set(history.map((value:any)=>value.temp))]).toEqual(['13°C'])
  })
- test(`preferred city wins before a 3.8 second automatic GPS ${width}`,async({page})=>{
+ test(`preferred city loads without an automatic GPS request ${width}`,async({page})=>{
   const s=await setup(page,'default','en',width)
-  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
   s.releaseDefault();await expect(page.locator('.big-temp')).toHaveText('17°C')
-  const first=await s.stable();await page.clock.fastForward(3800);await s.locate();await page.clock.fastForward(1000)
+  const first=await s.stable();await page.clock.fastForward(4800)
   expect(await s.stable()).toEqual(first);expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(sofia.latitude))
  })
  test(`manual choice wins over 3.8 second automatic GPS ${width}`,async({page})=>{
@@ -287,3 +289,49 @@ for(const width of [390,1440]) {
   expect(Math.abs(await page.evaluate(()=>scrollY)-offset)).toBeLessThanOrEqual(2)
  })
 }
+
+for (const lang of ['bg','en']) for (const mode of ['unconfirmed-prompt','unconfirmed-no-permissions'] as Mode[]) {
+ test(`first visit requests permission once and accepts late GPS ${mode} ${lang}`, async ({page}) => {
+  const s=await setup(page,mode,lang)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await expect(page.getByRole('button',{name:lang==='bg'?'Разреши местоположението':'Allow location',exact:true})).toBeVisible()
+  await page.clock.fastForward(4500)
+  await expect(page.locator('.forecast-loading')).toHaveCount(0)
+  await expect(page.locator('.location-choice')).toBeVisible()
+  expect(s.weatherCalls()).toHaveLength(0)
+  await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+  await page.clock.fastForward(15*60*1000)
+  await expect.poll(()=>s.weatherCalls().length).toBe(2)
+  expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+ })
+ test(`manual choice while permission pending wins ${mode} ${lang}`, async ({page}) => {
+  const s=await setup(page,mode,lang)
+  await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+  await page.clock.fastForward(4500)
+  await page.locator('.city-row .city-btn').nth(1).click()
+  await expect(page.locator('.big-temp')).toHaveText('17°C')
+  await s.locate();await page.clock.fastForward(1000)
+  await expect(page.locator('.big-temp')).toHaveText('17°C')
+  expect(s.weatherCalls()).toHaveLength(1)
+ })
+}
+for (const lang of ['bg','en']) test(`denied permission explains settings and retries after change ${lang}`, async ({page}) => {
+ const s=await setup(page,'unconfirmed-denied',lang)
+ const blocked=page.getByRole('status').filter({hasText:lang==='bg'?'Браузърът е блокирал':'Your browser has blocked'})
+ await expect(blocked).toBeVisible()
+ expect(await page.evaluate(()=>(window as any).gpsCalls.length)).toBe(0)
+ expect(s.weatherCalls()).toHaveLength(0)
+ await page.evaluate(()=>Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>({state:'prompt'})}}))
+ await blocked.getByRole('button').click()
+ await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+ await expect(blocked).toHaveCount(0)
+})
+for (const lang of ['bg','en']) test(`first visit refusal preserves manual choice and gesture retry ${lang}`, async ({page}) => {
+ const s=await setup(page,'unconfirmed-prompt',lang)
+ await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
+ await page.evaluate(()=>(window as any).gpsCalls[0].error({code:1}))
+ await expect(page.getByRole('status').filter({hasText:lang==='bg'?'Браузърът е блокирал':'Your browser has blocked'})).toBeVisible()
+ await expect(page.locator('.forecast-loading')).toHaveCount(0)
+ await page.getByRole('button',{name:lang==='bg'?'Разреши местоположението':'Allow location',exact:true}).click()
+ await s.locate(1);await expect(page.locator('.big-temp')).toHaveText('13°C')
+})
