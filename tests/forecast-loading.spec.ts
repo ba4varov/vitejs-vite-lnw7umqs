@@ -76,6 +76,7 @@ for (const width of [390, 1440]) for (const lang of ['bg', 'en'] as const) for (
 
 for (const scenario of ['initial error', 'geolocation stale response', 'manual selection wins']) {
   test(scenario, async ({ page }) => {
+    if (scenario === 'initial error') await page.clock.install()
     let fail = scenario === 'initial error'
     const delayed: (() => void)[] = []
     await page.addInitScript(scenario => {
@@ -99,6 +100,9 @@ for (const scenario of ['initial error', 'geolocation stale response', 'manual s
       await expect(page.locator('.main-card')).toHaveCount(0)
       fail = false
       await page.getByRole('button', { name: 'Опитай отново', exact: true }).click()
+      await expect(page.locator('.main-card')).toHaveCount(0)
+      await expect(page.getByText(/Доставчикът на прогнозата е временно/)).toBeVisible()
+      await page.clock.fastForward(15 * 60 * 1000)
       await expect(page.locator('.big-temp')).toHaveText('18°C')
     } else {
       if (scenario === 'manual selection wins') await page.getByRole('button', { name: 'София', exact: true }).click()
