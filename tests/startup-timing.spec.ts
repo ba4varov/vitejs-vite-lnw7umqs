@@ -22,10 +22,11 @@ for(const scenario of cases)for(const revision of ['before','after'])for(let rep
    const mark=(phase:string)=>{if(!events.some(e=>e.phase===phase))events.push({phase,ms:Math.round(performance.now()*10)/10})}
    w.timingEvidence=events
    localStorage.setItem('meteoPulseLanguage','en')
+   localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual'}))
    Math.random=()=>0.25
    if(s.preferred)localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'synthetic-fixture',refresh_token:'synthetic-fixture',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002'}}))
    Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:()=>{mark('permission:start');return Promise.resolve({state:s.permission||'granted'}).then(value=>{mark('permission:end');return value})}}})
-   Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success:any)=>{mark('gps:start');setTimeout(()=>{mark('gps:end');success({coords:{latitude:43.2256,longitude:27.8888}})},s.gps||0)}}})
+   Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success:any)=>{mark('gps:start');setTimeout(()=>{mark('gps:end');success({coords:{latitude:43.2256,longitude:27.8888,accuracy:25}})},s.gps||0)}}})
    const fetchOriginal=window.fetch.bind(window)
    let defaultResponses=0
    window.fetch=async(input,options)=>{

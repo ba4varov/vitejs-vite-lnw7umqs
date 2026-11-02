@@ -7,11 +7,11 @@ function setup(state='granted',extras={}) {
  const callbacks=[],timers=[];let queries=0
  const nav={permissions:{query:async()=>{queries++;return {state}}},geolocation:{getCurrentPosition:(success,error,options)=>callbacks.push({success,error,options})}}
  const chooser=createInitialLocation({navigator:nav,schedule:callback=>{timers.push(callback);return timers.length},cancel:()=>{},...extras})
- return {chooser,callbacks,timers,nav,queries:()=>queries,gps:()=>callbacks[0].success({coords:{latitude:43.22,longitude:27.89}})}
+ return {chooser,callbacks,timers,nav,queries:()=>queries,gps:()=>callbacks[0].success({coords:{latitude:43.22,longitude:27.89,accuracy:25}})}
 }
 test('granted GPS elects final coordinates, starts once across StrictMode setup and settles once',async()=>{
  const s=setup();const first=s.chooser.start();assert.equal(s.chooser.start(),first);await flush();assert.equal(s.callbacks.length,1);assert.equal(s.queries(),1)
- s.gps();assert.deepEqual(await first,{source:'geolocation',lat:43.22,lon:27.89});s.timers[0]();assert.equal(s.chooser.start(),first)
+ s.gps();assert.deepEqual(await first,{source:'geolocation',lat:43.22,lon:27.89,accuracy:25});s.timers[0]();assert.equal(s.chooser.start(),first)
 })
 for(const state of ['denied','prompt',undefined])test(`permission ${state} falls back without prompting`,async()=>{
  const s=setup(state);if(state===undefined)delete s.nav.permissions
@@ -40,7 +40,7 @@ test('default lookup has the same bounded budget; late default cannot reorder fa
  const s=setup('denied');s.chooser.waitForDefault();const result=s.chooser.start();await flush();s.timers[0]();assert.deepEqual(await result,{source:'fallback'});assert.equal(s.chooser.defaultResolved({name:'Sofia'}),false)
 })
 test('GPS coordinates release election immediately without reverse geocoding',async()=>{
- const s=setup();const result=s.chooser.start();await flush();s.gps();assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89});assert.equal(s.chooser.settled,true)
+ const s=setup();const result=s.chooser.start();await flush();s.gps();assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89,accuracy:25});assert.equal(s.chooser.settled,true)
 })
 test('invalid GPS coordinates never become a forecast location',async()=>{
  const s=setup();const result=s.chooser.start();await flush();s.callbacks[0].success({coords:{latitude:NaN,longitude:27}});assert.deepEqual(await result,{source:'fallback'})
@@ -60,7 +60,7 @@ for (const delivery of [800,2000,3800]) test(`granted automatic GPS at ${deliver
  const result=s.chooser.start();await flush()
  assert.equal(s.callbacks[0].options.timeout,4500)
  t.mock.timers.tick(delivery);assert.equal(s.chooser.settled,false)
- s.gps();assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89})
+ s.gps();assert.deepEqual(await result,{source:'geolocation',lat:43.22,lon:27.89,accuracy:25})
  t.mock.timers.tick(4500-delivery);assert.equal((await result).source,'geolocation')
 })
 for (const state of ['denied','prompt','unsupported','no-permissions']) test(`unavailable GPS settles without advancing the deadline: ${state}`,async()=>{
@@ -75,4 +75,18 @@ test('GPS delivered beyond 4.5 seconds cannot replace fallback',async t=>{
  const s=setup('granted',{schedule:setTimeout,cancel:clearTimeout});const result=s.chooser.start();await flush()
  t.mock.timers.tick(4500);assert.deepEqual(await result,{source:'fallback'})
  t.mock.timers.tick(1);s.gps();assert.deepEqual(await result,{source:'fallback'})
+})
+
+for (const accuracy of [259471, 3001, undefined, NaN, -1]) test(`inaccurate startup fix ${accuracy} settles immediately without electing coordinates`, async () => {
+ const s=setup();const result=s.chooser.start();await flush()
+ s.callbacks[0].success({coords:{latitude:43.57,longitude:27.83,accuracy}})
+ assert.deepEqual(await result,{source:'fallback',reason:'accuracy'})
+ s.gps();assert.deepEqual(await result,{source:'fallback',reason:'accuracy'})
+})
+test('a saved default still wins after an inaccurate fix', async () => {
+ const s=setup();s.chooser.waitForDefault();const result=s.chooser.start();await flush()
+ s.callbacks[0].success({coords:{latitude:43.57,longitude:27.83,accuracy:259471}})
+ assert.equal(s.chooser.settled,false)
+ const place={name:'Sofia',lat:42.7,lon:23.3};s.chooser.defaultResolved(place)
+ assert.deepEqual(await result,{source:'place',place})
 })

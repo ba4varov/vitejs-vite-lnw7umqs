@@ -1,3 +1,4 @@
+import { acceptableAccuracy, MAX_ADDRESS_ACCURACY } from './location-accuracy.js'
 const closeCoordinate = (left, right) => Math.abs(Number(left) - Number(right)) <= 0.0001
 
 export function quickCityAtCoordinates(quickCities, coords) {
@@ -11,7 +12,7 @@ export async function localizeCurrentLocation(current, language, quickCities, lo
   return localizer(current, language, options)
 }
 
-export function locationFromReverseGeocode(data, fallbackName) {
+export function locationFromReverseGeocode(data, fallbackName, accuracy) {
   const address = data?.address || {}
   const name = address.city || address.town || address.village || address.county || fallbackName
   const street = address.road || address.pedestrian || address.street
@@ -21,13 +22,14 @@ export function locationFromReverseGeocode(data, fallbackName) {
     name,
     region: address.state || address.county,
     country: address.country,
-    exactLocation: exactParts.length ? exactParts.join(' ') : null
+    exactLocation: acceptableAccuracy(accuracy, MAX_ADDRESS_ACCURACY) && exactParts.length ? exactParts.join(' ') : null
   }
 }
 
 export async function reverseGeocodeLocation(coords, language, options = {}) {
   const fetcher = options.fetcher || fetch
-  const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}&format=json&accept-language=${language}&zoom=18`
+  const zoom = acceptableAccuracy(options.accuracy, MAX_ADDRESS_ACCURACY) ? 18 : 10
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}&format=json&accept-language=${language}&zoom=${zoom}`
   const response = await fetcher(url, { signal: options.signal })
   if (!response.ok) throw new Error('Reverse geocoding failed')
   return response.json()

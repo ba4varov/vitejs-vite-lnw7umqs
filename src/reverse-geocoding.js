@@ -1,7 +1,9 @@
+import { acceptableAccuracy, MAX_ADDRESS_ACCURACY } from './location-accuracy.js'
 const endpoint = 'https://nominatim.openstreetmap.org/reverse'
 
 export async function reverseGeocodeLocation(lat, lon, language, dependencies = {}) {
   const fetcher = dependencies.fetcher || fetch
+  const precise = acceptableAccuracy(dependencies.accuracy, MAX_ADDRESS_ACCURACY)
   const params = new URLSearchParams({
     lat: String(lat),
     lon: String(lon),
@@ -9,7 +11,7 @@ export async function reverseGeocodeLocation(lat, lon, language, dependencies = 
     'accept-language': language,
     addressdetails: '1',
     namedetails: '1',
-    zoom: '18'
+    zoom: precise ? '18' : '10'
   })
   const response = await fetcher(`${endpoint}?${params}`, { signal: dependencies.signal })
   if (!response.ok) throw new Error('Reverse geocoding failed')
@@ -22,5 +24,5 @@ export async function reverseGeocodeLocation(lat, lon, language, dependencies = 
   const neighborhood = address.suburb || address.neighbourhood || address.city_district
   const addressLabel = street ? [street, address.house_number].filter(Boolean).join(' ') : neighborhood || null
 
-  return { name, region, country, address: addressLabel }
+  return { name, region, country, address: precise ? addressLabel : null }
 }

@@ -4,19 +4,21 @@ import { clickHeaderControl } from './header-navigation'
 import fs from 'node:fs/promises'
 
 test.use({ hasTouch: true })
-type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'
-const gps={latitude:43.2256,longitude:27.8888}
+type Mode='fast'|'slow'|'denied'|'missing'|'late'|'manual'|'default'|'no-permissions'|'stalled-permission'|'denied-callback'|'slow-label'|'saved-varna'|'unconfirmed'|'unconfirmed-denied'
+const gps={latitude:43.2256,longitude:27.8888,accuracy:25}
 const sofia={id:'00000000-0000-0000-0000-000000000010',name:'Sofia',latitude:42.6977,longitude:23.3219,geoname_id:null,country_code:null,admin1_id:null}
 async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
  const calls:{source:string,lat:string|null}[]=[], images:string[]=[]
  let releaseDefault=()=>{},releaseLabel=()=>{}
- const favorite=mode==='saved-varna'?{...sofia,name:'Varna',latitude:43.2141,longitude:27.9147}:sofia
+ const favorite=mode==='saved-varna'?{...sofia,name:'Varna',latitude:43.2141,longitude:27.9147,accuracy:25}:sofia
  let temperatureOverride:number|null=null, nextWeatherFailures=0
  let weatherHold:Promise<void>|null=null, releaseWeather=()=>{}
  const defaultWait=new Promise<void>(r=>{releaseDefault=r}),labelWait=new Promise<void>(r=>{releaseLabel=r})
  await page.setViewportSize({width,height:900});await page.clock.install({time:new Date('2026-10-14T09:00:00Z')});await page.clock.pauseAt(new Date('2026-10-14T09:01:00Z'))
  await page.addInitScript(({mode,lang})=>{
   localStorage.setItem('meteoPulseLanguage',lang)
+  // Existing startup matrix exercises fallback to a previously confirmed city.
+  if (!mode.startsWith('unconfirmed') && !localStorage.getItem('meteoPulseConfirmedLocationV1')) localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual'}))
   if(mode==='default'||mode==='saved-varna')localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'gps-fixture-token',refresh_token:'gps-fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002'}}))
   const w=window as any;w.gpsCalls=[];w.forecastHistory=[]
   window.addEventListener('DOMContentLoaded',()=>{
@@ -27,7 +29,7 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
     if(JSON.stringify(w.forecastHistory.at(-1))!==JSON.stringify(value))w.forecastHistory.push(value)
    }).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['src']})
   })
-  Object.defineProperty(navigator,'permissions',{configurable:true,value:mode==='no-permissions'?undefined:{query:()=>mode==='stalled-permission'?new Promise(()=>{}):Promise.resolve({state:mode==='denied'?'denied':mode==='no-permissions'?'prompt':'granted'})}})
+  Object.defineProperty(navigator,'permissions',{configurable:true,value:mode==='no-permissions'?undefined:{query:()=>mode==='stalled-permission'?new Promise(()=>{}):Promise.resolve({state:(mode==='denied'||mode==='unconfirmed-denied')?'denied':mode==='no-permissions'?'prompt':'granted'})}})
   Object.defineProperty(navigator,'geolocation',{configurable:true,value:mode==='missing'?undefined:{getCurrentPosition:(success:any,error:any,options:any)=>{w.gpsCalls.push({success,error,options})}}})
  },{mode,lang})
  await page.route('**/*',async route=>{
@@ -97,7 +99,7 @@ test('explicit location remains available after fallback; manual selection cance
 })
 test('same-coordinate selections and 15 minute refresh retain the background without duplicate requests',async({page})=>{
  const s=await setup(page,'denied');await expect(page.locator('.big-temp')).toHaveText('12°C');const first=await s.stable()
- await page.locator('.city-row .city-btn').first().click();await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(0,{latitude:43.2141,longitude:27.9147});await page.clock.fastForward(1000)
+ await page.locator('.city-row .city-btn').first().click();await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(0,{latitude:43.2141,longitude:27.9147,accuracy:25});await page.clock.fastForward(1000)
  expect(s.weatherCalls()).toHaveLength(1);expect((await s.stable()).background).toBe(first.background)
  s.changeTemperature(14)
  await page.clock.fastForward(15*60*1000);await expect.poll(()=>s.weatherCalls().length).toBe(2);await expect(page.locator('.big-temp')).toHaveText('14°C');await expect(page.locator('.forecast-refresh')).toHaveCount(0);expect((await s.stable()).background).toBe(first.background);expect(s.images).toHaveLength(1)
@@ -136,7 +138,7 @@ for(const width of [390,1440]) {
   const s=await setup(page,'saved-varna','en',width)
   await expect.poll(()=>page.evaluate(()=>(window as any).gpsCalls.length)).toBe(1)
   await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(1)
-  await expect(page.locator('.big-temp')).toHaveText('13°C');s.releaseDefault();await s.locate(0,{latitude:43.2141,longitude:27.9147})
+  await expect(page.locator('.big-temp')).toHaveText('13°C');s.releaseDefault();await s.locate(0,{latitude:43.2141,longitude:27.9147,accuracy:25})
   await page.clock.fastForward(5000);await expect(page.locator('.big-temp')).toHaveText('13°C')
   await expect(page.locator('.main-card h2')).toContainText('Troshevo');expect(s.weatherCalls()).toHaveLength(1);expect(s.weatherCalls()[0].lat).toBe(String(gps.latitude))
  })
@@ -171,6 +173,66 @@ for(const width of [390,1440]) {
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
  })
 }
+
+for (const lang of ['bg','en']) test(`259 km startup fix requires manual choice without a confirmed place ${lang}`, async ({page}) => {
+ const s=await setup(page,'unconfirmed',lang,1440)
+ await s.locate(0,{latitude:43.57,longitude:27.83,accuracy:259471})
+ await expect(page.locator('.location-choice')).toBeVisible()
+ await expect(page.getByRole('status').filter({hasText:lang==='bg'?'точността е недостатъчна':'accuracy is insufficient'})).toBeVisible()
+ expect(s.weatherCalls()).toHaveLength(0)
+ await expect(page.locator('.main-card')).toHaveCount(0)
+ expect(await page.evaluate(()=>localStorage.getItem('meteoPulseConfirmedLocationV1'))).toBeNull()
+ await page.locator('.city-row .city-btn').nth(1).click()
+ await expect(page.locator('.big-temp')).toHaveText('17°C')
+ await page.reload({waitUntil:'domcontentloaded'})
+ await s.locate(0,{latitude:43.57,longitude:27.83,accuracy:259471})
+ await expect(page.locator('.big-temp')).toHaveText('17°C')
+ expect(s.weatherCalls().every(call=>call.lat===String(sofia.latitude))).toBe(true)
+})
+
+test('permission denial without history offers a city; explicit inaccurate GPS keeps the chosen city and refresh', async ({page}) => {
+ const s=await setup(page,'unconfirmed-denied','en',1440)
+ await expect(page.locator('.location-choice')).toBeVisible()
+ expect(s.weatherCalls()).toHaveLength(0)
+ await page.locator('.city-row .city-btn').nth(1).click()
+ await expect(page.locator('.big-temp')).toHaveText('17°C')
+ await page.getByRole('button',{name:'Use my location',exact:true}).click()
+ await s.locate(0,{latitude:43.57,longitude:27.83,accuracy:259471})
+ await expect(page.getByRole('status').filter({hasText:'accuracy is insufficient'})).toBeVisible()
+ await expect(page.locator('.main-card h2')).toContainText('Sofia')
+ expect(s.weatherCalls()).toHaveLength(1)
+ await page.clock.fastForward(15*60*1000)
+ await expect.poll(()=>s.weatherCalls().length).toBe(2)
+ expect(s.weatherCalls().every(call=>call.lat===String(sofia.latitude))).toBe(true)
+ await page.reload({waitUntil:'domcontentloaded'})
+ await expect(page.locator('.main-card h2')).toContainText('Sofia')
+})
+
+test('accurate GPS on reload follows travel rather than pinning the last city', async ({page}) => {
+ const s=await setup(page,'unconfirmed','en',1440)
+ await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
+ await page.locator('.city-row .city-btn').nth(1).click()
+ await expect(page.locator('.big-temp')).toHaveText('17°C')
+ await page.reload({waitUntil:'domcontentloaded'})
+ await s.locate(0,{latitude:48.8566,longitude:2.3522,accuracy:25})
+ await expect.poll(()=>s.weatherCalls().at(-1)?.lat).toBe('48.8566')
+ await expect(page.locator('.big-temp')).toHaveText('12°C')
+})
+
+test('city-level fix suppresses street labels even if reverse service supplies an address', async ({page}) => {
+ const s=await setup(page,'unconfirmed','en',1440)
+ await page.route('**/reverse?**',route=>route.fulfill({json:{address:{city:'Paris',road:'Rue Test',house_number:'12'}}}))
+ await s.locate(0,{latitude:48.8566,longitude:2.3522,accuracy:2000})
+ await expect(page.locator('.main-card h2')).toContainText('Paris')
+ await expect(page.locator('.main-card h2')).not.toContainText('Rue Test')
+ await page.getByRole('button',{name:'Use my location',exact:true}).click()
+ await s.locate(1,{latitude:48.8566,longitude:2.3522,accuracy:25})
+ await expect(page.locator('.main-card h2')).toContainText('Rue Test 12')
+ await page.getByRole('button',{name:'Use my location',exact:true}).click()
+ await s.locate(2,{latitude:48.8566,longitude:2.3522,accuracy:2000})
+ await expect(page.locator('.main-card h2')).not.toContainText('Rue Test')
+ expect(s.weatherCalls()).toHaveLength(1)
+})
 for(const width of [390,1440])test(`same-coordinate explicit GPS refreshes a pending label without another forecast ${width}`,async({page})=>{
  const s=await setup(page,'slow-label','en',width);await s.locate();await expect(page.locator('.big-temp')).toHaveText('13°C')
  await page.getByRole('button',{name:'Use my location',exact:true}).click();await s.locate(1);s.releaseLabel()

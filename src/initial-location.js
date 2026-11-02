@@ -1,4 +1,5 @@
 import { startupTiming } from './startup-timing.js'
+import { acceptedPosition } from './location-accuracy.js'
 // Preserve the accepted mobile GPS window. This is a ceiling, not a delay:
 // known permission denial/unavailable GPS and successful fixes settle immediately.
 export const INITIAL_LOCATION_TIMEOUT = 4500
@@ -8,7 +9,7 @@ export const INITIAL_LOCATION_TIMEOUT = 4500
 // wins over GPS. A settled election never accepts another automatic result.
 export function createInitialLocation({ navigator: browser, timeout = INITIAL_LOCATION_TIMEOUT, schedule = setTimeout, cancel = clearTimeout } = {}) {
   let started = false, settled = false, defaultsDone = true, gpsDone = false
-  let gps = null, timer, resolve
+  let gps = null, timer, resolve, reason
   const result = new Promise(done => { resolve = done })
   const finish = selection => {
     if (settled) return false
@@ -18,7 +19,8 @@ export function createInitialLocation({ navigator: browser, timeout = INITIAL_LO
     resolve(selection)
     return true
   }
-  const complete = () => { if (defaultsDone && gpsDone) finish(gps || { source: 'fallback' }) }
+  const fallback = () => reason ? { source: 'fallback', reason } : { source: 'fallback' }
+  const complete = () => { if (defaultsDone && gpsDone) finish(gps || fallback()) }
   return {
     get settled() { return settled },
     waitForDefault() { if (!settled) { defaultsDone = false; startupTiming.mark('default:start') } },
@@ -35,7 +37,7 @@ export function createInitialLocation({ navigator: browser, timeout = INITIAL_LO
       if (started || settled) return result
       started = true
       startupTiming.mark('permission:start')
-      timer = schedule(() => finish(gps || { source: 'fallback' }), timeout)
+      timer = schedule(() => finish(gps || fallback()), timeout)
       // Unsupported GPS cannot benefit from waiting for a Permissions response.
       if (!browser?.geolocation?.getCurrentPosition) {
         gpsDone = true
@@ -55,7 +57,8 @@ export function createInitialLocation({ navigator: browser, timeout = INITIAL_LO
           if (settled) return
           const lat = position?.coords?.latitude, lon = position?.coords?.longitude
           if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lon) || Math.abs(lon) > 180) { gpsDone = true; complete(); return }
-          gps = { source: 'geolocation', lat, lon }
+          if (!acceptedPosition(position?.coords)) { reason = 'accuracy'; gpsDone = true; complete(); return }
+          gps = { source: 'geolocation', lat, lon, accuracy: position.coords.accuracy }
           gpsDone = true
           complete()
         }, () => { startupTiming.mark('gps:end'); if (!settled) { gpsDone = true; complete() } }, { timeout, maximumAge: 60000 })
