@@ -11,6 +11,9 @@ const reasons={
  InvalidTTL:'fcm_invalid_ttl',
 }
 const bodyStatuses=['recognized','empty','unknown_format','incomplete','timeout','too_large','unsupported_encoding','invalid_framing','read_failed']
+// RFC 9112 chunk extensions: validate syntax, discard values. Wire limits still apply.
+const chunkLine=/^([0-9a-fA-F]{1,4})(?:[ \t]*;[ \t]*[!#$%&'*+.^_`|~0-9A-Za-z-]+(?:[ \t]*=[ \t]*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"(?:[\t !\x23-\x5b\x5d-\x7e\x80-\xff]|\\[\t \x21-\x7e\x80-\xff])*"))?)*$/
+const trailerLine=/^[!#$%&'*+.^_`|~0-9A-Za-z-]+:[\t \x21-\x7e\x80-\xff]*$/
 export const safeProviderReason=value=>typeof value==='string'&&[...Object.values(reasons),'fcm_vapid_subscription_mismatch'].includes(value)?value:undefined
 export const safeProviderBodyStatus=value=>typeof value==='string'&&bodyStatuses.includes(value)?value:undefined
 export const providerPhraseReason=value=>typeof value==='string'&&Object.hasOwn(reasons,value)?reasons[value]:undefined
@@ -55,20 +58,27 @@ export async function readProviderDiagnostic(connection,initial,lines) {
   if(length!==undefined&&Number(length)>1024)return status('too_large')
   if(length==='0')return status('empty')
   if(headers.has('content-encoding')&&headers.get('content-encoding').toLowerCase()!=='identity')return status('unsupported_encoding')
-  let wire=Buffer.from(initial),body=Buffer.alloc(0),offset=0
+  let wire=Buffer.from(initial),body=Buffer.alloc(0),offset=0,trailers=false
   if(wire.length>2048)return status('too_large')
   while(true){
    if(transfer){
     while(true){
      const end=wire.indexOf('\r\n',offset)
      if(end<0)break
-     const sizeText=wire.subarray(offset,end).toString('ascii')
-     if(!/^[0-9a-fA-F]{1,4}$/.test(sizeText))return status('invalid_framing')
-     const size=parseInt(sizeText,16),start=end+2
+     const line=wire.subarray(offset,end).toString('latin1')
+     if(trailers){
+      if(line==='')return classify(body,type)
+      if(!trailerLine.test(line))return status('invalid_framing')
+      // Never merge trailer fields into headers or diagnostic fields.
+      offset=end+2;continue
+     }
+     const match=chunkLine.exec(line)
+     if(!match)return status('invalid_framing')
+     const size=parseInt(match[1],16),start=end+2
+     if(size===0){trailers=true;offset=start;continue}
      if(body.length+size>1024)return status('too_large')
      if(wire.length<start+size+2)break
      if(wire.subarray(start+size,start+size+2).toString()!=='\r\n')return status('invalid_framing')
-     if(size===0)return classify(body,type)
      body=Buffer.concat([body,wire.subarray(start,start+size)]);offset=start+size+2
     }
    }else if(length!==undefined&&wire.length>=Number(length)){
