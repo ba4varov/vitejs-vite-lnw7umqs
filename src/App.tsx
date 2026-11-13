@@ -1,4 +1,4 @@
-import { gpsWarningArea } from './nimh-location.js'
+import { gpsWarningArea, MAX_WARNING_REGION_ACCURACY } from './nimh-location.js'
 import { OfficialWarnings } from './OfficialWarnings'
 import { RainWarning } from './RainWarning'
 import StartupDiagnostics from './StartupDiagnostics'
@@ -257,6 +257,8 @@ const WeatherApp = () => {
   const [lang, setLang] = useState<'bg' | 'en'>(() => loadLanguage())
   const [city, setCity] = useState('')
   const [hasAcceptedLocation, setHasAcceptedLocation] = useState(false)
+  const [gpsRestored, setGpsRestored] = useState(false)
+  const [gpsWarningIssue, setGpsWarningIssue] = useState<'pending' | 'accuracy' | 'administrative' | 'unavailable' | null>('pending')
   const [gpsAccuracy, setGpsAccuracy] = useState<number | undefined>(undefined)
   const [gpsInaccurate, setGpsInaccurate] = useState(false)
   // Inert until a location is accepted; never use a universal forecast city.
@@ -431,6 +433,7 @@ const WeatherApp = () => {
     locationChoiceRef.current = place.source !== 'geolocation'
     // Restored GPS coordinates still require fresh administrative evidence.
     setLocationSource(place.source === 'geolocation' ? 'geolocation' : 'place')
+    setGpsRestored(place.source === 'geolocation')
     if (place.source === 'geolocation') setGpsAccuracy(place.accuracy ?? null)
     setCity(place.name); updateCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails(place.source === 'geolocation' ? {} : { geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
   }
@@ -974,6 +977,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         setGpsError(false)
         setGpsDenied(false)
         setGpsInaccurate(false)
+        setGpsRestored(false)
         setGpsAccuracy(selection.accuracy)
         setLocationSource('geolocation')
         setCity(selection.name || translations[langRef.current].myLocation)
@@ -1040,6 +1044,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setInitialLocationReady(true)
       const lat = position.coords.latitude, lon = position.coords.longitude
       if (!acceptedPosition(position.coords)) { keepLastLocation(); setGpsBusy(false); setGpsInaccurate(true); return }
+      setGpsRestored(false)
       setGpsAccuracy(position.coords.accuracy)
       setExactLocation(null)
       locationChoiceRef.current = false
@@ -1060,18 +1065,22 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   useEffect(() => {
     if (locationSource !== 'geolocation') return
     const controller = new AbortController()
+    setPlaceDetails(details => ({ ...details, warningArea: undefined }))
+    setGpsWarningIssue('pending')
     startupTiming.mark('reverse:start')
     const revision = locationRevisionRef.current
     const key = locationKey
     const labelCurrent = () => !controller.signal.aborted && !locationChoiceRef.current && revision === locationRevisionRef.current && key === locationKeyRef.current && lang === langRef.current
-    void reverseGeocodeLocation(coords, lang, { signal: controller.signal, accuracy: gpsAccuracy }).then(data => {
+    void reverseGeocodeLocation(coords, lang, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]), accuracy: gpsAccuracy }).then(data => {
       startupTiming.mark('reverse:end')
       if (!labelCurrent()) return
       const localized = locationFromReverseGeocode(data, t.myLocation, gpsAccuracy)
       setCity(localized.name)
-      setPlaceDetails({ region: localized.region, country: localized.country, warningArea: gpsWarningArea(data, gpsAccuracy) })
+      const warningArea = gpsWarningArea(data, gpsAccuracy)
+      setGpsWarningIssue(warningArea ? null : gpsAccuracy == null || gpsAccuracy > MAX_WARNING_REGION_ACCURACY ? 'accuracy' : 'administrative')
+      setPlaceDetails({ region: localized.region, country: localized.country, warningArea: warningArea || undefined })
       setExactLocation(localized.exactLocation)
-    }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) setCity(t.myLocation) })
+    }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) { setCity(t.myLocation); setGpsWarningIssue('unavailable') } })
     return () => controller.abort()
   }, [lang, coords.lat, coords.lon, locationSource, gpsLabelGeneration, gpsAccuracy, locationSelection])
 
@@ -1222,7 +1231,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {placesError && <p className="places-error" role="alert">{placesErrorText(placesError, lang)} <button disabled={placesBusy} onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
 
-      {hasAcceptedLocation && <OfficialWarnings placeId={placeDetails.geonameId} area={placeDetails.warningArea} locationKey={locationKey} city={city} lang={lang} enabled={!gpsBusy} />}
+      {hasAcceptedLocation && <OfficialWarnings placeId={placeDetails.geonameId} area={placeDetails.warningArea} gpsRestored={locationSource === 'geolocation' && gpsRestored} gpsIssue={locationSource === 'geolocation' ? gpsWarningIssue : null} locationKey={locationKey} city={city} lang={lang} enabled={!gpsBusy} />}
 
       {snapshotTime !== null && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon && !freshness.fresh && <p role="status" className="forecast-update-error">
         {lang === 'bg' ? 'Последна валидна прогноза: ' : 'Last valid forecast: '}{new Date(snapshotTime).toLocaleString(lang === 'bg' ? 'bg-BG' : 'en-GB')}.{' '}

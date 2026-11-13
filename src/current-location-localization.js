@@ -34,7 +34,8 @@ export function locationFromReverseGeocode(data, fallbackName, accuracy) {
 
 export async function reverseGeocodeLocation(coords, language, options = {}) {
   const fetcher = options.fetcher || fetch
-  const zoom = acceptableAccuracy(options.accuracy, MAX_ADDRESS_ACCURACY) ? 18 : 10
+  // City zoom omits municipality evidence. Address display remains accuracy gated.
+  const zoom = 18
   const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}&format=json&accept-language=${language}&zoom=${zoom}`
   const response = await fetcher(url, { signal: options.signal })
   if (!response.ok) throw new Error('Reverse geocoding failed')
