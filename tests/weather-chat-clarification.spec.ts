@@ -3,6 +3,11 @@ import { fixture } from './forecast-order-fixture'
 import { clickHeaderControl } from './header-navigation'
 import { clarificationTurn } from '../server/weather-chat-core.js'
 
+// Chat scenarios require an accepted place; startup no longer invents a default.
+test.beforeEach(async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('meteoPulseConfirmedLocationV1', JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual',geonameId:726050,countryCode:'BG'})))
+})
+
 for (const lang of ['bg', 'en'] as const) for (const reset of ['city', 'language'] as const) {
   test(`pending chat state ${lang}: survives replies and clears on ${reset}`, async ({ page }) => {
     await fixture(page, lang)

@@ -17,8 +17,9 @@ async function setup(page:Page,mode:Mode,lang='en',width=390,dark=false){
  await page.setViewportSize({width,height:900});await page.clock.install({time:new Date('2026-10-14T09:00:00Z')});await page.clock.pauseAt(new Date('2026-10-14T09:01:00Z'))
  await page.addInitScript(({mode,lang})=>{
   localStorage.setItem('meteoPulseLanguage',lang)
-  // Existing startup matrix exercises fallback to a previously confirmed city.
-  if (!mode.startsWith('unconfirmed') && !localStorage.getItem('meteoPulseConfirmedLocationV1')) localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:'manual'}))
+  // Slow reverse-response cases need a saved GPS origin: an intentional manual
+  // selection must survive reload without starting automatic GPS.
+  if (!mode.startsWith('unconfirmed') && !localStorage.getItem('meteoPulseConfirmedLocationV1')) localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Varna',lat:43.2141,lon:27.9147,source:mode==='slow-label'?'geolocation':'manual',accuracy:25}))
   if(mode==='default'||mode==='saved-varna')localStorage.setItem('meteo-pulse-auth',JSON.stringify({access_token:'gps-fixture-token',refresh_token:'gps-fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'00000000-0000-0000-0000-000000000002'}}))
   const w=window as any;w.gpsCalls=[];w.forecastHistory=[]
   window.addEventListener('DOMContentLoaded',()=>{

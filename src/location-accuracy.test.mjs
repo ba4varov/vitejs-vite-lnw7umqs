@@ -33,13 +33,13 @@ test('storage failures never block location selection', () => {
   assert.equal(loadConfirmedLocation(storage), null)
   assert.doesNotThrow(() => saveConfirmedLocation({ name: 'Sofia', lat: 42.7, lon: 23.3, source: 'manual' }, storage))
 })
-test('street labels and reverse zoom follow fix accuracy', async () => {
+test('administrative reverse evidence keeps detail while street display follows fix accuracy', async () => {
   const data = { address: { city: 'Paris', road: 'Rue Test', house_number: '12' } }
   for (const accuracy of [25, 100, 101, 3000, undefined, NaN]) {
     let url
     await reverseGeocodeLocation({ lat: 48.85, lon: 2.35 }, 'en', { accuracy, fetcher: async request => { url = new URL(request); return { ok: true, json: async () => data } } })
     const precise = accuracy <= 100
-    assert.equal(url.searchParams.get('zoom'), precise ? '18' : '10')
+    assert.equal(url.searchParams.get('zoom'), '18')
     assert.equal(locationFromReverseGeocode(data, 'My Location', accuracy).exactLocation, precise ? 'Rue Test 12' : null)
   }
 })
