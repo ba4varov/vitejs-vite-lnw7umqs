@@ -54,6 +54,16 @@ try{
     if(scenario==='encoded'){res.writeHead(400,{'content-encoding':'gzip'});res.end('not decoded');return}
     if(scenario==='phrase-empty'){res.writeHead(400,'UnauthorizedRegistration',{'content-length':0});res.end();return}
     if(scenario==='bad-json'){res.writeHead(400,{'content-type':'application/json'});res.end('{'+privateSentinel);return}
+    const diagnosticFixtures={
+     'missing-type':[undefined,privateSentinel],
+     'generic-html':['text/html; charset=UTF-8','<!DOCTYPE html><html><head><title>400 Bad Request</title></head><body><h1>Bad Request</h1>'+privateSentinel+'</body></html>'],
+     'google-bad-request':['text/html; charset=UTF-8','<!DOCTYPE html><html lang=en><meta charset=utf-8><title>Error 400 (Bad Request)!!1</title><p><b>400.</b> <ins>That’s an error.</ins><p>'+privateSentinel+'</html>'],
+     'fcm-html':['text/html','<html><head><title>UnauthorizedRegistration</title></head><body><h1>UnauthorizedRegistration</h1><h2>Error 400</h2><!-- '+privateSentinel+' --></body></html>'],
+     'json-error':['application/json',JSON.stringify({error:{status:'INVALID_ARGUMENT',message:privateSentinel}})],
+     'unknown-text':['text/plain',privateSentinel],
+     'other-mime':['application/octet-stream',privateSentinel],
+    }
+    if(diagnosticFixtures[scenario]){const [type,body]=diagnosticFixtures[scenario];res.writeHead(400,type?{'content-type':type}:{});res.end(body);return}
     if(scenario==='empty'){res.writeHead(400,{'content-length':0});res.end();return}
     if(scenario==='private'){res.writeHead(400);res.end(privateSentinel);return}
     if(scenario==='rejected'){res.writeHead(400,{'content-type':'text/plain'});res.end('INVALID_ARGUMENT');return}
@@ -106,6 +116,22 @@ try{
    assert.equal(value.result.providerBodyStatus,scenario==='bad-json'?'unknown_format':'empty')
    assert.equal(value.result.providerReason,scenario==='phrase-empty'?'fcm_unauthorized_registration':undefined)
    assert.equal(JSON.stringify(value).includes(privateSentinel),false)
+  }
+ })
+ await check('offline MIME and body shape categories preserve legacy results and never disclose content',async()=>{
+  for(const [scenario,mime,shape,bodyStatus,reason] of [
+   ['missing-type','missing','other','unknown_format'],
+   ['generic-html','html','generic_bad_request_html','unknown_format'],
+   ['google-bad-request','html','generic_bad_request_html','unknown_format'],
+   ['fcm-html','html','known_fcm_html','recognized','fcm_unauthorized_registration'],
+   ['bad-json','json','other','unknown_format'],
+   ['json-error','json','json_error','recognized','fcm_invalid_argument'],
+   ['unknown-text','plain','other','unknown_format'],
+   ['other-mime','other','other','unknown_format'],
+  ]){
+   const {result}=await attempt(scenario)
+   assert.deepEqual(result,{status:400,providerMimeCategory:mime,providerBodyShape:shape,providerBodyStatus:bodyStatus,...(reason?{providerReason:reason}:{})})
+   assert.equal(observed.selected,1);assert.equal(JSON.stringify(result).includes(privateSentinel),false)
   }
  })
  await check('reference web-push.sendNotification uses same generated request bytes and headers',async()=>{
@@ -169,7 +195,7 @@ try{
  await check('complete Node operator with fake RPCs produces one real local TLS request under concurrency and HTTP 400',async()=>{
   const id='b0000000-0000-0000-0000-000000000001'
   const env={VERCEL:'1',VERCEL_ENV:'production',PUSH_NODE_OPERATOR_ENABLED:'true',SUPABASE_URL:`https://${'a'.repeat(20)}.supabase.co`,SUPABASE_SERVICE_ROLE_KEY:'synthetic_service_key_do_not_use',PUSH_TEST_OPERATOR_TOKEN:'A'.repeat(43),PUSH_VAPID_PUBLIC_KEY:vapid.publicKey,PUSH_NODE_VAPID_PRIVATE_KEY:vapid.privateKey,PUSH_VAPID_SUBJECT:options.vapidDetails.subject}
-  for(const scenario of ['accepted','rejected','disconnect']){
+  for(const scenario of ['accepted','rejected','disconnect','generic-html','fcm-html','json-error']){
    reset(scenario);let armed=false,claimed=false,burned=false,dns=0
    const calls=[],claim={claimId:id,endpoint:'https://fcm.googleapis.com/wp/SYNTHETIC',publicKey:vapid.publicKey,...subscription.keys}
    const fetcher=async(url,init)=>{
@@ -194,7 +220,12 @@ try{
     }})
    const request=()=>new Request('https://weather.fixture.invalid/api/push-operator',{method:'POST',headers:{authorization:`Bearer ${env.PUSH_TEST_OPERATOR_TOKEN}.synthetic.jwt.signature`},body:JSON.stringify({operation:'send',permitId:id,confirmation:`SEND ONE ${id} ${id}`})})
    const responses=await Promise.all([handler()(request()),handler()(request())])
-   assert.deepEqual(responses.map(r=>r.status).sort(),scenario==='accepted'?[200,409]:scenario==='rejected'?[409,502]:[409,503])
+   assert.deepEqual(responses.map(r=>r.status).sort(),scenario==='accepted'?[200,409]:['rejected','generic-html','fcm-html','json-error'].includes(scenario)?[409,502]:[409,503])
+   if(['generic-html','fcm-html','json-error'].includes(scenario)){
+    const body=await responses.find(r=>r.status===502).json()
+    assert.equal(body.diagnostic.providerBodyShape,{'generic-html':'generic_bad_request_html','fcm-html':'known_fcm_html','json-error':'json_error'}[scenario])
+    assert.equal(JSON.stringify(body).includes(privateSentinel),false)
+   }
    assert.equal(observed.selected,1);assert.equal(observed.wire,true);assert.equal(observed.sni,true);assert.equal(dns,1)
    assert.ok(calls.includes('close_push_operator'))
    assert.equal((await handler()(request())).status,409);assert.equal(observed.selected,1)

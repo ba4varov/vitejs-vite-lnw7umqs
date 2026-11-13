@@ -47,6 +47,23 @@ test('safe provider fields survive HTTP failure and UI diagnostics never echo ar
   assert.ok(text.includes(bodyStatus==='recognized'?'providerReason:fcm_unauthorized_registration':lang==='bg'?'Точната причина за отказа не е установена.':'The exact rejection reason is unknown.'))
   assert.equal(text.includes('PRIVATE_FCM_TEXT'),false)
  }
- const malicious={diagnostic:{category:'PRIVATE_CATEGORY',providerStatus:'PRIVATE_STATUS',providerReason:'PRIVATE_TOKEN',providerBodyStatus:'PRIVATE_ENDPOINT'}}
+ const malicious={diagnostic:{category:'PRIVATE_CATEGORY',providerStatus:'PRIVATE_STATUS',providerReason:'PRIVATE_TOKEN',providerBodyStatus:'PRIVATE_ENDPOINT',providerMimeCategory:'PRIVATE_MIME',providerBodyShape:'PRIVATE_SHAPE'}}
  for(const lang of ['bg','en'])assert.equal(f.client.pushTestDiagnostic(malicious,lang),'')
+})
+
+test('HTTP failure categories reach the phone formatter in both languages, with independent allowlists',async t=>{
+ const f=await fixture(t,async()=>originalSession)
+ for(const lang of ['bg','en'])for(const providerMimeCategory of ['missing','plain','html','json','other'])for(const providerBodyShape of ['known_fcm_html','generic_bad_request_html','json_error','other']){
+  t.mock.method(globalThis,'fetch',async()=>Response.json({code:'fcm:rejected',diagnostic:{category:'request_rejected',providerStatus:400,providerBodyStatus:'unknown_format',providerMimeCategory,providerBodyShape}},{status:502}))
+  let failure;try{await f.client.sessionPushTest(originalSession,{operation:'send'})}catch(e){failure=e}
+  const text=f.client.pushTestDiagnostic(failure,lang)
+  assert.ok(text.includes('providerMimeCategory:'+providerMimeCategory));assert.ok(text.includes('providerBodyShape:'+providerBodyShape))
+  for(const invalid of ['PRIVATE',null,{},[],['html'],400]){
+   const safe=f.client.pushTestDiagnostic({diagnostic:{providerMimeCategory:invalid,providerBodyShape:invalid}},lang)
+   assert.equal(safe,'')
+  }
+ }
+ const ui=await readFile(new URL('../../src/PushSettings.tsx',import.meta.url),'utf8')
+ assert.match(ui,/catch\(e\)\{if\(current\(\)\)setMessage[\s\S]*?pushTestDiagnostic\(e,lang\)/)
+ assert.match(ui,/\{message\}/)
 })

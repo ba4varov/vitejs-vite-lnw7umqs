@@ -1,3 +1,4 @@
+import {createNodeDiagnosticBridge} from './push-node-diagnostics.js'
 import {createOperatorHandler} from '../supabase/functions/_shared/push-operator.mjs'
 import {preparePush,validVapid} from '../supabase/functions/_shared/push-test.mjs'
 import {isFcmEndpoint,prepareNodeAttempt} from './push-node-transport.js'
@@ -68,6 +69,7 @@ export function createNodeOperatorHandler({env=process.env,fetcher=fetch,resolve
   const signal=AbortSignal.any([request.signal,AbortSignal.timeout(40000)])
   const {getUser,rpc}=controlClient(config,fetcher,signal)
   // Explicitly supply the Node sender. The shared handler's legacy default is unreachable.
+  const diagnostics=createNodeDiagnosticBridge()
   const handler=createOperatorHandler({
    env:{PUSH_TEST_DELIVERY_ENABLED:'true',PUSH_TEST_OPERATOR_TOKEN:config.operatorToken,
     PUSH_VAPID_PUBLIC_KEY:config.vapid.publicKey,PUSH_VAPID_PRIVATE_KEY:config.vapid.privateKey,PUSH_VAPID_SUBJECT:config.vapid.subject},
@@ -79,10 +81,13 @@ export function createNodeOperatorHandler({env=process.env,fetcher=fetch,resolve
    send:async(details,cachedResolver)=>{
     // cachedResolver contains the pre-authorize DNS snapshot, not a second network lookup.
     const once=await prepareTransport(details,cachedResolver,signal)
-    return once()
+    return diagnostics.capture(await once())
    },
   })
-  try{return await handler(request)}catch{return reply(503,'PUSH_TEST_UNCERTAIN')}
+  try{
+   const response=await handler(request)
+   return new Response(JSON.stringify(diagnostics.enrich(await response.json())),{status:response.status,headers:response.headers})
+  }catch{return reply(503,'PUSH_TEST_UNCERTAIN')}
  }
 }
 

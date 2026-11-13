@@ -16,7 +16,7 @@ const {build}=require('@vercel/node'),{FileFsRef}=require('@vercel/build-utils')
 assert.equal(require('@vercel/node/package.json').version,'23.0.0')
 assert.match(process.version,/^v24\./)
 await rm(here,{recursive:true,force:true})
-const names=[entrypoint,'server/push-session-test.js','server/push-node-operator.js','server/push-node-transport.js',
+const names=[entrypoint,'server/push-session-test.js','server/push-node-operator.js','server/push-node-transport.js','server/push-node-diagnostics.js',
  'supabase/functions/_shared/push-operator.mjs','supabase/functions/_shared/push-test.mjs','supabase/functions/_shared/push-provider.mjs']
 const files={}
 for(const name of names){
@@ -30,7 +30,7 @@ const result=await build({files,entrypoint,workPath:buildWork,
  config:{projectSettings:{nodeVersion:'24.x',installCommand:'',buildCommand:'true'}},meta:{},considerBuildCommand:true})
 assert.equal(result.output.type,'Lambda');assert.equal(result.output.runtime,'nodejs24.x')
 const builtNames=Object.keys(result.output.files)
-for(const fragment of ['web-push','ipaddr.js','server/push-node-operator','server/push-node-transport','_shared/push-operator','_shared/push-test'])assert.ok(builtNames.some(n=>n.includes(fragment)),fragment)
+for(const fragment of ['web-push','ipaddr.js','server/push-node-operator','server/push-node-transport','server/push-node-diagnostics','_shared/push-operator','_shared/push-test'])assert.ok(builtNames.some(n=>n.includes(fragment)),fragment)
 assert.ok(!builtNames.some(n=>/(?:^|\/)(?:work|tests|\.env)(?:[/.]|$)|\.(?:pem|key)$/.test(n)))
 for(const [name,ref] of Object.entries(result.output.files)){
  const destination=resolve(bundle,name);assert.ok(destination.startsWith(bundle+'/'))
