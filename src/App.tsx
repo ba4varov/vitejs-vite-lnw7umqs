@@ -403,10 +403,13 @@ const WeatherApp = () => {
     return () => { observer.disconnect(); document.removeEventListener('visibilitychange', recordView) }
   }, [loading, Boolean(weather), forecastReady])
 
+  // A repeated choice must restart identity work even at identical coordinates.
+  const [locationSelection, setLocationSelection] = useState(0)
   const updateCoords = (next: { lat: number, lon: number }) => {
     // Invalidate older async work synchronously, before React's next commit.
     locationKeyRef.current = `${next.lat},${next.lon}`
     setCoords(next)
+    setLocationSelection(selection => selection + 1)
     setHasAcceptedLocation(true)
   }
 
@@ -422,12 +425,14 @@ const WeatherApp = () => {
     setInitialLocationReady(true)
   }
 
-  const choosePlace = (place: Place, manual = true) => {
+  const choosePlace = (place: Place & { source?: string; accuracy?: number }, manual = true) => {
     finalizeManualLocation()
     if (manual) { forecastIntent.current++; placesGuardRef.current.manualSelection() }
-    locationChoiceRef.current = true
-    setLocationSource('place')
-    setCity(place.name); updateCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails({ geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
+    locationChoiceRef.current = place.source !== 'geolocation'
+    // Restored GPS coordinates still require fresh administrative evidence.
+    setLocationSource(place.source === 'geolocation' ? 'geolocation' : 'place')
+    if (place.source === 'geolocation') setGpsAccuracy(place.accuracy ?? null)
+    setCity(place.name); updateCoords({ lat: place.lat, lon: place.lon }); setExactLocation(null); setPlaceDetails(place.source === 'geolocation' ? {} : { geonameId: place.geonameId || undefined, countryCode: place.countryCode || undefined, admin1Id: place.admin1Id || undefined, region: place.region || undefined, country: place.country || undefined })
   }
 
   useEffect(() => {
@@ -473,7 +478,7 @@ const WeatherApp = () => {
       }))
     }).catch(() => {})
     return () => guard.invalidate(ticket)
-  }, [lang, coords.lat, coords.lon, placeDetails.geonameId, locationSource, hasAcceptedLocation])
+  }, [lang, coords.lat, coords.lon, placeDetails.geonameId, locationSource, hasAcceptedLocation, locationSelection])
 
   const placesLoadRef = useRef(0)
   const loadAccountPlaces = async (active: AuthSession, ticket: any) => {
@@ -1068,7 +1073,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       setExactLocation(localized.exactLocation)
     }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) setCity(t.myLocation) })
     return () => controller.abort()
-  }, [lang, coords.lat, coords.lon, locationSource, gpsLabelGeneration, gpsAccuracy])
+  }, [lang, coords.lat, coords.lon, locationSource, gpsLabelGeneration, gpsAccuracy, locationSelection])
 
   useEffect(() => {
     if (!hasAcceptedLocation) return

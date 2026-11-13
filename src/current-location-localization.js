@@ -7,8 +7,14 @@ export function quickCityAtCoordinates(quickCities, coords) {
 
 export async function localizeCurrentLocation(current, language, quickCities, localizer, options = {}) {
   const quickCity = quickCityAtCoordinates(quickCities, current)
-  if (quickCity) return { ...current, name: quickCity.name }
-  if (current.geonameId == null) return current
+  // Legacy manual selections need the same coordinate/metadata-validated
+  // identity recovery as saved places; a translated city label is not an ID.
+  if (quickCity) {
+    const localized = current.geonameId == null
+      ? await localizer(current, language, options).catch(() => current)
+      : current
+    return { ...localized, name: quickCity.name }
+  }
   return localizer(current, language, options)
 }
 
