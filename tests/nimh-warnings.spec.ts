@@ -19,6 +19,7 @@ for(const width of [390,1440]) for(const lang of ['bg','en']) for(const dark of 
    const u=new URL(route.request().url())
    if(u.pathname==='/api/alerts'&&u.searchParams.get('source')==='nimh'){
     requests++
+    if(unavailable&&dark)return route.fulfill({status:503,json:{status:'unavailable'}})
     return route.fulfill({json:unavailable?{status:'unavailable'}:{placeId:726050,municipality:'Варна',region:'Област Варна',days:[{date:'2026-11-13',status:'verified',checkedAt:Date.parse('2026-11-13T12:00:00Z'),warnings:[...official.municipalities.Варна,...official.warnings]},{date:'2026-11-14',status:'verified',checkedAt:Date.parse('2026-11-13T12:00:00Z'),warnings:[]}]}})
    }
    if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/'))return route.continue()
