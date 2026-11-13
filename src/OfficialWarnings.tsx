@@ -20,8 +20,9 @@ const labels = {
  bg: { yellow:'Жълт код', orange:'Оранжев код', red:'Червен код', heat:'Висока температура', cold:'Ниска температура', wind:'Вятър', rain:'Дъжд', snow:'Сняг / поледица', storm:'Гръмотевична активност', fog:'Мъгла', waves:'Силно вълнение', official:'Опасно време', municipality:'Община', district:'Област', marine:'Морско предупреждение' },
  en: { yellow:'Yellow warning', orange:'Orange warning', red:'Red warning', heat:'High temperature', cold:'Low temperature', wind:'Wind', rain:'Rain', snow:'Snow / ice', storm:'Thunderstorms', fog:'Fog', waves:'High waves', official:'Severe weather', municipality:'Municipality', district:'District', marine:'Marine warning' },
 }
-export function OfficialWarnings({ placeId, area, gpsIssue, gpsRestored, locationKey, city, lang, enabled }: {gpsRestored?:boolean;gpsIssue?:string | null;placeId?:number;area?:{region:string;municipality?:string};locationKey:string;city:string;lang:'bg'|'en';enabled:boolean}) {
- const query=area?new URLSearchParams(area).toString():placeId?`id=${placeId}`:''
+export function OfficialWarnings({ placeId, area, gpsIssue, gpsRestored, locationKey, city, countryCode, lang, enabled }: {gpsRestored?:boolean;gpsIssue?:string | null;placeId?:number;area?:{region:string;municipality?:string};locationKey:string;city:string;countryCode?:string;lang:'bg'|'en';enabled:boolean}) {
+ const isBulgarianPlace=!countryCode||countryCode.toUpperCase()==='BG'
+ const query=isBulgarianPlace?(area?new URLSearchParams(area).toString():placeId?`id=${placeId}`:''):''
  const identity=`${locationKey}:${query}`
  const [snapshot,setSnapshot]=useState<any>(null)
  const [clock,setClock]=useState(Date.now())
@@ -48,6 +49,7 @@ export function OfficialWarnings({ placeId, area, gpsIssue, gpsRestored, locatio
  const data=enabled&&snapshot&&snapshot.identity===identity&&clock-snapshot.received<20*60*1000?snapshot.data:null
  const days=Array.isArray(data?.days)?data.days.filter((d:any)=>d.date>=today&&d.status==='verified'&&clock-d.checkedAt>=0&&clock-d.checkedAt<20*60*1000):[]
  const warnings=days.flatMap((day:any)=>Array.isArray(day.warnings)?day.warnings.filter((w:any)=>['yellow','orange','red'].includes(w.level)&&w.date===day.date).map((w:any)=>({...w,source:day.source})):[])
+ if(!warnings.length)return null
  return <section className="official-warnings" aria-labelledby="official-warnings-title">
   <h2 id="official-warnings-title">{bg?'Официални предупреждения · НИМХ':'Official warnings · NIMH'}</h2>
   <p>{city}{data?.municipality&&` · ${bg?'община':'municipality'} ${data.municipality}`}{data?.region&&` · ${data.region}`}</p>
@@ -67,7 +69,6 @@ export function OfficialWarnings({ placeId, area, gpsIssue, gpsRestored, locatio
    {!bg&&<small>Original NIMH text in Bulgarian.</small>}
   </article>)}
   {warnings.some(w=>w.scope==='marine')&&<details className="marine-context"><summary>{bg?'Отделно: предупреждения за морския район (не за населеното място)':'Separate: marine-area warnings (not for the settlement)'}</summary>{warnings.filter(w=>w.scope==='marine').map((w:any,i:number)=><div key={i}><p><strong>{l[w.level]} · {w.area} · {w.date}</strong></p><p lang="bg">{w.description}</p></div>)}</details>}
-  {days.length===2&&warnings.length===0?<p>{bg?'Няма публикувани жълти, оранжеви или червени кодове за проверените дати и обхвати.':'No published yellow, orange or red warnings for the verified dates and areas.'}</p>:days.length<2&&<p role="status">{!query&&gpsIssue?null:!query? (bg?'Общината не е потвърдена. Изберете населено място от търсенето, за да проверите официалните кодове.':'Municipality is unverified. Select a settlement from search to check official warnings.'):(bg?'Част от официалните данни са недостъпни или непроверени. Това не означава липса на опасност.':'Some official data are unavailable or unverified. This does not mean there is no danger.')}</p>}
   {days.length>0&&<small>{bg?'Проверено':'Checked'}: {new Intl.DateTimeFormat(bg?'bg-BG':'en-GB',{timeZone:'Europe/Sofia',dateStyle:'short',timeStyle:'short'}).format(Math.min(...days.map((d:any)=>d.checkedAt)))} · Europe/Sofia</small>}
   <p><a href="https://weather.bg/obshtini/" target="_blank" rel="noreferrer">{bg?'Източник: НИМХ · днес и утре':'Source: NIMH · today and tomorrow'}</a> · <a href="https://meteo.bg/" target="_blank" rel="noreferrer">meteo.bg</a></p>
   <small>{bg?'Кодовете за областта и морето са отделни от тези за общината. Общинските текстове са стандартни по праговете на НИМХ.':'District and marine warnings have separate scopes from municipality warnings. Municipality texts use standard NIMH thresholds.'}</small>

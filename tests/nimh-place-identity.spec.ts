@@ -37,7 +37,7 @@ for (const quick of [true, false]) for (const repeat of [false, true]) test(`leg
   await page.goto('/')
   const section = page.locator('.official-warnings')
   if (repeat) {
-    await expect(section).toContainText('Общината не е потвърдена')
+    await expect(section).toHaveCount(0)
     await expect(page.locator('.place-select')).toBeVisible()
     await page.waitForLoadState('networkidle')
     await page.locator('.city-row').getByRole('button', { name: 'Варна', exact: true }).click()
@@ -91,7 +91,7 @@ for (const administrative of [true, false]) test(`restored GPS requires administ
     expect(queries[0]).toContain('region=VAR')
     expect(queries[0]).toContain('municipality=')
   } else {
-    await expect(section).toContainText('Общината не е потвърдена')
+    await expect(section).toHaveCount(0)
     await expect(section.locator('article')).toHaveCount(0)
     expect(queries).toEqual([])
   }
