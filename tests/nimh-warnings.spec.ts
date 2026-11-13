@@ -42,7 +42,7 @@ for(const width of [390,1440]) for(const lang of ['bg','en']) for(const dark of 
   unavailable=true
   await page.clock.fastForward(15*60*1000)
   await expect(section.locator('article')).toHaveCount(0)
-  await expect(section).toContainText(lang==='bg'?'недостъпни':'unavailable')
+  await expect(section).toHaveCount(0)
   await page.getByRole('button',{name:lang==='bg'?'София':'Sofia',exact:true}).click()
   await expect(section.locator('article')).toHaveCount(0)
  })
@@ -108,4 +108,46 @@ test('inland settlement warnings load without forecast; marine context never bec
  await expect(section.locator('summary')).toContainText('not for the settlement')
  await expect(page.locator('.main-card')).toHaveCount(0)
  await expect(page.locator('.alerts-container')).toHaveCount(0)
+})
+
+test('NIMH appears only for active BG warnings; city changes and London never require reload',async({page})=>{
+ await page.clock.install({time:new Date('2026-11-13T12:00:00Z')})
+ await page.addInitScript(()=>{
+  localStorage.setItem('meteoPulseLanguage','bg')
+  localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Варна',lat:43.2141,lon:27.9147,source:'manual',geonameId:726050,countryCode:'BG'}))
+ })
+ const queries:string[]=[]
+ const checkedAt=Date.parse('2026-11-13T12:00:00Z')
+ const london={id:2643743,name:'London',latitude:51.5085,longitude:-0.1257,country_code:'GB',country:'United Kingdom',admin1:'England'}
+ await page.route('**/*',async route=>{
+  const u=new URL(route.request().url())
+  if(u.pathname==='/api/alerts'&&u.searchParams.get('source')==='nimh'){
+   const id=u.searchParams.get('id') || ''
+   queries.push(id)
+   return route.fulfill({json:{status:'resolved',days:[{date:'2026-11-13',status:'verified',checkedAt,warnings:id==='726050'?[...official.municipalities.Варна,...official.warnings]:[]},{date:'2026-11-14',status:'verified',checkedAt,warnings:[]}]}})
+  }
+  if(u.hostname==='geocoding-api.open-meteo.com'){
+   if(u.pathname.endsWith('/search'))return route.fulfill({json:{results:u.searchParams.get('name')?.toLowerCase()==='london'?[london]:[]}})
+   const id=u.searchParams.get('id')
+   return route.fulfill({json:id==='726050'?{id:726050,name:'Варна',latitude:43.2141,longitude:27.9147,country_code:'BG',country:'България',admin1:'Варна'}:id==='2643743'?london:{}})
+  }
+  if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/'))return route.continue()
+  return route.fulfill({json:u.hostname==='api.open-meteo.com'?weather:{}})
+ })
+ await page.goto('/')
+ const section=page.locator('.official-warnings')
+ await expect(section.locator('article')).toHaveCount(2)
+ await page.locator('.city-row').getByRole('button',{name:'София',exact:true}).click()
+ await expect(section).toHaveCount(0)
+ await page.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click()
+ await expect(section.locator('article')).toHaveCount(2)
+ const countBeforeLondon=queries.length
+ await page.locator('input[type=search]').fill('London')
+ await expect(page.locator('.suggestion-item')).toBeVisible()
+ await page.locator('.suggestion-item').first().click()
+ await expect(section).toHaveCount(0)
+ expect(queries.length).toBe(countBeforeLondon)
+ expect(queries).not.toContain('2643743')
+ await page.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click()
+ await expect(section.locator('article')).toHaveCount(2)
 })

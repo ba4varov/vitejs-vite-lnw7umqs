@@ -30,12 +30,12 @@ async function setup(page:any,{accuracy=500,saved='',permission='granted',stalle
 for(const accuracy of [25,100,101,500,1000,1001,3000])test(`initial GPS accuracy ${accuracy}`,async({page})=>{
  const s=await setup(page,{accuracy});await s.fix()
  if(accuracy<=1000){await expect(s.section.locator('article')).toHaveCount(accuracy<=100?2:1);expect(s.queries.some(q=>q.includes('region=VAR'))).toBe(true)}
- else {await expect(s.section).toContainText('точност');expect(s.queries).toHaveLength(0)}
+ else {await expect(s.section).toHaveCount(0);expect(s.queries).toHaveLength(0)}
 })
 for(const variant of ['missing','unavailable','no municipality'])test(`GPS ${variant}`,async({page})=>{
  const s=await setup(page,{accuracy:25,admin:variant!=='missing',unavailable:variant==='unavailable',municipality:variant!=='no municipality'});await s.fix()
  if(variant==='no municipality'){await expect(s.section.locator('article')).toHaveCount(1);await expect(s.section).toContainText('само областта')}
- else await expect(s.section).toContainText(variant==='missing'?'административни':'недостъпна')
+ else await expect(s.section).toHaveCount(0)
 })
 test('manual restoration stays manual; GPS → manual → GPS uses requested fix',async({page})=>{
  const s=await setup(page,{saved:'manual',accuracy:25});await expect(s.section).toBeVisible();expect(await page.evaluate(()=>typeof (window as any).fix)).toBe('undefined')
@@ -51,13 +51,12 @@ test('denied GPS preserves saved selection and explains failure',async({page})=>
 })
 test('denied startup restores old GPS explicitly as saved location',async({page})=>{
  const s=await setup(page,{saved:'geolocation',permission:'denied',accuracy:25})
- await expect(s.section).toContainText('последното запазено GPS място')
  await expect(s.section).toContainText('Община: Провадия')
 })
 test('stalled reverse service is bounded and explained',async({page})=>{
  const s=await setup(page,{stalled:true});await s.fix()
- await expect(s.section).toContainText('Проверяваме')
+ await expect(s.section).toHaveCount(0)
  await page.clock.fastForward(13000)
- await expect(s.section).toContainText('недостъпна')
+ await expect(s.section).toHaveCount(0)
  expect(s.queries).toHaveLength(0)
 })

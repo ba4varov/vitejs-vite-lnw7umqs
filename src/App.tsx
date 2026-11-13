@@ -1231,7 +1231,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {placesError && <p className="places-error" role="alert">{placesErrorText(placesError, lang)} <button disabled={placesBusy} onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
 
-      {hasAcceptedLocation && <OfficialWarnings placeId={placeDetails.geonameId} area={placeDetails.warningArea} gpsRestored={locationSource === 'geolocation' && gpsRestored} gpsIssue={locationSource === 'geolocation' ? gpsWarningIssue : null} locationKey={locationKey} city={city} lang={lang} enabled={!gpsBusy} />}
+      {hasAcceptedLocation && <OfficialWarnings key={`${locationKey}:${placeDetails.geonameId ?? ''}:${placeDetails.warningArea?.region ?? ''}:${placeDetails.warningArea?.municipality ?? ''}:${placeDetails.countryCode ?? ''}`} countryCode={placeDetails.countryCode} placeId={placeDetails.geonameId} area={placeDetails.warningArea} gpsRestored={locationSource === 'geolocation' && gpsRestored} gpsIssue={locationSource === 'geolocation' ? gpsWarningIssue : null} locationKey={locationKey} city={city} lang={lang} enabled={!gpsBusy} />}
 
       {snapshotTime !== null && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon && !freshness.fresh && <p role="status" className="forecast-update-error">
         {lang === 'bg' ? 'Последна валидна прогноза: ' : 'Last valid forecast: '}{new Date(snapshotTime).toLocaleString(lang === 'bg' ? 'bg-BG' : 'en-GB')}.{' '}
