@@ -1,0 +1,13 @@
+.official-warnings {padding:1rem;border:1px solid currentColor;border-radius:1rem;overflow-wrap:anywhere;color:var(--text-color,inherit);background:var(--card-bg,transparent)}
+.official-warnings h2 {font-size:1.15rem;margin:0 0 .5rem}
+.official-warnings p {margin:.5rem 0;line-height:1.5}
+.official-warnings a {color:inherit;text-decoration:underline}
+.official-warnings small {display:block;line-height:1.5}
+.official-warning {margin:.75rem 0;padding:.85rem;border-radius:.65rem;border-left:6px solid}
+.official-warning h3 {font-size:1.05rem;margin:0 0 .5rem}
+.official-warning-yellow {background:#fff7cc;color:#3d3000;border-color:#b08b00}
+.official-warning-orange {background:#ffead6;color:#562500;border-color:#c75a00}
+.official-warning-red {background:#ffe1e1;color:#690707;border-color:#ba1515}
+@media(max-width:480px){.official-warnings{padding:.8rem}.official-warning{padding:.65rem}}
+
+.weather-app .official-warnings > h2 {color:inherit}

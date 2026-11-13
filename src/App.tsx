@@ -1,3 +1,4 @@
+import { OfficialWarnings } from './OfficialWarnings'
 import { RainWarning } from './RainWarning'
 import StartupDiagnostics from './StartupDiagnostics'
 import type { ConversationContext, PendingClarification } from '../server/weather-chat-core.js'
@@ -111,10 +112,10 @@ const translations = {
       95: 'Гръмотевична буря', 96: 'Буря с градушка', 99: 'Силна буря'
     },
     quickCities: [
-      { name: 'Варна', lat: 43.2141, lon: 27.9147 },
-      { name: 'София', lat: 42.6977, lon: 23.3219 },
-      { name: 'Пловдив', lat: 42.1522, lon: 24.7454 },
-      { name: 'Бургас', lat: 42.5048, lon: 27.4732 },
+      { geonameId: 726050, name: 'Варна', lat: 43.2141, lon: 27.9147 },
+      { geonameId: 727011, name: 'София', lat: 42.6977, lon: 23.3219 },
+      { geonameId: 728193, name: 'Пловдив', lat: 42.1522, lon: 24.7454 },
+      { geonameId: 732770, name: 'Бургас', lat: 42.5048, lon: 27.4732 },
       { name: 'Лондон', lat: 51.5074, lon: -0.1278 },
       { name: 'Париж', lat: 48.8566, lon: 2.3522 },
       { name: 'Ню Йорк', lat: 40.7128, lon: -74.006 },
@@ -199,10 +200,10 @@ const translations = {
       95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Heavy thunderstorm'
     },
     quickCities: [
-      { name: 'Varna', lat: 43.2141, lon: 27.9147 },
-      { name: 'Sofia', lat: 42.6977, lon: 23.3219 },
-      { name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
-      { name: 'Burgas', lat: 42.5048, lon: 27.4732 },
+      { geonameId: 726050, name: 'Varna', lat: 43.2141, lon: 27.9147 },
+      { geonameId: 727011, name: 'Sofia', lat: 42.6977, lon: 23.3219 },
+      { geonameId: 728193, name: 'Plovdiv', lat: 42.1522, lon: 24.7454 },
+      { geonameId: 732770, name: 'Burgas', lat: 42.5048, lon: 27.4732 },
       { name: 'London', lat: 51.5074, lon: -0.1278 },
       { name: 'Paris', lat: 48.8566, lon: 2.3522 },
       { name: 'New York', lat: 40.7128, lon: -74.006 },
@@ -758,7 +759,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
     try {
       const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + 
         '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature,visibility,surface_pressure,uv_index,cloud_cover' + 
-        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature,precipitation_probability' +
+        '&hourly=temperature_2m,weather_code,precipitation,wind_speed_10m,wind_gusts_10m,surface_pressure,relative_humidity_2m,visibility,dew_point_2m,cloud_cover,apparent_temperature,precipitation_probability' +
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,apparent_temperature_max,sunrise,sunset' + 
         '&timezone=auto&forecast_days=15';
 
@@ -835,6 +836,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           rainProbability: hourlyNumber(data.hourly.precipitation_probability?.[idx]),
           description: code.desc,
           wind: hourlyNumber(data.hourly.wind_speed_10m[idx]),
+          windGust: hourlyNumber(data.hourly.wind_gusts_10m?.[idx], false),
           pressure: hourlyNumber(data.hourly.surface_pressure[idx]),
           humidity: hourlyNumber(data.hourly.relative_humidity_2m[idx]),
           visibility: data.hourly.visibility[idx] == null ? null : hourlyNumber(data.hourly.visibility[idx] / 1000),
@@ -1076,6 +1078,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
   if (weather && forecastIsFresh) {
     if (weather.temp >= 35) activeAlerts.push({ icon: '🔥', text: (t as any).highTemp });
     if (weather.temp <= -5) activeAlerts.push({ icon: '❄️', text: (t as any).lowTemp });
+    const gust = Math.max(...hourly.slice(0, 24).map(h => Number.isFinite(h.windGust) ? h.windGust : 0))
+    if (forecastIsFresh && gust >= 65) activeAlerts.push({ icon: '💨', text: lang === 'bg' ? `Пориви до ${gust} km/h през следващите 24 часа · Open-Meteo` : `Gusts up to ${gust} km/h over the next 24 hours · Open-Meteo` });
     if (weather.windSpeed >= 65) activeAlerts.push({ icon: '⚠️', text: (t as any).highWind });
     if (weather.uvIndex >= 8) activeAlerts.push({ icon: '☀️', text: (t as any).highUv });
     if ([95, 96, 99].includes(weather.code)) activeAlerts.push({ icon: '⚡', text: (t as any).storm });
@@ -1194,7 +1198,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           return (
             <button key={c.name}
               aria-pressed={city === c.name}
-              onClick={() => { finalizeManualLocation(); forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); updateCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({}); }}
+              onClick={() => { finalizeManualLocation(); forecastIntent.current++; placesGuardRef.current.manualSelection(); locationChoiceRef.current = true; setLocationSource('quick'); setCity(c.name); updateCoords({ lat: c.lat, lon: c.lon }); setExactLocation(null); setPlaceDetails({ geonameId: c.geonameId }); }}
               className={city === c.name ? 'city-btn active' : 'city-btn'}>
               {c.name}
             </button>
@@ -1239,9 +1243,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         <main ref={forecastDashboardRef} className="forecast-dashboard">
           {error && <p className="forecast-update-error" role="status">{error} <button type="button" onClick={() => fetchWeather(coords.lat, coords.lon, true)}>{t.tryAgain}</button></p>}
           {loading && <div className="forecast-refresh" role="status" aria-live="polite">↻ {t.refreshing}</div>}
+          <OfficialWarnings placeId={placeDetails.geonameId} city={city} lang={lang} enabled={!gpsBusy} />
           <RainWarning forecast={gpsBusy || !forecastIsFresh ? null : notificationForecast} city={city} lang={lang} updated={lastUpdated} />
           {activeAlerts.length > 0 && (
-            <div className="alerts-container">
+            <div className="alerts-container" aria-label={lang === 'bg' ? 'Ориентировъчни предупреждения · Open-Meteo' : 'Indicative warnings · Open-Meteo'}>
+              <p>{lang === 'bg' ? 'Ориентировъчно · Open-Meteo (не е официален код)' : 'Indicative · Open-Meteo (not an official warning code)'}</p>
               {activeAlerts.map((alert, idx) => (
                 <div key={idx} className="alert-item">
                   <span style={{fontSize: '1.8rem'}}>{alert.icon}</span>
