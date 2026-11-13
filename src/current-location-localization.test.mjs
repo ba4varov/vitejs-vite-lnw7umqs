@@ -7,20 +7,20 @@ import {
 } from './current-location-localization.js'
 
 const quickCities = {
-  bg: [{ name: 'Варна', lat: 43.2141, lon: 27.9147 }],
-  en: [{ name: 'Varna', lat: 43.2141, lon: 27.9147 }]
+  bg: [{ name: 'Варна', lat: 43.2141, lon: 27.9147, geonameId: 726050 }],
+  en: [{ name: 'Varna', lat: 43.2141, lon: 27.9147, geonameId: 726050 }]
 }
 
 test('current quick city localizes bg to en with no favorites or API lookup', async () => {
   let calls = 0
-  const current = { name: 'Варна', lat: 43.2141, lon: 27.9147 }
+  const current = { name: 'Варна', lat: 43.2141, lon: 27.9147, geonameId: 726050 }
   const localized = await localizeCurrentLocation(current, 'en', quickCities.en, async () => { calls++; return current })
   assert.equal(localized.name, 'Varna')
   assert.equal(calls, 0)
 })
 
 test('current quick city localizes en to bg without changing its identity', async () => {
-  const current = { name: 'Varna', lat: 43.2141, lon: 27.9147 }
+  const current = { name: 'Varna', lat: 43.2141, lon: 27.9147, geonameId: 726050 }
   const localized = await localizeCurrentLocation(current, 'bg', quickCities.bg, async () => current)
   assert.deepEqual(localized, { ...current, name: 'Варна' })
 })
@@ -52,7 +52,32 @@ test('geolocation language refresh requests Nominatim again and parses localized
 })
 
 test('localization leaves unrelated weather and favorite state untouched', async () => {
-  const appState = { weather: { temperature: 20 }, favorites: [], selected: { name: 'Варна', lat: 43.2141, lon: 27.9147 } }
+  const appState = { weather: { temperature: 20 }, favorites: [], selected: { name: 'Варна', lat: 43.2141, lon: 27.9147, geonameId: 726050 } }
   const selected = await localizeCurrentLocation(appState.selected, 'en', quickCities.en, async () => appState.selected)
-  assert.deepEqual({ ...appState, selected }, { weather: { temperature: 20 }, favorites: [], selected: { name: 'Varna', lat: 43.2141, lon: 27.9147 } })
+  assert.deepEqual({ ...appState, selected }, { weather: { temperature: 20 }, favorites: [], selected: { name: 'Varna', lat: 43.2141, lon: 27.9147, geonameId: 726050 } })
+})
+
+test('legacy current selections recover identity through the validated place localizer, including quick coordinates', async () => {
+  for (const coords of [{ lat: 43.2141, lon: 27.9147 }, { lat: 43.21912, lon: 27.91024 }]) {
+    const current = { name: 'Варна', ...coords }
+    let calls = 0
+    const localized = await localizeCurrentLocation(current, 'bg', quickCities.bg, async place => {
+      calls++
+      assert.deepEqual(place, current)
+      return { ...place, geonameId: 726050 }
+    })
+    assert.equal(calls, 1)
+    assert.equal(localized.geonameId, 726050)
+  }
+})
+
+test('legacy current selection stays unverified if the place localizer cannot prove identity', async () => {
+  const current = { name: 'Варна', lat: 43.2141, lon: 27.9147 }
+  assert.deepEqual(await localizeCurrentLocation(current, 'bg', quickCities.bg, async place => place), current)
+})
+
+test('offline legacy quick-city labels still translate without inventing an identity', async () => {
+  const current = { name: 'Варна', lat: 43.2141, lon: 27.9147 }
+  const localized = await localizeCurrentLocation(current, 'en', quickCities.en, async () => { throw Error('offline') })
+  assert.deepEqual(localized, { ...current, name: 'Varna' })
 })
