@@ -22,8 +22,12 @@ const badText=value=>['\r','\n','\0'].some(c=>String(value).includes(c))
 
 // Only allowlisted reasons escape this bounded (<=1024 bytes) parser.
 function classifyBody(bytes,contentType){
- if(!bytes.length)return {providerBodyStatus:'empty'}
- const text=bytes.toString('utf8').trim(),type=typeof contentType==='string'?contentType.split(';')[0].trim().toLowerCase():''
+ const type=typeof contentType==='string'?contentType.split(';')[0].trim().toLowerCase():''
+ const providerMimeCategory=!type?'missing':type==='text/plain'?'plain':type==='text/html'?'html':type==='application/json'?'json':'other'
+ let providerBodyShape='other'
+ const fields=()=>({providerMimeCategory,providerBodyShape})
+ if(!bytes.length)return {providerBodyStatus:'empty',...fields()}
+ const text=bytes.toString('utf8').trim()
  let reason
  if(type==='text/plain'){
   reason=providerPhraseReason(text)
@@ -31,14 +35,17 @@ function classifyBody(bytes,contentType){
  }else if(type==='application/json'){
   try{
    const error=JSON.parse(text)?.error
+   if(error&&typeof error==='object'&&!Array.isArray(error))providerBodyShape='json_error'
    const detail=Array.isArray(error?.details)?error.details.find(d=>d?.['@type']==='type.googleapis.com/google.firebase.fcm.v1.FcmError'):undefined
    reason=providerPhraseReason(detail?.errorCode)||providerPhraseReason(error?.status)
   }catch{/* Raw JSON, messages and field violations are never returned. */}
  }else if(type==='text/html'){
   const html=/^<html>\s*<head>\s*<title>\s*([A-Za-z]+)\s*<\/title>\s*<\/head>\s*<body(?:\s+[^<>]*)?>\s*<h1>\s*([A-Za-z]+)\s*<\/h1>\s*<h2>\s*Error [45][0-9]{2}\s*<\/h2>\s*(?:<!--[\s\S]*?-->\s*)*<\/body>\s*<\/html>$/i.exec(text)
   if(html&&html[1]===html[2])reason=providerPhraseReason(html[1])
+  if(reason)providerBodyShape='known_fcm_html'
+  else if(/^(?:<!doctype html>\s*)?<html[\s>]/i.test(text)&&/<title>\s*(?:(?:400\s+)?Bad Request|Error 400 \(Bad Request\)!!1)\s*<\/title>/i.test(text)&&/<(?:h1|b)>\s*(?:(?:400[.\s]+)?Bad Request|400\.)\s*<\/(?:h1|b)>/i.test(text))providerBodyShape='generic_bad_request_html'
  }
- return reason?{providerBodyStatus:'recognized',providerReason:reason}:{providerBodyStatus:'unknown_format'}
+ return {...fields(),...(reason?{providerBodyStatus:'recognized',providerReason:reason}:{providerBodyStatus:'unknown_format'})}
 }
 // Options are trusted construction-time dependencies for local fixtures, never request data.
 export function createNodeTransport({validEndpoint=isFcmEndpoint,allowedAddress=isPublicAddress,ca,port=443,deadlineMs=8000,bodyDeadlineMs=300}={}){

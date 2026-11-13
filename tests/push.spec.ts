@@ -533,7 +533,9 @@ for(const refusal of ['rights','consent','registration'])test(`Push final revali
  expect(dialogs).toBe(1);expect(operations.filter(x=>x==='prepare')).toHaveLength(1);expect(operations.filter(x=>x==='send')).toHaveLength(0)
 })
 
-for(const lang of ['bg','en'])for(const reason of ['known','unknown','empty','unsafe'])test(`FCM 400 safe provider diagnostic ${reason} ${lang}`,async({page})=>{
+for(const lang of ['bg','en'])for(const reason of ['known','unknown','empty','unsafe','missing','html','fcm-html','bad-json','json-error','plain'])test(`FCM 400 safe provider diagnostic ${reason} ${lang}`,async({page})=>{
+ await page.setViewportSize({width:390,height:844})
+ const categories:Record<string,{providerMimeCategory:string;providerBodyShape:string}>={missing:{providerMimeCategory:'missing',providerBodyShape:'other'},html:{providerMimeCategory:'html',providerBodyShape:'generic_bad_request_html'},'fcm-html':{providerMimeCategory:'html',providerBodyShape:'known_fcm_html'},'bad-json':{providerMimeCategory:'json',providerBodyShape:'other'},'json-error':{providerMimeCategory:'json',providerBodyShape:'json_error'},plain:{providerMimeCategory:'plain',providerBodyShape:'other'},unsafe:{providerMimeCategory:'PRIVATE_MIME',providerBodyShape:'PRIVATE_SHAPE'}}
  await setup(page,{diagnostic:true,sessionDiagnostic:true});await choose(page)
  if(lang==='en'){
   await page.locator('.push-settings').getByLabel('Име на това устройство').fill('')
@@ -550,7 +552,7 @@ for(const lang of ['bg','en'])for(const reason of ['known','unknown','empty','un
   if(operation==='cancel')cancels++
   if(operation!=='send')return r.fallback()
   sends++
-  return r.fulfill({status:502,json:{code:'fcm:rejected',deliveryEnabled:false,phoneDelivery:'unconfirmed',diagnostic:{category:'request_rejected',providerStatus:400,providerBodyStatus:reason==='known'?'recognized':reason==='empty'?'empty':reason==='unsafe'?'PRIVATE_ENDPOINT':'unknown_format',...(reason==='known'?{providerReason:'fcm_unauthorized_registration'}:reason==='unsafe'?{providerReason:'PRIVATE_TOKEN'}:{}),raw:'PRIVATE_FCM_BODY',authorization:'PRIVATE_AUTH',endpoint:'PRIVATE_ENDPOINT'}}})
+  return r.fulfill({status:502,json:{code:'fcm:rejected',deliveryEnabled:false,phoneDelivery:'unconfirmed',diagnostic:{category:'request_rejected',providerStatus:400,...categories[reason],providerBodyStatus:reason==='known'?'recognized':reason==='empty'?'empty':reason==='unsafe'?'PRIVATE_ENDPOINT':'unknown_format',...(reason==='known'?{providerReason:'fcm_unauthorized_registration'}:reason==='unsafe'?{providerReason:'PRIVATE_TOKEN'}:{}),raw:'PRIVATE_FCM_BODY',authorization:'PRIVATE_AUTH',endpoint:'PRIVATE_ENDPOINT'}}})
  })
  await page.getByRole('button',{name:lang==='bg'?'Изпрати тестово Push известие':'Send test Push notification',exact:true}).click()
  const status=page.locator('.push-settings').getByRole('status')
@@ -558,6 +560,10 @@ for(const lang of ['bg','en'])for(const reason of ['known','unknown','empty','un
  if(reason==='known')await expect(status).toContainText('providerReason:fcm_unauthorized_registration')
  else await expect(status).toContainText(lang==='bg'?'Точната причина за отказа не е установена.':'The exact rejection reason is unknown.')
  if(['known','empty'].includes(reason))await expect(status).toContainText('providerBodyStatus:'+(reason==='known'?'recognized':'empty'))
+ if(categories[reason]&&reason!=='unsafe'){
+  await expect(status).toContainText('providerMimeCategory:'+categories[reason].providerMimeCategory)
+  await expect(status).toContainText('providerBodyShape:'+categories[reason].providerBodyShape)
+ }
  await expect(status).not.toContainText('PRIVATE_')
  expect(sends).toBe(1);expect(cancels).toBe(0);expect(dialogs).toBe(1)
 })

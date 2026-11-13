@@ -1,8 +1,15 @@
+import {readFile} from 'node:fs/promises'
+import {stripTypeScriptTypes} from 'node:module'
+import {createNodeDiagnosticBridge} from '../../server/push-node-diagnostics.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import webpush from 'web-push'
 import {createSessionPushHandler} from '../../server/push-session-test.js'
 import {checkLocalNotification} from '../../src/push-local-test.js'
+
+const clientSource=await readFile(new URL('../../src/push-client.ts',import.meta.url),'utf8')
+const formatterSource=clientSource.slice(clientSource.indexOf('export function pushTestDiagnostic'),clientSource.indexOf('// No retries:'))
+const {pushTestDiagnostic}=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(formatterSource)).toString('base64'))
 
 const testDevice='b1000000-0000-0000-0000-000000000001'
 const actor='b0000000-0000-0000-0000-000000000001',permit='b0000000-0000-0000-0000-000000000002'
@@ -113,6 +120,8 @@ test('session adapter preserves safe FCM 400 reason/body fields, excludes raw da
   {providerReason:'fcm_unauthorized_registration',providerBodyStatus:'recognized'},
   {providerBodyStatus:'empty'},
   {providerBodyStatus:'unknown_format'},
+  ...['missing','plain','html','json','other'].flatMap(providerMimeCategory=>['known_fcm_html','generic_bad_request_html','json_error','other'].map(providerBodyShape=>({providerBodyStatus:'unknown_format',providerMimeCategory,providerBodyShape}))),
+  {providerMimeCategory:'SENSITIVE_UNTRUSTED_PROVIDER_DATA',providerBodyShape:'SENSITIVE_UNTRUSTED_PROVIDER_DATA'},
   {providerReason:'SENSITIVE_UNTRUSTED_PROVIDER_DATA',providerBodyStatus:'SENSITIVE_UNTRUSTED_PROVIDER_DATA'},
  ]){
   const f=fixture({status:400,diagnostic})
@@ -121,6 +130,14 @@ test('session adapter preserves safe FCM 400 reason/body fields, excludes raw da
   assert.equal(result.diagnostic.providerStatus,400);assert.equal(result.diagnostic.category,'request_rejected')
   assert.equal(result.diagnostic.providerReason,diagnostic.providerReason==='fcm_unauthorized_registration'?diagnostic.providerReason:undefined)
   assert.equal(result.diagnostic.providerBodyStatus,['recognized','empty','unknown_format'].includes(diagnostic.providerBodyStatus)?diagnostic.providerBodyStatus:undefined)
+  for(const key of ['providerMimeCategory','providerBodyShape']){
+   assert.equal(result.diagnostic[key],diagnostic[key]==='SENSITIVE_UNTRUSTED_PROVIDER_DATA'?undefined:diagnostic[key])
+   for(const lang of ['bg','en']){
+    const text=pushTestDiagnostic(result,lang)
+    if(result.diagnostic[key])assert.ok(text.includes(key+':'+result.diagnostic[key]))
+    assert.equal(text.includes('SENSITIVE_UNTRUSTED_PROVIDER_DATA'),false)
+   }
+  }
   for(const sensitive of ['SENSITIVE_UNTRUSTED_PROVIDER_DATA',vapid.privateKey,env.SUPABASE_SERVICE_ROLE_KEY,'fcm.googleapis.com','synthetic.jwt.signature'])assert.equal(JSON.stringify(result).includes(sensitive),false)
   await f.handler(request(send));assert.equal(f.state.sends,1)
  }
@@ -140,4 +157,18 @@ test('wrong target, changed registration, expired or missing permit never reach 
  for(const failure of ['wrong-device','registration','expired','missing-permit']){
   const f=fixture({failure});assert.equal((await f.handler(request(send))).status,409);assert.equal(f.state.sends,0)
  }
+})
+
+test('Node bridge rejects invalid category types, mismatched/success status, and request cross-contamination',()=>{
+ for(const value of ['PRIVATE',null,{},[],['html'],400]){
+  const bridge=createNodeDiagnosticBridge()
+  bridge.capture({status:400,providerMimeCategory:value,providerBodyShape:value})
+  assert.deepEqual(bridge.enrich({diagnostic:{providerStatus:400}}),{diagnostic:{providerStatus:400}})
+ }
+ const first=createNodeDiagnosticBridge(),second=createNodeDiagnosticBridge()
+ first.capture({status:400,providerMimeCategory:'html',providerBodyShape:'generic_bad_request_html'})
+ for(const providerStatus of [201,403,'400',undefined])assert.deepEqual(first.enrich({diagnostic:{providerStatus}}),{diagnostic:{providerStatus}})
+ assert.deepEqual(second.enrich({diagnostic:{providerStatus:400}}),{diagnostic:{providerStatus:400}})
+ first.capture({status:201,providerMimeCategory:'html',providerBodyShape:'other'})
+ assert.deepEqual(first.enrich({diagnostic:{providerStatus:201}}),{diagnostic:{providerStatus:201}})
 })

@@ -1,3 +1,4 @@
+import {createNodeDiagnosticBridge} from './push-node-diagnostics.js'
 import {randomBytes} from 'node:crypto'
 import {controlClient} from './push-node-operator.js'
 import {createOperatorHandler,bodyOf} from '../supabase/functions/_shared/push-operator.mjs'
@@ -47,16 +48,17 @@ export function createSessionPushHandler({env=process.env,fetcher=fetch,resolver
    if(['arm_push_operator','cancel_push_operator'].includes(name))return client.rpc('push_session_permit',{action:name==='arm_push_operator'?'arm':'cancel',actor_id:actor.id,permit_id:args.permit_id,confirmation:args.confirmation??null})
    return client.rpc(name,args)
   }
+  const diagnostics=createNodeDiagnosticBridge()
   const handler=createOperatorHandler({env:{PUSH_TEST_DELIVERY_ENABLED:'true',PUSH_TEST_OPERATOR_TOKEN:internal,PUSH_VAPID_PUBLIC_KEY:vapid.publicKey,PUSH_VAPID_PRIVATE_KEY:vapid.privateKey,PUSH_VAPID_SUBJECT:vapid.subject},
    getUser:async()=>actor,rpc,...(resolver?{resolver}:{}),
    prepare:(device,config,id)=>{if(!isFcmEndpoint(device.endpoint))throw Error('INVALID_DEVICE');return preparePush(device,config,id)},
-   send:async(details,dns)=>(await prepareTransport(details,dns,signal))(),
+   send:async(details,dns)=>diagnostics.capture(await (await prepareTransport(details,dns,signal))()),
   })
   try{
    const response=await handler(new Request(url,{method:'POST',signal,headers:{authorization:`Bearer ${internal}.${authorization.slice(7)}`},body:JSON.stringify(body)}))
-   const result=await response.json()
+   const result=diagnostics.enrich(await response.json())
    const codes={PUSH_TEST_READY:'device:ready',PUSH_TEST_CLOSED:'device:closed',PUSH_TEST_NOT_READY:'device:registration-or-consent',PUSH_TEST_NOT_ALLOWED:'rights:permit-refused',INVALID_SUBSCRIPTION:'vapid:subscription-invalid',PUSH_TEST_ACCEPTED:'fcm:accepted',PUSH_TEST_NOT_CONFIRMED:'fcm:rejected',PUSH_TEST_UNCERTAIN:'attempt:unknown'}
-   // Shared sender constructs only allowlisted provider diagnostics; no raw provider body.
+   // Shared sender validates legacy fields; the request-local Node bridge adds only fixed categories.
    return reply(response.status,codes[result.error]||'attempt:refused',{
     ...(result.permitId?{permitId:result.permitId,expiresAt:result.expiresAt}:{}),
     ...(result.diagnostic?{diagnostic:result.diagnostic}:{}),
