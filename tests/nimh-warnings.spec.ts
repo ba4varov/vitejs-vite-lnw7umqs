@@ -41,7 +41,11 @@ for(const width of [390,1440]) for(const lang of ['bg','en']) for(const dark of 
   expect(requests).toBe(1)
   unavailable=true
   await page.clock.fastForward(15*60*1000)
-  await expect(section.locator('article')).toHaveCount(0)
+  await expect.poll(()=>requests).toBe(2)
+  await expect(section.locator('article')).toHaveCount(2)
+  await expect(section).toContainText(lang==='bg'?'може да са остарели':'may be outdated')
+  // A stale warning is bounded: an outage must not leave an undated alert forever.
+  await page.clock.fastForward(46*60*1000)
   await expect(section).toHaveCount(0)
   await page.getByRole('button',{name:lang==='bg'?'София':'Sofia',exact:true}).click()
   await expect(section.locator('article')).toHaveCount(0)
@@ -150,4 +154,40 @@ test('NIMH appears only for active BG warnings; city changes and London never re
  expect(queries).not.toContain('2643743')
  await page.locator('.city-row').getByRole('button',{name:'Варна',exact:true}).click()
  await expect(section.locator('article')).toHaveCount(2)
+})
+
+
+test('NIMH refresh retains verified day on partial source failure, then removes it on confirmed green',async({page})=>{
+ await page.clock.install({time:new Date('2026-11-13T12:00:00Z')})
+ await page.addInitScript(()=>{
+  localStorage.setItem('meteoPulseLanguage','bg')
+  localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({name:'Варна',lat:43.2141,lon:27.9147,source:'manual',geonameId:726050,countryCode:'BG'}))
+ })
+ let phase:'warning'|'partial-outage'|'green'='warning'
+ let requests=0
+ const initial=Date.parse('2026-11-13T12:00:00Z')
+ await page.route('**/*',async route=>{
+  const u=new URL(route.request().url())
+  if(u.pathname==='/api/alerts'&&u.searchParams.get('source')==='nimh'){
+   requests++
+   const days=phase==='partial-outage'
+    ?[{date:'2026-11-13',status:'unavailable',warnings:[]},{date:'2026-11-14',status:'verified',checkedAt:initial+15*60*1000,warnings:[]}]
+    :[{date:'2026-11-13',status:'verified',checkedAt:phase==='warning'?initial:initial+30*60*1000,warnings:phase==='warning'?[...official.municipalities.Варна,...official.warnings]:[]}]
+   return route.fulfill({json:{status:'resolved',coverage:phase==='partial-outage'?'district':'municipality',municipality:phase==='partial-outage'?null:'Варна',region:'Област Варна',days}})
+  }
+  if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/'))return route.continue()
+  return route.fulfill({json:u.hostname==='api.open-meteo.com'?weather:{}})
+ })
+ await page.goto('/')
+ const section=page.locator('.official-warnings')
+ await expect(section.locator('article')).toHaveCount(2)
+ phase='partial-outage'
+ await page.clock.fastForward(15*60*1000)
+ await expect.poll(()=>requests).toBe(2)
+ await expect(section.locator('article')).toHaveCount(2)
+ await expect(section).toContainText('може да са остарели')
+ phase='green'
+ await page.clock.fastForward(15*60*1000)
+ await expect.poll(()=>requests).toBe(3)
+ await expect(section).toHaveCount(0)
 })
