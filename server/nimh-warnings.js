@@ -60,30 +60,53 @@ async function cached(key,ttl,load,now) {
  entry.promise=load().catch(error=>{entry.until=now+60000;throw error})
  cache.set(key,entry);return entry.promise
 }
-async function read(url,fetcher) {
+// Per warm instance: bounds invocation work and cache-miss fan-out; not a distributed WAF.
+export function createNimhGuard() {
+ let window=-1,total=0,sources=0
+ const clients=new Map()
+ return {
+  allow(kind,now,client='unknown') {
+   const minute=Math.floor(now/60000)
+   if(minute!==window){window=minute;total=0;sources=0;clients.clear()}
+   if(kind==='source')return ++sources<=40
+   const count=(clients.get(client)||0)+1
+   if(clients.size<512||clients.has(client))clients.set(client,count)
+   else return false
+   return ++total<=120&&count<=30
+  }
+ }
+}
+const guard=createNimhGuard()
+async function read(url,fetcher,now) {
+ if(!guard.allow('source',now))throw Error('SOURCE_BUDGET')
  const r=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(8000)})
  if(!r.ok)throw Error('SOURCE_UNAVAILABLE')
  const body=await r.text();if(body.length>1500000)throw Error('SOURCE_TOO_LARGE');return body
 }
 export async function handleNimh(req,res,fetcher=fetch,now=Date.now()) {
  res.setHeader('Cache-Control','public, max-age=60, s-maxage=300, must-revalidate')
+ const client=String(req.headers?.['x-vercel-forwarded-for']||'unknown').slice(0,64)
+ if(!guard.allow('request',now,client)){res.setHeader('Cache-Control','no-store');res.setHeader('Retry-After','60');return res.status(429).json({status:'unavailable',warnings:[]})}
  if(req.method!=='GET')return res.status(405).json({status:'unavailable',warnings:[]})
  const q=req.query||{}
- if(Object.keys(q).some(k=>k!=='id')||!/^\d{1,9}$/.test(q.id||''))return res.status(400).json({status:'unverified',warnings:[]})
+ const direct=typeof q.region==='string'&&Object.values(regions).includes(q.region)
+ const valid=direct?Object.keys(q).every(k=>['region','municipality'].includes(k))&&(q.municipality===undefined||typeof q.municipality==='string'&&/^[А-Яа-яѝ -]{2,80}$/.test(q.municipality)):Object.keys(q).every(k=>k==='id')&&typeof q.id==='string'&&/^\d{1,9}$/.test(q.id)
+ if(!valid){res.setHeader('Cache-Control','no-store');return res.status(400).json({status:'unverified',warnings:[]})}
  try {
-  const geo=await cached(`geo:${q.id}`,86400000,async()=>JSON.parse(await read(`https://geocoding-api.open-meteo.com/v1/get?id=${q.id}&language=bg`,fetcher)),now)
-  const region=geo.country_code==='BG'&&regions[geo.admin1?.replace(/^Област\s+/, '')]
-  if(!region||!geo.admin2)return res.status(200).json({status:'unverified',warnings:[]})
-  const municipality=region==='SOF'&&geo.admin2_id===6458974?'Столична':geo.admin2.replace(/^Община\s+/, '')
+  const geo=direct?null:await cached(`geo:${q.id}`,86400000,async()=>JSON.parse(await read(`https://geocoding-api.open-meteo.com/v1/get?id=${q.id}&language=bg`,fetcher,now)),now)
+  const region=direct?q.region:geo.country_code==='BG'&&regions[geo.admin1?.replace(/^Област\s+/, '')]
+  if(!region)return res.status(200).json({status:'unverified',warnings:[]})
+  const municipality=direct?q.municipality:region==='SOF'&&geo.admin2_id===6458974?'Столична':geo.admin2?.replace(/^Община\s+/, '')
   const today=sofiaDate(now),tomorrow=sofiaDate(new Date(`${today}T12:00:00Z`).getTime()+86400000)
   const days=await Promise.all(['d','u'].map(async(day,i)=>{
    const date=i?tomorrow:today
    try {
-    const data=await cached(`${region}:${date}`,900000,async()=>({ ...parseNimh(await read(sourceUrl(region,day),fetcher),region,date),checkedAt:now }),now)
-    if(!Object.hasOwn(data.municipalities,municipality))throw Error('UNVERIFIED_MUNICIPALITY')
-    return {status:'verified',date,checkedAt:data.checkedAt,source:sourceUrl(region,day),warnings:[...data.municipalities[municipality],...data.warnings]}
+    const data=await cached(`${region}:${date}`,900000,async()=>({ ...parseNimh(await read(sourceUrl(region,day),fetcher,now),region,date),checkedAt:now }),now)
+    const confirmed=municipality&&Object.hasOwn(data.municipalities,municipality)
+    return {coverage:confirmed?'municipality':'district',status:'verified',date,checkedAt:data.checkedAt,source:sourceUrl(region,day),warnings:[...(confirmed?data.municipalities[municipality]:[]),...data.warnings.filter(w=>confirmed||w.scope==='district')]}
    }catch{return {status:'unavailable',date,warnings:[],source:sourceUrl(region,day)}}
   }))
-  return res.status(200).json({status:'resolved',region:geo.admin1,municipality,placeId:geo.id,days})
+  const confirmed=days.some(d=>d.coverage==='municipality')
+  return res.status(200).json({status:'resolved',coverage:confirmed?'municipality':'district',region:direct?Object.keys(regions).find(k=>regions[k]===region):geo.admin1,municipality:confirmed?municipality:null,placeId:geo?.id,days})
  }catch{return res.status(503).json({status:'unavailable',warnings:[]})}
 }

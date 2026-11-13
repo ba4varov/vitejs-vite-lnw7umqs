@@ -1,3 +1,4 @@
+import { gpsWarningArea } from './nimh-location.js'
 import { OfficialWarnings } from './OfficialWarnings'
 import { RainWarning } from './RainWarning'
 import StartupDiagnostics from './StartupDiagnostics'
@@ -261,7 +262,7 @@ const WeatherApp = () => {
   // Inert until a location is accepted; never use a universal forecast city.
   const [coords, setCoords] = useState({ lat: 0, lon: 0 })
   const [exactLocation, setExactLocation] = useState<string | null>(null)
-  const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string }>({})
+  const [placeDetails, setPlaceDetails] = useState<{ geonameId?: number, countryCode?: string, admin1Id?: number, region?: string, country?: string, warningArea?: { region: string; municipality?: string } }>({})
   startupTiming.mark('react')
   const initialLocationRef = useRef(createInitialLocation({ navigator, confirmed: loadConfirmedLocation() }))
   const [initialLocationReady, setInitialLocationReady] = useState(false)
@@ -1063,7 +1064,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
       if (!labelCurrent()) return
       const localized = locationFromReverseGeocode(data, t.myLocation, gpsAccuracy)
       setCity(localized.name)
-      setPlaceDetails({ region: localized.region, country: localized.country })
+      setPlaceDetails({ region: localized.region, country: localized.country, warningArea: gpsWarningArea(data, gpsAccuracy) })
       setExactLocation(localized.exactLocation)
     }).catch(() => { startupTiming.mark('reverse:end'); if (labelCurrent()) setCity(t.myLocation) })
     return () => controller.abort()
@@ -1216,9 +1217,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         {placesError && <p className="places-error" role="alert">{placesErrorText(placesError, lang)} <button disabled={placesBusy} onClick={() => session ? loadAccountPlaces(session, placesGuardRef.current.ticket()) : setPlaces(localPlaces())}>{t.tryAgain}</button></p>}
       </section>
 
+      {hasAcceptedLocation && <OfficialWarnings placeId={placeDetails.geonameId} area={placeDetails.warningArea} locationKey={locationKey} city={city} lang={lang} enabled={!gpsBusy} />}
+
       {snapshotTime !== null && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon && !freshness.fresh && <p role="status" className="forecast-update-error">
         {lang === 'bg' ? 'Последна валидна прогноза: ' : 'Last valid forecast: '}{new Date(snapshotTime).toLocaleString(lang === 'bg' ? 'bg-BG' : 'en-GB')}.{' '}
-        {lang === 'bg' ? (freshness.usable ? 'Данните не са текущи. Предупрежденията и съветите са скрити.' : 'Данните са изтекли и са скрити.') : (freshness.usable ? 'Data is not current. Warnings and advice are hidden.' : 'Data has expired and is hidden.')}
+        {lang === 'bg' ? (freshness.usable ? 'Данните не са текущи. Прогностичните предупреждения и съветите са скрити.' : 'Данните са изтекли и са скрити.') : (freshness.usable ? 'Data is not current. Forecast warnings and advice are hidden.' : 'Data has expired and is hidden.')}
       </p>}
       {!hasCurrentForecast && (!initialLocationReady || hasAcceptedLocation) && (loading || (!error && snapshotTime === null)) && (
         <section className="forecast-loading" role="status" aria-live="polite" aria-busy="true">
@@ -1243,7 +1246,6 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         <main ref={forecastDashboardRef} className="forecast-dashboard">
           {error && <p className="forecast-update-error" role="status">{error} <button type="button" onClick={() => fetchWeather(coords.lat, coords.lon, true)}>{t.tryAgain}</button></p>}
           {loading && <div className="forecast-refresh" role="status" aria-live="polite">↻ {t.refreshing}</div>}
-          <OfficialWarnings placeId={placeDetails.geonameId} city={city} lang={lang} enabled={!gpsBusy} />
           <RainWarning forecast={gpsBusy || !forecastIsFresh ? null : notificationForecast} city={city} lang={lang} updated={lastUpdated} />
           {activeAlerts.length > 0 && (
             <div className="alerts-container" aria-label={lang === 'bg' ? 'Ориентировъчни предупреждения · Open-Meteo' : 'Indicative warnings · Open-Meteo'}>

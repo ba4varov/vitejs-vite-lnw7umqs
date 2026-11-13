@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-import {parseNimh,handleNimh,sofiaDate} from '../../server/nimh-warnings.js'
+import {parseNimh,handleNimh,sofiaDate,createNimhGuard} from '../../server/nimh-warnings.js'
 const html=readFileSync(new URL('../fixtures/nimh/varna-2026-11-13.html',import.meta.url),'utf8')
 const tomorrow=readFileSync(new URL('../fixtures/nimh/varna-2026-11-14.html',import.meta.url),'utf8')
 test('real NIMH Varna tables distinguish municipality, district and marine scopes',()=>{
@@ -29,10 +29,10 @@ test('endpoint uses verified admin2, two shared region fetches, bounded cache an
  const c=response();await handleNimh({method:'GET',query:{id:'726050'}},c,async()=>{throw Error('offline')},now+16*60000)
  assert.ok(c.data.days.every(d=>d.status==='unavailable'&&d.warnings.length===0))
 })
-test('unverified, foreign and missing municipalities never inherit district codes',async()=>{
+test('foreign places are unverified; missing municipalities receive district scope only',async()=>{
  for(const [id,geo] of [['1',{country_code:'US',admin1:'Област Варна',admin2:'Варна'}],['2',{country_code:'BG',admin1:'Област Варна',admin2:'Несъществуваща'}]]){
  const r=response();await handleNimh({method:'GET',query:{id}},r,async url=>({ok:true,text:async()=>url.includes('geocoding')?JSON.stringify(geo):url.includes('z=d')?html:tomorrow}),Date.parse('2026-11-13T12:40:00Z'))
- assert.ok(r.data.status==='unverified'||r.data.days.every(d=>d.status==='unavailable'))
+ assert.ok(r.data.status==='unverified'||r.data.coverage==='district'&&r.data.days.every(d=>d.warnings.every(w=>w.scope!=='municipality')))
  }
  const r=response();await handleNimh({method:'GET',query:{id:'https://evil.invalid'}},r);assert.equal(r.code,400)
 })
@@ -58,4 +58,36 @@ test('public dispatch validates its own query while personal alerts remain priva
  const invalid=response();await handler({method:'GET',query:{source:'nimh',id:'bad'}},invalid);assert.equal(invalid.code,400)
  const mutation=response();await handler({method:'PATCH',query:{source:'nimh',id:'726050'}},mutation);assert.equal(mutation.code,405)
  const personal=response();await handler({method:'GET',query:{},headers:{}},personal);assert.ok([401,503].includes(personal.code));assert.equal(personal.headers['Cache-Control'],'private, no-store')
+})
+
+test('GPS region queries use NIMH directly, with optional exact municipality row',async()=>{
+ for(const municipality of [undefined,'Варна','Непроверена']) {
+  const r=response(),calls=[]
+  await handleNimh({method:'GET',query:{region:'VAR',...(municipality?{municipality}:{})}},r,async url=>{calls.push(url);return {ok:true,text:async()=>url.includes('z=d')?html:tomorrow}},Date.parse('2026-11-13T16:00:00Z'))
+  assert.equal(r.code,200)
+  assert.ok(calls.every(url=>url.startsWith('https://weather.bg/')))
+  assert.equal(r.data.coverage,municipality==='Варна'?'municipality':'district')
+  assert.equal(r.data.days[0].warnings.some(w=>w.scope==='municipality'),municipality==='Варна')
+  if(municipality!=='Варна')assert.ok(r.data.days.every(d=>d.warnings.every(w=>w.scope==='district')))
+ }
+})
+test('bounded request and source budgets reset; public endpoint rejects excess requests before upstream I/O',async()=>{
+ const guard=createNimhGuard()
+ for(let i=0;i<30;i++)assert.equal(guard.allow('request',0,'one'),true)
+ assert.equal(guard.allow('request',0,'one'),false)
+ for(let i=0;i<40;i++)assert.equal(guard.allow('source',0),true)
+ assert.equal(guard.allow('source',0),false)
+ assert.equal(guard.allow('request',60000,'one'),true)
+ let last
+ for(let i=0;i<31;i++) {last=response();await handleNimh({method:'GET',headers:{'x-vercel-forwarded-for':'192.0.2.50'},query:{id:'bad'}},last,()=>{throw Error('must not fetch')},Date.parse('2026-11-13T18:00:00Z'))}
+ assert.equal(last.code,429);assert.equal(last.headers['Retry-After'],'60');assert.equal(last.headers['Cache-Control'],'no-store')
+})
+
+test('random ID fan-out cannot exceed the shared outbound budget',async()=>{
+ let calls=0,last
+ for(let i=0;i<45;i++){
+  last=response()
+  await handleNimh({method:'GET',headers:{'x-vercel-forwarded-for':`192.0.2.${i}`},query:{id:String(100000+i)}},last,async()=>{calls++;return {ok:true,text:async()=>JSON.stringify({country_code:'US'})}},Date.parse('2026-11-13T19:00:00Z'))
+ }
+ assert.equal(calls,40);assert.equal(last.code,503)
 })
