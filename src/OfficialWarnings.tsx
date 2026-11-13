@@ -1,6 +1,31 @@
 import { useEffect, useState } from 'react'
 import './official-warnings.css'
 
+const MAX_CONFIRMED_AGE_MS = 60 * 60 * 1000
+const FRESH_CONFIRMED_AGE_MS = 20 * 60 * 1000
+
+function recentVerifiedDay(day:any, now:number) {
+ return day?.status==='verified' && typeof day.checkedAt==='number' && Number.isFinite(day.checkedAt)
+  && now>=day.checkedAt && now-day.checkedAt<MAX_CONFIRMED_AGE_MS
+}
+
+// A failed refresh is not a verified "green" day. Keep only a recent, same-place
+// verified day until NIMH confirms a replacement or the confirmation expires.
+function mergeVerifiedDays(previous:any, next:any, identity:string, now:number) {
+ const incoming={...next,identity}
+ if(!previous || previous.identity!==identity)return incoming
+ if(next.data?.status==='unavailable')return previous
+ if(next.data?.status!=='resolved' || !Array.isArray(next.data.days) || !Array.isArray(previous.data?.days))return incoming
+ const previousByDate=new Map<string,any>(previous.data.days.map((day:any)=>[day.date,day]))
+ const days=next.data.days.map((day:any)=>{
+  if(day?.status==='verified')return day
+  const earlier=previousByDate.get(day?.date)
+  return day?.status==='unavailable' && recentVerifiedDay(earlier,now) ? earlier : day
+ })
+ const retained=days.some((day:any,i:number)=>day!==next.data.days[i])
+ return {...incoming,data:{...next.data,...(retained && previous.data?.coverage==='municipality'?{coverage:'municipality',municipality:previous.data.municipality}:{}),days}}
+}
+
 // Share requests across StrictMode/remounts and city revisits within this document.
 const requests = new Map<string, {until:number;promise:Promise<any>}>()
 function loadWarnings(id:string) {
@@ -25,16 +50,23 @@ export function OfficialWarnings({ placeId, area, gpsIssue, gpsRestored, locatio
  const query=isBulgarianPlace?(area?new URLSearchParams(area).toString():placeId?`id=${placeId}`:''):''
  const identity=`${locationKey}:${query}`
  const [snapshot,setSnapshot]=useState<any>(null)
+ const [refreshFailed,setRefreshFailed]=useState(false)
  const [clock,setClock]=useState(Date.now())
  useEffect(()=>{
   setSnapshot(null)
+  setRefreshFailed(false)
   if(!enabled||!query)return
   let alive=true
   const load=async()=>{
    try {
     const next=await loadWarnings(query)
-    if(alive)setSnapshot({...next,identity})
-   }catch{if(alive)setSnapshot(null)}
+    if(!alive)return
+    setRefreshFailed(next.data?.status==='unavailable' || (Array.isArray(next.data?.days) && next.data.days.some((day:any)=>day.status==='unavailable')))
+    setSnapshot(previous=>mergeVerifiedDays(previous,next,identity,Date.now()))
+    setClock(Date.now())
+   }catch{
+    if(alive){setRefreshFailed(true);setClock(Date.now())}
+   }
   }
   void load()
   const interval=setInterval(()=>{if(document.visibilityState==='visible')void load()},15*60*1000)
@@ -43,16 +75,23 @@ export function OfficialWarnings({ placeId, area, gpsIssue, gpsRestored, locatio
   document.addEventListener('visibilitychange',visible)
   return ()=>{alive=false;clearInterval(interval);document.removeEventListener('visibilitychange',visible)}
  },[identity,enabled])
- useEffect(()=>{const id=setInterval(()=>setClock(Date.now()),60000);return()=>clearInterval(id)},[])
+ useEffect(()=>{
+  const tick=()=>setClock(Date.now())
+  const id=setInterval(tick,60000)
+  document.addEventListener('visibilitychange',tick)
+  return()=>{clearInterval(id);document.removeEventListener('visibilitychange',tick)}
+ },[])
  const bg=lang==='bg', l=labels[lang]
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Sofia',year:'numeric',month:'2-digit',day:'2-digit'}).format(clock)
- const data=enabled&&snapshot&&snapshot.identity===identity&&clock-snapshot.received<20*60*1000?snapshot.data:null
- const days=Array.isArray(data?.days)?data.days.filter((d:any)=>d.date>=today&&d.status==='verified'&&clock-d.checkedAt>=0&&clock-d.checkedAt<20*60*1000):[]
+ const data=enabled&&snapshot?.identity===identity?snapshot.data:null
+ const days=Array.isArray(data?.days)?data.days.filter((day:any)=>day.date>=today&&recentVerifiedDay(day,clock)):[]
  const warnings=days.flatMap((day:any)=>Array.isArray(day.warnings)?day.warnings.filter((w:any)=>['yellow','orange','red'].includes(w.level)&&w.date===day.date).map((w:any)=>({...w,source:day.source})):[])
+ const showingOlderConfirmation=refreshFailed||days.some((day:any)=>clock-day.checkedAt>=FRESH_CONFIRMED_AGE_MS)
  if(!warnings.length)return null
  return <section className="official-warnings" aria-labelledby="official-warnings-title">
   <h2 id="official-warnings-title">{bg?'Официални предупреждения · НИМХ':'Official warnings · NIMH'}</h2>
   <p>{city}{data?.municipality&&` · ${bg?'община':'municipality'} ${data.municipality}`}{data?.region&&` · ${data.region}`}</p>
+  {showingOlderConfirmation&&<p role="status">{bg?'Няма ново потвърждение от НИМХ. Показваме последните потвърдени кодове, които може да са остарели.':'No new NIMH confirmation. Showing the last verified warnings, which may be outdated.'}</p>}
   {gpsRestored&&<p role="status">{bg?'Показваме последното запазено GPS място, а не ново определено местоположение. Използвайте „Моето местоположение“ за нова GPS проверка.':'Showing the last saved GPS place, not a new location fix. Use My location for a fresh GPS check.'}</p>}
   {gpsIssue&&<p role="status">{({
    pending: bg?'Проверяваме административната област за GPS местоположението.':'Checking the administrative district for your GPS location.',
