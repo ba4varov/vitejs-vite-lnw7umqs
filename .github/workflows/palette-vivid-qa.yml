@@ -34,7 +34,7 @@ jobs:
       - name: Multicolor and Nimbo regression
         run: npx playwright test tests/palette-vivid.spec.ts tests/nimbo-vivid.spec.ts --reporter=line --workers=2
       - name: Existing mobile forecast card regression
-        run: npx playwright test tests/mobile-forecast-cards.spec.ts --grep "forecast cards (360|390|768|1440) " --reporter=line --workers=2
+        run: npx playwright test tests/mobile-forecast-cards.spec.ts --grep "forecast cards (360|390|768|1440) " --reporter=line --workers=2 --output=work/forecast-regression-results
       - name: Browser screenshots and failure traces
         if: always()
         uses: actions/upload-artifact@v4
