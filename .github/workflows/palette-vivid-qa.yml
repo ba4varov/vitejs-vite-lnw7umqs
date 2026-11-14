@@ -1,0 +1,45 @@
+name: Meteo Pulse multicolor palette QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/App.tsx'
+      - 'src/palette-vivid.css'
+      - 'tests/palette-vivid.spec.ts'
+      - '.github/workflows/palette-vivid-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  palette-qa:
+    if: github.head_ref == 'design/multicolor-weather-dashboard'
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Typecheck and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Multicolor and Nimbo regression
+        run: npx playwright test tests/palette-vivid.spec.ts tests/nimbo-vivid.spec.ts --reporter=line --workers=2
+      - name: Existing mobile forecast card regression
+        run: npx playwright test tests/mobile-forecast-cards.spec.ts --grep "forecast cards (360|390|768|1440) " --reporter=line --workers=2 --output=work/forecast-regression-results
+      - name: Browser screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: palette-vivid-qa
+          path: work/browser-results/
+          retention-days: 3
+          if-no-files-found: ignore
