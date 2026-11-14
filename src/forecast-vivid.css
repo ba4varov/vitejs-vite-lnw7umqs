@@ -1,0 +1,221 @@
+/* Meteo Pulse visual refresh — forecast cards and charts only.
+   Keep the existing 174×278 desktop and compact mobile card geometry. */
+.weather-app .hourly-section,
+.weather-app .forecast-section,
+.weather-app .charts-section {
+  background-image: radial-gradient(ellipse at 90% 0%, rgba(72, 166, 219, .065), transparent 54%);
+}
+.weather-app.dark .hourly-section,
+.weather-app.dark .forecast-section,
+.weather-app.dark .charts-section {
+  background-image: radial-gradient(ellipse at 90% 0%, rgba(118, 186, 242, .075), transparent 54%);
+}
+.weather-app :is(.hourly-section, .forecast-section, .charts-section) > :is(.forecast-heading, h3) {
+  position: relative;
+}
+.weather-app :is(.hourly-section, .forecast-section) .forecast-heading h3::before,
+.weather-app .charts-section > h3::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 1.05em;
+  margin-right: 10px;
+  border-radius: 10px;
+  vertical-align: -.15em;
+  background: linear-gradient(180deg, #44b4e4, #527bd9);
+}
+.weather-app .forecast-scroll-controls button {
+  border-radius: 11px;
+  background-image: linear-gradient(130deg, rgba(99, 185, 231, .095), transparent);
+  transition: background-color .18s ease, border-color .18s ease;
+}
+.weather-app .forecast-scroll-controls button:hover {
+  background-color: var(--weather-blue-soft);
+  border-color: var(--weather-blue);
+}
+.weather-app .forecast-scroll-controls button:focus-visible {
+  outline: 3px solid var(--weather-blue);
+  outline-offset: 2px;
+}
+
+/* Per-day WMO tones are decorative. Text and value markup remain unchanged. */
+.weather-app .forecast-period-card {
+  --tone-background: #f5faff;
+  --tone-accent: #287ab0;
+  --tone-halo: rgba(96, 182, 222, .16);
+  position: relative;
+  isolation: isolate;
+  border-color: color-mix(in srgb, var(--tone-accent) 24%, var(--weather-line));
+  background-color: var(--tone-background) !important;
+  background-image: radial-gradient(ellipse at 90% 19%, var(--tone-halo), transparent 67%);
+  box-shadow: 0 5px 19px rgba(15, 62, 103, .065);
+  transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.weather-app .forecast-period-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 4px;
+  border-radius: 0 0 7px 7px;
+  background: var(--tone-accent);
+  opacity: .92;
+}
+.weather-app .forecast-period-card.forecast-tone-fair {
+  --tone-background: #fffaf3;
+  --tone-accent: #bb690c;
+  --tone-halo: rgba(248, 181, 66, .17);
+}
+.weather-app .forecast-period-card.forecast-tone-clouds {
+  --tone-background: #f5faff;
+  --tone-accent: #497eac;
+  --tone-halo: rgba(139, 180, 222, .16);
+}
+.weather-app .forecast-period-card.forecast-tone-rain {
+  --tone-background: #f4fbff;
+  --tone-accent: #147da8;
+  --tone-halo: rgba(73, 174, 222, .15);
+}
+.weather-app .forecast-period-card.forecast-tone-snow {
+  --tone-background: #f5fcff;
+  --tone-accent: #317da5;
+  --tone-halo: rgba(173, 216, 237, .19);
+}
+.weather-app .forecast-period-card.forecast-tone-fog {
+  --tone-background: #f7f9fb;
+  --tone-accent: #60788f;
+  --tone-halo: rgba(128, 154, 176, .15);
+}
+.weather-app .forecast-period-card.forecast-tone-storm {
+  --tone-background: #f7f5ff;
+  --tone-accent: #7054b8;
+  --tone-halo: rgba(157, 129, 219, .18);
+}
+.weather-app .forecast-period-card .forecast-icon {
+  filter: drop-shadow(0 3px 5px rgba(16, 47, 76, .1));
+}
+.weather-app .forecast-period-card .forecast-temperature {
+  font-weight: 800;
+  letter-spacing: -.04em;
+  color: var(--weather-ink);
+}
+.weather-app .forecast-period-card[aria-pressed="true"] {
+  border-color: var(--tone-accent) !important;
+  box-shadow: inset 0 0 0 1px var(--tone-accent), 0 6px 21px rgba(18, 90, 139, .17);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .weather-app .forecast-period-card:hover {
+    border-color: var(--tone-accent);
+    box-shadow: 0 11px 25px rgba(20, 80, 120, .14);
+    transform: translateY(-3px);
+  }
+}
+.weather-app.dark .forecast-period-card {
+  --tone-background: #20354a;
+  --tone-accent: #91bad7;
+  --tone-halo: rgba(148, 194, 229, .09);
+  background-color: var(--tone-background) !important;
+  box-shadow: 0 6px 20px rgba(1, 11, 26, .12);
+}
+.weather-app.dark .forecast-period-card.forecast-tone-fair {
+  --tone-background: #293546;
+  --tone-accent: #f0bb64;
+  --tone-halo: rgba(233, 179, 80, .1);
+}
+.weather-app.dark .forecast-period-card.forecast-tone-clouds {
+  --tone-background: #20344b;
+  --tone-accent: #8dbbdf;
+  --tone-halo: rgba(127, 172, 213, .11);
+}
+.weather-app.dark .forecast-period-card.forecast-tone-rain {
+  --tone-background: #19384b;
+  --tone-accent: #80c7e5;
+  --tone-halo: rgba(78, 176, 209, .12);
+}
+.weather-app.dark .forecast-period-card.forecast-tone-snow {
+  --tone-background: #1d3b52;
+  --tone-accent: #a6daef;
+  --tone-halo: rgba(150, 207, 236, .11);
+}
+.weather-app.dark .forecast-period-card.forecast-tone-fog {
+  --tone-background: #293746;
+  --tone-accent: #b0c5d8;
+  --tone-halo: rgba(172, 195, 217, .1);
+}
+.weather-app.dark .forecast-period-card.forecast-tone-storm {
+  --tone-background: #322f52;
+  --tone-accent: #c3b6fa;
+  --tone-halo: rgba(166, 143, 229, .14);
+}
+.weather-app.dark .forecast-period-card .forecast-temperature,
+.weather-app.dark .forecast-period-card .forecast-condition,
+.weather-app.dark .forecast-period-card .forecast-secondary {
+  color: #edf6fc;
+}
+.weather-app.dark .forecast-period-card .forecast-period strong { color: #deeeff; }
+.weather-app.dark .forecast-period-card .forecast-period small { color: #d2e2ef; }
+
+/* Distinct, readable chart panels. Preserve the existing canvas drawing and layout. */
+.weather-app .mini-chart {
+  --chart-edge: #378fc2;
+  position: relative;
+  border: 1px solid var(--weather-line);
+  border-top: 3px solid var(--chart-edge);
+  border-radius: 20px;
+  background-color: var(--weather-surface-soft);
+  background-image: radial-gradient(ellipse at 95% 3%, rgba(65, 151, 217, .09), transparent 50%);
+  box-shadow: 0 7px 24px rgba(19, 76, 114, .06);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.weather-app .mini-chart-temp { --chart-edge: #d66d38; }
+.weather-app .mini-chart-rain { --chart-edge: #3187d3; }
+.weather-app .mini-chart-wind { --chart-edge: #198e81; }
+.weather-app .mini-chart-pressure { --chart-edge: #8961c4; }
+.weather-app .mini-chart-aqi { --chart-edge: #5aa15e; }
+.weather-app .mini-chart .chart-header h4 {
+  font-weight: 780;
+  letter-spacing: -.02em;
+}
+.weather-app .mini-chart .chart-icon {
+  border-radius: 11px;
+  box-shadow: 0 4px 12px rgba(20, 60, 105, .11);
+}
+.weather-app .mini-chart .chart-frame {
+  border-radius: 13px;
+  background: rgba(131, 179, 215, .035);
+}
+.weather-app.dark .mini-chart {
+  background-color: var(--weather-surface-soft);
+  background-image: radial-gradient(ellipse at 95% 3%, rgba(121, 180, 231, .09), transparent 50%);
+  box-shadow: 0 9px 28px rgba(1, 12, 24, .15);
+}
+.weather-app.dark .mini-chart .chart-frame { background: rgba(204, 228, 247, .025); }
+@media (max-width: 760px) {
+  .weather-app .charts-section .chart-selector {
+    border-radius: 17px;
+    padding: 5px;
+    gap: 6px;
+  }
+  .weather-app .charts-section .chart-selector button {
+    border-radius: 10px;
+    transition: background-color .16s ease, color .16s ease;
+  }
+  .weather-app .charts-section .chart-selector button.active {
+    box-shadow: 0 3px 12px rgba(24, 95, 157, .23);
+  }
+}
+@media (max-width: 640px) {
+  .weather-app .forecast-period-card::before { height: 3px; }
+  .weather-app .mini-chart { border-radius: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-app .forecast-period-card,
+  .weather-app .mini-chart,
+  .weather-app .forecast-scroll-controls button,
+  .weather-app .charts-section .chart-selector button {
+    transition: none !important;
+    animation: none !important;
+  }
+}
