@@ -63,3 +63,50 @@ test('nighttime palette and reduced motion preserve readable content', async ({ 
   expect(await hero.locator('.atmosphere-orb').evaluate(node => getComputedStyle(node).animationName)).toBe('none')
   expect(await hero.locator('.big-temp').evaluate(node => getComputedStyle(node).color)).toBe('rgb(255, 255, 255)')
 })
+
+test.describe('responsive atmospheric dashboard and header', () => {
+  for (const width of [360, 390, 768, 1440]) {
+    for (const lang of ['bg', 'en'] as const) {
+      for (const dark of [false, true]) {
+        test(`${width}px ${lang} ${dark ? 'dark' : 'light'} theme`, async ({ page }, testInfo) => {
+          await page.setViewportSize({ width, height: 900 })
+          await page.addInitScript(language => {
+            localStorage.setItem('meteoPulseLanguage', language)
+            localStorage.setItem('meteoPulseConfirmedLocationV1', JSON.stringify({
+              name: 'Varna', lat: 43.2141, lon: 27.9147, source: 'manual',
+              geonameId: 726050, countryCode: 'BG',
+            }))
+          }, lang)
+          const forecast = structuredClone(weather)
+          forecast.current.weather_code = 3
+          forecast.current.time = '2026-10-13T12:00'
+          await page.route('**/*', route => {
+            const url = new URL(route.request().url())
+            if (url.pathname === '/api/alerts' && url.searchParams.get('source') === 'nimh') {
+              return route.fulfill({ json: { status: 'resolved', days: [] } })
+            }
+            if (url.hostname === '127.0.0.1' && !url.pathname.startsWith('/api/')) return route.continue()
+            return route.fulfill({ json: url.hostname === 'api.open-meteo.com' ? forecast : {} })
+          })
+          await page.goto('/')
+          const hero = page.locator('.weather-forecast-view')
+          await expect(hero).toHaveClass(/weather-scene-clouds/)
+          await expect(page.locator('.header-row')).toBeVisible()
+          await expect(hero.locator('.big-temp')).toBeVisible()
+          if (dark) {
+            const menu = page.locator('.mobile-menu-toggle')
+            if (await menu.isVisible()) await menu.click()
+            await page.locator('.header-menu > .icon-btn').click()
+            await expect(page.locator('.weather-app')).toHaveClass(/\\bdark\\b/)
+          }
+          if (width <= 640) await expect(hero.locator('.metrics-toggle')).toBeVisible()
+          else await expect(hero.locator('.metrics-toggle')).toBeHidden()
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+          const ink = await hero.locator('.big-temp').evaluate(node => getComputedStyle(node).color)
+          expect(ink).toBe('rgb(255, 255, 255)')
+          await page.screenshot({ path: testInfo.outputPath(`vivid-${width}-${lang}-${dark ? 'dark' : 'light'}.png`), fullPage: false })
+        })
+      }
+    }
+  }
+})
