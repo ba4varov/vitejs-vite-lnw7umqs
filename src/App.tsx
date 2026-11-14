@@ -13,6 +13,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import './App.css'
 import './weather-vivid.css'
 import './forecast-vivid.css'
+import './nimbo-vivid.css'
 import { WeatherAdvice } from './WeatherAdvice'
 import { WindyMap } from './WindyMap'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
@@ -1334,8 +1335,9 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           <ForecastSectionOrder dashboardRef={forecastDashboardRef}>
           <section key="chat" className="card weather-chat" aria-labelledby="weather-chat-title">
             <div className="chat-heading">
-              <div className="chat-avatar" aria-hidden="true">🤖</div>
+              <div className="chat-avatar nimbo-avatar" aria-hidden="true"><span className="nimbo-orb"><span>N</span></span></div>
               <div>
+                <span className="nimbo-eyebrow">{lang === 'bg' ? 'AI МЕТЕО ПОМОЩНИК' : 'AI WEATHER GUIDE'}</span>
                 <h3 id="weather-chat-title">{t.chatTitle}</h3>
                 <p>{t.chatSubtitle}</p>
               </div>
@@ -1344,13 +1346,13 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             <div className="chat-messages" aria-live="polite" ref={chatMessagesRef}>
               {chatMessages.map((message, index) => (
                 <div key={index} className={`chat-message ${message.role}`}>
-                  {message.role === 'bot' && <span aria-hidden="true">🌤️</span>}
+                  {message.role === 'bot' && <span className="nimbo-message-symbol" aria-hidden="true">✦</span>}
                   <p>{message.text}</p>
                 </div>
               ))}
               {chatLoading && (
                 <div className="chat-message bot">
-                  <span aria-hidden="true">🌤️</span>
+                  <span className="nimbo-message-symbol nimbo-thinking" aria-hidden="true">✦</span>
                   <p>{lang === 'bg' ? 'Nimbo мисли…' : 'Nimbo is thinking…'}</p>
                 </div>
               )}
@@ -1362,7 +1364,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
             <form className="chat-form" onSubmit={event => { event.preventDefault(); sendChatMessage() }}>
               <input value={chatInput} maxLength={400} disabled={chatLoading} onChange={event => setChatInput(event.target.value)} placeholder={t.chatPlaceholder} aria-label={t.chatPlaceholder} />
-              <button type="submit" disabled={!chatInput.trim() || chatLoading}>{t.chatSend} <span aria-hidden="true">➤</span></button>
+              <button type="submit" className="nimbo-send" disabled={!chatInput.trim() || chatLoading}>{t.chatSend} <span aria-hidden="true">➤</span></button>
             </form>
             <p className="chat-disclaimer">{lang === 'bg' ? 'Съветите са информативни. При опасно време следвай указанията на местните власти.' : 'Advice is informational. During severe weather, follow local authority guidance.'}</p>
           </section>

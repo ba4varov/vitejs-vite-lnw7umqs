@@ -1,0 +1,324 @@
+/* Nimbo visual identity — decoration only; request and reply logic is unchanged. */
+.weather-app .weather-chat {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid #aacde9;
+  border-radius: 27px;
+  background: linear-gradient(125deg, #fcfeff 0%, #f0f8ff 55%, #ecf4ff 100%);
+  box-shadow: 0 16px 42px rgba(22, 86, 142, .1);
+}
+.weather-app .weather-chat::before {
+  content: "";
+  position: absolute;
+  inset: -100px -95px auto auto;
+  width: clamp(170px, 24vw, 300px);
+  aspect-ratio: 1;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(83, 169, 232, .17), rgba(139, 112, 242, .08) 48%, transparent 70%);
+  pointer-events: none;
+}
+.weather-app .weather-chat::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #379bd3, #8a6de0);
+  pointer-events: none;
+}
+.weather-app .weather-chat .chat-heading {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: clamp(12px, 2vw, 20px);
+  text-align: left;
+}
+.weather-app .weather-chat .chat-heading > div:nth-child(2) { min-width: 0; flex: 1; }
+.weather-app .weather-chat .nimbo-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #306caa;
+  font-size: .7rem;
+  line-height: 1.3;
+  letter-spacing: .15em;
+  font-weight: 800;
+}
+.weather-app .weather-chat .chat-heading h3 {
+  margin: 0 0 6px;
+  color: #163c64;
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  line-height: 1.2;
+  font-weight: 820;
+  letter-spacing: -.027em;
+}
+.weather-app .weather-chat .chat-heading p {
+  max-width: 620px;
+  color: #45657f;
+  line-height: 1.5;
+}
+.weather-app .weather-chat .nimbo-avatar {
+  display: grid;
+  place-items: center;
+  width: clamp(58px, 6vw, 74px);
+  height: clamp(58px, 6vw, 74px);
+  flex: 0 0 auto;
+  border: 1px solid rgba(89, 151, 220, .28);
+  border-radius: 22px;
+  background: radial-gradient(circle at 70% 18%, rgba(255, 255, 255, .95), rgba(204, 229, 255, .8) 46%, rgba(186, 189, 250, .32));
+  box-shadow: 0 7px 20px rgba(77, 120, 194, .16);
+}
+.weather-app .weather-chat .nimbo-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 73%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 25%, #f9ffff 0%, #92e2ff 19%, #568fdb 51%, #705ec6 76%, #433b9b 100%);
+  box-shadow: inset -4px -6px 12px rgba(30, 48, 127, .24), 0 0 0 4px rgba(180, 211, 250, .42), 0 4px 16px rgba(71, 98, 193, .35);
+}
+.weather-app .weather-chat .nimbo-orb::after {
+  content: "";
+  position: absolute;
+  inset: 10% 12% auto 17%;
+  height: 23%;
+  border-radius: 50%;
+  transform: rotate(-22deg);
+  background: rgba(255,255,255,.38);
+  filter: blur(4px);
+}
+.weather-app .weather-chat .nimbo-orb > span {
+  color: #fff;
+  font-family: inherit;
+  font-size: clamp(1.15rem, 2.25vw, 1.55rem);
+  font-weight: 870;
+  line-height: 1;
+  text-shadow: 0 1px 6px rgba(17, 25, 81, .65);
+}
+.weather-app .weather-chat .chat-location {
+  max-width: 32%;
+  flex: 0 1 auto;
+  margin-left: auto;
+  padding: 9px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid #c9e2f6;
+  background: rgba(238, 248, 255, .92);
+  color: #175888;
+  font-weight: 700;
+}
+.weather-app .weather-chat .chat-messages {
+  min-height: 133px;
+  max-height: 290px;
+  margin: 22px 0 17px;
+  padding: clamp(12px, 2vw, 19px);
+  border: 1px solid #d3e6f5;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .74);
+  box-shadow: inset 0 2px 14px rgba(38, 107, 154, .035);
+}
+.weather-app .weather-chat .chat-message { max-width: min(90%, 780px); min-width: 0; }
+.weather-app .weather-chat .chat-message.bot { align-self: flex-start; }
+.weather-app .weather-chat .nimbo-message-symbol {
+  flex: 0 0 29px;
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bbd9f0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #dcf5ff, #e9e1ff);
+  color: #385ca6;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.weather-app .weather-chat .chat-message p {
+  min-width: 0;
+  margin: 0;
+  padding: 12px 16px;
+  overflow-wrap: anywhere;
+  border: 1px solid #dce9f3;
+  border-radius: 17px 17px 17px 5px;
+  background: #fff;
+  color: #193650;
+  box-shadow: 0 3px 13px rgba(20, 68, 109, .05);
+  line-height: 1.55;
+}
+.weather-app .weather-chat .chat-message.user p {
+  border-color: #246eaa;
+  border-radius: 17px 17px 5px 17px;
+  background: linear-gradient(125deg, #155b97, #2674b5);
+  color: #fff;
+  box-shadow: 0 4px 13px rgba(23, 88, 150, .12);
+}
+.weather-app .weather-chat .chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+.weather-app .weather-chat .chat-suggestions button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #accfe9;
+  border-radius: 999px;
+  background: rgba(247, 252, 255, .97);
+  color: #195a8c;
+  font-size: .88rem;
+  font-weight: 690;
+  line-height: 1.3;
+  text-align: left;
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
+}
+.weather-app .weather-chat .chat-suggestions button:hover {
+  border-color: #5f9fcc;
+  background: #e5f4ff;
+}
+.weather-app .weather-chat .chat-suggestions button:disabled { opacity: .6; cursor: not-allowed; }
+.weather-app .weather-chat .chat-form {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  width: 100%;
+}
+.weather-app .weather-chat .chat-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 50px;
+  padding: 12px 17px;
+  border: 1px solid #a6c5dc;
+  border-radius: 15px;
+  background: #fff;
+  color: #143452;
+  box-shadow: inset 0 1px 4px rgba(23, 67, 101, .03);
+}
+.weather-app .weather-chat .chat-form .nimbo-send {
+  flex: 0 0 auto;
+  min-height: 50px;
+  padding-inline: 18px;
+  border: 1px solid #265cb2;
+  border-radius: 15px;
+  background: linear-gradient(125deg, #206baa, #6554b8);
+  color: #fff;
+  font-weight: 760;
+  box-shadow: 0 4px 12px rgba(61, 92, 177, .17);
+}
+.weather-app .weather-chat .chat-form .nimbo-send:disabled { box-shadow: none; opacity: .5; }
+.weather-app .weather-chat .chat-disclaimer {
+  margin-top: 14px;
+  color: #526d82;
+  font-size: .76rem;
+  line-height: 1.5;
+}
+.weather-app .weather-chat :is(button, input):focus-visible {
+  outline: 3px solid #1769aa;
+  outline-offset: 3px;
+}
+.weather-app .weather-chat .nimbo-thinking {
+  animation: nimbo-think 1.65s ease-in-out infinite;
+}
+@keyframes nimbo-think {
+  0%, 100% { opacity: .64; transform: scale(.93); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Accessible night palette. */
+.weather-app.dark .weather-chat {
+  border-color: #355879;
+  background: linear-gradient(125deg, #102338, #162b49 55%, #211f48);
+  box-shadow: 0 16px 42px rgba(0, 8, 24, .24);
+}
+.weather-app.dark .weather-chat::before {
+  background: radial-gradient(circle, rgba(72, 140, 228, .21), rgba(140, 101, 222, .1) 50%, transparent 70%);
+}
+.weather-app.dark .weather-chat .nimbo-eyebrow { color: #92d1f7; }
+.weather-app.dark .weather-chat .chat-heading h3 { color: #e8f5ff; }
+.weather-app.dark .weather-chat .chat-heading p,
+.weather-app.dark .weather-chat .chat-disclaimer { color: #bfd4e7; }
+.weather-app.dark .weather-chat .nimbo-avatar {
+  border-color: #4b7093;
+  background: radial-gradient(circle at 70% 18%, #335c86, #233752 65%, #28274f);
+}
+.weather-app.dark .weather-chat .chat-location {
+  border-color: #365d80;
+  background: #1b3a56;
+  color: #d5edff;
+}
+.weather-app.dark .weather-chat .chat-messages {
+  border-color: #355270;
+  background: rgba(8, 22, 41, .67);
+}
+.weather-app.dark .weather-chat .nimbo-message-symbol {
+  border-color: #476585;
+  background: linear-gradient(135deg, #254971, #393664);
+  color: #d0ebff;
+}
+.weather-app.dark .weather-chat .chat-message p {
+  border-color: #395777;
+  background: #213b56;
+  color: #f0f8ff;
+}
+.weather-app.dark .weather-chat .chat-message.user p {
+  border-color: #4e87cc;
+  background: linear-gradient(125deg, #1b5798, #4849a1);
+  color: #fff;
+}
+.weather-app.dark .weather-chat .chat-suggestions button {
+  border-color: #4c718e;
+  background: #1d3d57;
+  color: #e3f4ff;
+}
+.weather-app.dark .weather-chat .chat-suggestions button:hover { background: #285572; }
+.weather-app.dark .weather-chat .chat-form input {
+  border-color: #52728f;
+  background: #102940;
+  color: #f4fbff;
+}
+.weather-app.dark .weather-chat .chat-form input::placeholder { color: #afc5d7; }
+.weather-app.dark .weather-chat :is(button, input):focus-visible {
+  outline-color: #c2e6ff;
+}
+
+/* Compact and comfortable on narrow phones, no forced input shrink. */
+@media (max-width: 760px) {
+  .weather-app .weather-chat { border-radius: 21px; }
+  .weather-app .weather-chat .chat-heading { align-items: flex-start; gap: 12px; }
+  .weather-app .weather-chat .chat-location { display: none; }
+  .weather-app .weather-chat .nimbo-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 17px;
+  }
+  .weather-app .weather-chat .nimbo-orb > span { font-size: 1.12rem; }
+  .weather-app .weather-chat .chat-messages { max-height: 245px; min-height: 116px; }
+  .weather-app .weather-chat .chat-message { max-width: 96%; }
+}
+@media (max-width: 420px) {
+  .weather-app .weather-chat { padding: 17px 13px; }
+  .weather-app .weather-chat .chat-heading h3 { font-size: 1.12rem; }
+  .weather-app .weather-chat .nimbo-eyebrow { font-size: .65rem; letter-spacing: .1em; }
+  .weather-app .weather-chat .chat-suggestions button { font-size: .83rem; }
+  .weather-app .weather-chat .chat-form { flex-direction: row; }
+  .weather-app .weather-chat .chat-form input { min-width: 0; padding-inline: 11px; }
+  .weather-app .weather-chat .chat-form .nimbo-send {
+    min-width: 92px;
+    padding-inline: 11px;
+    font-size: .87rem;
+  }
+  .weather-app .weather-chat .chat-messages { margin: 17px 0 14px; padding: 11px; }
+  .weather-app .weather-chat .chat-message p { padding: 10px 12px; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .weather-app .weather-chat .chat-suggestions button:hover { transform: translateY(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-app .weather-chat .nimbo-thinking,
+  .weather-app .weather-chat .chat-suggestions button,
+  .weather-app .weather-chat .nimbo-orb {
+    animation: none !important;
+    transition: none !important;
+  }
+}
