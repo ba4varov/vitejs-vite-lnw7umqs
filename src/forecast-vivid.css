@@ -54,7 +54,8 @@
 .weather-app .forecast-period-card::before {
   content: "";
   position: absolute;
-  z-index: -1;
+  z-index: 1;
+  pointer-events: none;
   top: 0;
   left: 12%;
   right: 12%;
