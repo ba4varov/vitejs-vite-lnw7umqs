@@ -135,7 +135,7 @@ export const SingleChart = ({ hourly, darkMode, type, label, unit, color, height
     : `${copy.now} ${formatChartValue(summary.current, type)}${type === 'temp' ? '°' : ` ${unit}`} · ${copy.min} ${formatChartValue(summary.min, type)}${type === 'temp' ? '°' : ` ${unit}`} · ${copy.max} ${formatChartValue(summary.max, type)}${type === 'temp' ? '°' : ` ${unit}`}`
   const accessible = `${label}. ${summaryText}. ${copy.period}`
 
-  return <article className="mini-chart" aria-label={accessible}>
+  return <article className={`mini-chart mini-chart-${type}`} aria-label={accessible}>
     <header className="chart-header"><span className="chart-icon" style={{ color: chartColor }} aria-hidden="true">{metric.icon}</span><div><h4>{label}</h4><p>{summaryText}</p></div></header>
     <p className="sr-only">{accessible} {copy.keyboard}</p>
     <div className="chart-frame" ref={frameRef} style={{ height: chartHeight }}>
