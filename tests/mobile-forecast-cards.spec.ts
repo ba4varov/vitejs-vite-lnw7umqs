@@ -4,6 +4,18 @@ import { openHeaderMenu } from './header-navigation'
 
 test.use({ hasTouch: true })
 
+// The application intentionally requires an accepted location before rendering a
+// forecast. Seed a confirmed manual city so visual tests never depend on browser
+// geolocation permissions or a missing default. This affects test setup only.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('meteoPulseConfirmedLocationV1', JSON.stringify({
+      name: 'Varna', lat: 43.2141, lon: 27.9147, source: 'manual',
+      geonameId: 726050, countryCode: 'BG',
+    }))
+  })
+})
+
 async function readableCards(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   const cards = await page.locator('.forecast-period-card').evaluateAll(elements => elements.map(element => {
