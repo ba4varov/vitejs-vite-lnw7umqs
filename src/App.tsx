@@ -11,6 +11,7 @@ import { formatAqiValue } from './aqi-display.js'
 import { trackActivity } from './activity-client'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import './App.css'
+import './weather-vivid.css'
 import { WeatherAdvice } from './WeatherAdvice'
 import { WindyMap } from './WindyMap'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
@@ -214,24 +215,15 @@ const translations = {
   }
 }
 
-const getDynamicOverlay = (temp: number) => {
-  let rgbDark, rgbLight;
-  if (temp <= 0) {
-    rgbDark = '15, 23, 42'; 
-    rgbLight = '56, 189, 248'; 
-  } else if (temp <= 15) {
-    rgbDark = '6, 78, 59'; 
-    rgbLight = '52, 211, 153'; 
-  } else if (temp <= 29) {
-    rgbDark = '120, 53, 15'; 
-    rgbLight = '251, 191, 36'; 
-  } else {
-    rgbDark = '127, 29, 29'; 
-    rgbLight = '248, 113, 113'; 
-  }
-  return `linear-gradient(to right, rgba(${rgbDark}, 0.95) 0%, rgba(${rgbDark}, 0.6) 50%, rgba(${rgbLight}, 0.1) 100%)`;
+// Decorative scene only: these labels never affect forecasts or official warnings.
+const weatherScene = (code: number): 'storm' | 'snow' | 'rain' | 'fog' | 'clouds' | 'fair' => {
+  if ([95, 96, 99].includes(code)) return 'storm'
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow'
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain'
+  if ([45, 48].includes(code)) return 'fog'
+  if ([2, 3].includes(code)) return 'clouds'
+  return 'fair'
 }
-
 const getIconAnimation = (icon: string) => {
   if (icon === '☀️') return 'spin-slow'
   if (icon === '🌤️' || icon === '⛅') return 'float'
@@ -278,7 +270,6 @@ const WeatherApp = () => {
   const [gpsBusy, setGpsBusy] = useState(false)
   const [gpsError, setGpsError] = useState(false)
   const [gpsDenied, setGpsDenied] = useState(false)
-  const backgroundLocationRef = useRef<string | null>(null)
   const [locationSource, setLocationSource] = useState<'default' | 'quick' | 'search' | 'place' | 'geolocation'>('default')
   const [searchInput, setSearchInput] = useState('')
   const [suggestions, setSuggestions] = useState<any[]>([])
@@ -341,7 +332,6 @@ const WeatherApp = () => {
   const [placesBusy, setPlacesBusy] = useState(false)
   const [offerImport, setOfferImport] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null) 
-  const [bgImageUrl, setBgImageUrl] = useState<string>('')
   
   const [daySelection, setSelectedDay] = useState<any>(null)
   const [hourSelection, setSelectedHour] = useState<any>(null)
@@ -810,6 +800,11 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         sunrise: data.daily.sunrise && data.daily.sunrise[0] ? formatTime(data.daily.sunrise[0]) : '--:--',
         sunset: data.daily.sunset && data.daily.sunset[0] ? formatTime(data.daily.sunset[0]) : '--:--',
         code: data.current.weather_code,
+        isNight: typeof data.current.time === 'string' &&
+          typeof data.daily.sunrise?.[0] === 'string' &&
+          typeof data.daily.sunset?.[0] === 'string'
+            ? data.current.time < data.daily.sunrise[0] || data.current.time >= data.daily.sunset[0]
+            : false,
         seaTemp: null,
         description: cur.desc,
         icon: cur.icon,
@@ -920,12 +915,6 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         code: data.current.weather_code,
         description: cur.desc
       }, requestId);
-
-      if (backgroundLocationRef.current !== key) {
-        backgroundLocationRef.current = key
-        const randomId = Math.floor(Math.random() * 1000) + 1;
-        setBgImageUrl(`https://picsum.photos/seed/bobbyweather${randomId}/1200/800`);
-      }
 
     } catch (failure: any) {
       if (requestId !== weatherRequestIdRef.current || locationKeyRef.current !== key) return
@@ -1273,35 +1262,15 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
             </div>
           )}
 
-          <div className="card main-card weather-forecast-view" style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none', backgroundColor: '#1e293b' }}>
-            
-            {bgImageUrl && (
-              <img 
-                src={bgImageUrl} 
-                alt="" 
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  zIndex: 0
-                }} 
-              />
-            )}
+          <div className={`card main-card weather-forecast-view weather-scene-${weatherScene(weather.code)}${weather.isNight ? ' weather-scene-night' : ''}`} style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none' }}>
+            <div className="weather-atmosphere" aria-hidden="true">
+              <span className="atmosphere-orb" />
+              <span className="atmosphere-cloud atmosphere-cloud-one" />
+              <span className="atmosphere-cloud atmosphere-cloud-two" />
+              <span className="atmosphere-rain" />
+            </div>
 
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: getDynamicOverlay(weather.temp),
-              zIndex: 1
-            }}></div>
-
-            <div style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
+            <div className="weather-hero-content" style={{ position: 'relative', zIndex: 2, padding: '32px', display: 'flex', flexDirection: 'column', minHeight: '400px', justifyContent: 'space-between' }}>
               
               <div className="main-top" style={{ padding: 0, marginBottom: '24px' }}>
                 <div className="main-info-left">
