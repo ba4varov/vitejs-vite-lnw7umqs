@@ -97,7 +97,7 @@ test.describe('responsive atmospheric dashboard and header', () => {
             const menu = page.locator('.mobile-menu-toggle')
             if (await menu.isVisible()) await menu.click()
             await page.locator('.header-menu > .icon-btn').click()
-            await expect(page.locator('.weather-app')).toHaveClass(/\\bdark\\b/)
+            await expect(page.locator('.weather-app')).toHaveClass(/\bdark\b/)
           }
           if (width <= 640) await expect(hero.locator('.metrics-toggle')).toBeVisible()
           else await expect(hero.locator('.metrics-toggle')).toBeHidden()
