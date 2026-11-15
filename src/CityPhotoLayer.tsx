@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  cityDayOrdinal, cityPhotoGalleryKey, fetchCityPhotoGallery,
-  readCityPhotoCache, saveCityPhotoCache, selectCityPhoto
+  cityDayOrdinal, cityPhotoGalleryKey, loadCityPhotoGallery, selectCityPhoto
 } from './city-photo-core.js'
 
 type Place = {
@@ -27,24 +26,14 @@ export function CityPhotoLayer({
     setFailedUrl('')
     if (!cityKey) return
 
-    const cached = readCityPhotoCache(cityKey, localStorage)
-    if (cached) {
-      setGallery({ key: cityKey, photos: cached })
-      return
-    }
-
     let active = true
-    const controller = new AbortController()
-    void fetchCityPhotoGallery(cityKey, { signal: controller.signal })
-      .then(photos => {
-        if (!active || photos.length < 2) return
-        // Only a reviewed, sufficiently varied collection may replace the sky.
-        saveCityPhotoCache(cityKey, photos, localStorage)
-        setGallery({ key: cityKey, photos })
-      })
-      .catch(() => { /* Keep weather-driven background if Commons is unavailable. */ })
-
-    return () => { active = false; controller.abort() }
+    // localStorage may be disabled by browser privacy settings.
+    let storage: Storage | null = null
+    try { storage = window.localStorage } catch { /* in-memory view still works */ }
+    void loadCityPhotoGallery(cityKey, { storage }).then(photos => {
+      if (active && photos.length >= 2) setGallery({ key: cityKey, photos })
+    })
+    return () => { active = false }
   }, [cityKey])
 
   const day = cityDayOrdinal(new Date(now), timeZone)
