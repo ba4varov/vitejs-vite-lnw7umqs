@@ -1269,7 +1269,8 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
 
           <div className={`card main-card weather-forecast-view weather-scene-${weatherScene(weather.code)}${weather.isNight ? ' weather-scene-night' : ''}`} style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none' }}>
             <CityPhotoLayer
-              place={{ name: city, ...coords, geonameId: placeDetails.geonameId, countryCode: placeDetails.countryCode }}
+              place={{ name: city, ...coords, geonameId: placeDetails.geonameId, countryCode: placeDetails.countryCode, country: placeDetails.country }}
+              source={locationSource}
               accepted={hasAcceptedLocation}
               now={clock}
               timeZone={notificationForecast?.timeZone}
