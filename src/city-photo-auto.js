@@ -114,8 +114,8 @@ const scenicTitle = /(?:panoram|skyline|cityscape|city.view|city.centre|city.cen
 const unsafeSceneTitle = /(?:office|meeting|portrait|selfie|person|people|man.at|woman.at|worker|employee|reception|interior|lobby|workspace|conference|workshop|conference.room|hotel.room|shop|store|mall|businessman|businesswoman|headshot|desk|cubicle|camera|phone|computer|graduation)/iu
 const cityNameAliases = {
   'пловдив':'plovdiv', 'бургас':'burgas', 'лондон':'london',
-  'париж':'paris', 'нюйорк':'newyork', 'токио':'tokyo',
-  'дубай':'dubai', 'варна':'varna', 'софия':'sofia',
+  'париж':'paris', 'нюйорк':'newyork', 'нюиорк':'newyork', 'токио':'tokyo',
+  'дубай':'dubai', 'дубаи':'dubai', 'варна':'varna', 'софия':'sofia',
 }
 const citySlug = text => normalize(text).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]/gu,'')
 function matchesCity(title, name) {
