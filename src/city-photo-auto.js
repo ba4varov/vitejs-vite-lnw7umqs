@@ -21,7 +21,7 @@ const isPoint = p => Number.isFinite(p?.lat) && Number.isFinite(p?.lon) &&
   !(p.lat === 0 && p.lon === 0)
 const normalize = value => String(value || '').normalize('NFKC').toLocaleLowerCase('en-US').trim().replace(/\s+/g, ' ')
 const safeName = value => typeof value === 'string' && value.length >= 2 && value.length <= 80 &&
-  /\p{L}/u.test(value) && !/[\d\/\\,;<>]/u.test(value) &&
+  /\p{L}/u.test(value) && !/[\d\\,;<>]/u.test(value) && !value.includes('/') &&
   !/^(?:my location|моето местоположение|current location|текущо местоположение)$/iu.test(value.trim())
 const rounded = value => Number(value).toFixed(3)
 const canonicalKey = center => `nearby:${rounded(center.lat)}:${rounded(center.lon)}`
