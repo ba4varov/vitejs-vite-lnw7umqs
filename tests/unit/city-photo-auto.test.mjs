@@ -137,9 +137,15 @@ test('per-city cache retains only HTTPS Commons images, expires after 30 days',(
   saveNearbyCache(key,[make(1),make(2)],storage,when)
   assert.equal(readNearbyCache(key,storage,when+900000).length,2)
   assert.equal(readNearbyCache(key,storage,when+30*86_400_000),null)
+  // Rejected writes must NOT wipe an earlier valid gallery.
   saveNearbyCache(key,[make(1),{...make(2),url:'https://evil.example/image.jpg'}],storage,when)
-  assert.equal(readNearbyCache(key,storage,when+1),null)
+  assert.equal(readNearbyCache(key,storage,when+1).length,2)
   saveNearbyCache(key,[make(1),{...make(2),licenseUrl:'javascript:alert(1)'}],storage,when)
+  assert.equal(readNearbyCache(key,storage,when+1).length,2)
+  // A cache entry tampered with outside the writer must never be rendered.
+  storage.setItem('meteoPulseNearbyPhotosV1:'+key,JSON.stringify({savedAt:when,photos:[
+    make(1),{...make(2),url:'https://evil.example/image.jpg'}
+  ]}))
   assert.equal(readNearbyCache(key,storage,when+1),null)
 })
 
