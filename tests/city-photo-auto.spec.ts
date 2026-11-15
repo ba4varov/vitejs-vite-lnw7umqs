@@ -116,3 +116,21 @@ test('worldwide city photos do not rotate on refresh, but do rotate tomorrow',as
   await page.clock.fastForward(24*60*60*1000)
   await expect.poll(()=>img.getAttribute('src')).not.toBe(first)
 })
+
+test('Paris and Dubai photos load directly, without metadata search or stale office pictures',async({page})=>{
+  await page.setViewportSize({width:390,height:844})
+  const calls=await boot(page,'en')
+  const hero=page.locator('.weather-forecast-view')
+  const img=hero.locator('.weather-city-photo')
+  for (const city of ['Paris','Dubai'] as const) {
+    const before=calls.length
+    await page.getByRole('button',{name:city,exact:true}).click()
+    await expect(img).toHaveAttribute('src',new RegExp(city,'i'))
+    await expect(img).toHaveAttribute('loading','eager')
+    await expect(img).toHaveAttribute('fetchpriority','high')
+    await expect(hero.locator('.weather-city-photo-credit a')).toHaveCount(2)
+    // The reviewed gallery is a local manifest: no geosearch or imageinfo API.
+    expect(calls.length).toBe(before)
+    expect((await img.getAttribute('src'))).toContain('/960px-')
+  }
+})
