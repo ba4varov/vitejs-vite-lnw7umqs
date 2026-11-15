@@ -122,6 +122,9 @@ test('Paris and Dubai photos load directly, without metadata search or stale off
   const calls=await boot(page,'en')
   const hero=page.locator('.weather-forecast-view')
   const img=hero.locator('.weather-city-photo')
+  // The initial Varna metadata request may still be in flight after the
+  // forecast renders. Wait for it before counting any new Commons requests.
+  await expect(img).toHaveAttribute('src',/varna/i)
   for (const city of ['Paris','Dubai'] as const) {
     const before=calls.length
     await page.getByRole('button',{name:city,exact:true}).click()
