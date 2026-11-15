@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { autoCityPhotoRequest, loadNearbyCityGallery } from './city-photo-auto.js'
+import { featuredCityPhotoKey, featuredCityPhotos } from './city-photo-featured.js'
 import {
   cityDayOrdinal, cityPhotoGalleryKey, loadCityPhotoGallery, selectCityPhoto
 } from './city-photo-core.js'
@@ -19,16 +20,24 @@ export function CityPhotoLayer({
   place: Place; accepted: boolean; now: number; timeZone?: string; lang: 'bg' | 'en';
   source?: 'default' | 'quick' | 'search' | 'place' | 'geolocation'
 }) {
-  const curatedKey = accepted ? cityPhotoGalleryKey(place) : null
-  const automatic = accepted && !curatedKey ? autoCityPhotoRequest(place, source) : null
-  const cityKey = curatedKey || automatic?.key || null
+  const featuredKey = accepted ? featuredCityPhotoKey(place) : null
+  const curatedKey = accepted && !featuredKey ? cityPhotoGalleryKey(place) : null
+  const automatic = accepted && !featuredKey && !curatedKey ? autoCityPhotoRequest(place, source) : null
+  const cityKey = featuredKey || curatedKey || automatic?.key || null
   const [gallery, setGallery] = useState<{ key: string; photos: Photo[] } | null>(null)
-  const [failedUrl, setFailedUrl] = useState('')
+  const [failedUrls, setFailedUrls] = useState<string[]>([])
 
   useEffect(() => {
     setGallery(null)
-    setFailedUrl('')
+    setFailedUrls([])
     if (!cityKey) return
+
+    // Editorially verified Paris/Dubai photographs are local metadata:
+    // no slow Wikimedia metadata fetch or stale automatic office photos.
+    if (featuredKey) {
+      setGallery({ key: featuredKey, photos: featuredCityPhotos(featuredKey) })
+      return
+    }
 
     let active = true
     // localStorage may be disabled by browser privacy settings.
@@ -43,14 +52,18 @@ export function CityPhotoLayer({
       if (active && photos.length >= 2) setGallery({ key: cityKey, photos })
     })
     return () => { active = false }
-  }, [cityKey, curatedKey, lang])
+  }, [cityKey, curatedKey, featuredKey, lang])
 
   const day = cityDayOrdinal(new Date(now), timeZone)
-  const photo: Photo | null = useMemo(
-    () => gallery && gallery.key === cityKey ? selectCityPhoto(gallery.photos, cityKey, day) : null,
-    [gallery, cityKey, day]
-  )
-  if (!photo || photo.url === failedUrl) return null
+  const photo: Photo | null = useMemo(() => {
+    if (!gallery || gallery.key !== cityKey || !gallery.photos.length) return null
+    const first = selectCityPhoto(gallery.photos, cityKey, day)
+    const index = gallery.photos.indexOf(first)
+    if (index < 0) return null
+    const ordered = [...gallery.photos.slice(index), ...gallery.photos.slice(0, index)]
+    return ordered.find(item => !failedUrls.includes(item.url)) || null
+  }, [gallery, cityKey, day, failedUrls])
+  if (!photo) return null
 
   const bg = lang === 'bg'
   return <>
@@ -59,9 +72,10 @@ export function CityPhotoLayer({
       className="weather-city-photo"
       src={photo.url}
       alt=""
-      loading="lazy"
+      loading="eager"
+      fetchPriority="high"
       decoding="async"
-      onError={() => setFailedUrl(photo.url)}
+      onError={() => setFailedUrls(previous => previous.includes(photo.url) ? previous : [...previous, photo.url])}
     />
     <div className="weather-city-photo-credit">
       <span>{bg ? 'Снимка (изрязана, не на живо):' : 'Photo (cropped, not live):'}</span>

@@ -17,7 +17,8 @@ const REVIEWED_CITY_GALLERIES = Object.freeze({
 })
 
 export const CITY_PHOTO_CACHE_MS = 30 * 24 * 60 * 60 * 1000
-const CACHE_PREFIX = 'meteoPulseCityPhotoGalleryV1:'
+// Drop the old 1440px URLs on next visit; only 960px thumbnails are needed.
+const CACHE_PREFIX = 'meteoPulseCityPhotoGalleryV2:'
 const API = 'https://commons.wikimedia.org/w/api.php'
 const CLIENT_ID = 'MeteoPulse/1.0 (https://ba4varov-wheater.vercel.app)'
 
@@ -130,7 +131,7 @@ export function cityPhotoApiUrl(cityKey) {
   const url = new URL(API)
   for (const [key, value] of Object.entries({
     action: 'query', format: 'json', origin: '*', prop: 'imageinfo',
-    iiprop: 'url|size|mime|user|extmetadata', iiurlwidth: '1440', titles: titles.join('|')
+    iiprop: 'url|size|mime|user|extmetadata', iiurlwidth: '960', titles: titles.join('|')
   })) url.searchParams.set(key, value)
   return url.toString()
 }

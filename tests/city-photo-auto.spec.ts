@@ -76,13 +76,13 @@ for(const [width,lang] of [[360,'bg'],[390,'en'],[1440,'bg']] as const) {
       await page.getByRole('button',{name:lang==='bg'?city.nameBg:city.nameEn,exact:true}).click()
       await expect(page.locator('.weather-forecast-view .big-temp')).toBeVisible()
       await expect(page.locator('.weather-forecast-view .weather-city-photo'))
-        .toHaveAttribute('src',new RegExp(`${city.slug}-`))
+        .toHaveAttribute('src',new RegExp(['paris','dubai'].includes(city.slug) ? city.slug : `${city.slug}-`, 'i'))
       await expect(page.locator('.weather-forecast-view .weather-city-photo-credit a')).toHaveCount(2)
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
     }
     // Only geotagged photos about the selected city can be shown.
     const queries=calls.filter(x=>new URL(x).searchParams.get('list')==='geosearch')
-    expect(queries).toHaveLength(sampleCities.length)
+    expect(queries).toHaveLength(sampleCities.length - 2) // Paris/Dubai are fast pre-reviewed galleries
     expect(queries.every(x=>!x.includes('geonameId'))).toBe(true)
   })
 }
@@ -105,7 +105,7 @@ test('worldwide city photos do not rotate on refresh, but do rotate tomorrow',as
   const calls=await boot(page,'en')
   await page.getByRole('button',{name:'Paris',exact:true}).click()
   const img=page.locator('.weather-forecast-view .weather-city-photo')
-  await expect(img).toHaveAttribute('src',/paris-/)
+  await expect(img).toHaveAttribute('src',/paris/i)
   const first=await img.getAttribute('src')
   const before=calls.length
   await page.clock.fastForward(15*60*1000)
@@ -115,4 +115,25 @@ test('worldwide city photos do not rotate on refresh, but do rotate tomorrow',as
   expect(calls.length).toBe(before) // no API refresh, even with StrictMode
   await page.clock.fastForward(24*60*60*1000)
   await expect.poll(()=>img.getAttribute('src')).not.toBe(first)
+})
+
+test('Paris and Dubai photos load directly, without metadata search or stale office pictures',async({page})=>{
+  await page.setViewportSize({width:390,height:844})
+  const calls=await boot(page,'en')
+  const hero=page.locator('.weather-forecast-view')
+  const img=hero.locator('.weather-city-photo')
+  // The initial Varna metadata request may still be in flight after the
+  // forecast renders. Wait for it before counting any new Commons requests.
+  await expect(img).toHaveAttribute('src',/varna/i)
+  for (const city of ['Paris','Dubai'] as const) {
+    const before=calls.length
+    await page.getByRole('button',{name:city,exact:true}).click()
+    await expect(img).toHaveAttribute('src',new RegExp(city,'i'))
+    await expect(img).toHaveAttribute('loading','eager')
+    await expect(img).toHaveAttribute('fetchpriority','high')
+    await expect(hero.locator('.weather-city-photo-credit a')).toHaveCount(2)
+    // The reviewed gallery is a local manifest: no geosearch or imageinfo API.
+    expect(calls.length).toBe(before)
+    expect((await img.getAttribute('src'))).toContain('/960px-')
+  }
 })

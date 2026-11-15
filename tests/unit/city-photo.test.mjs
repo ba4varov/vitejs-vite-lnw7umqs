@@ -64,7 +64,7 @@ test('API request is one bounded photo-metadata fetch with a contact identifier'
       calls++
       const u=new URL(url)
       assert.equal(u.hostname,'commons.wikimedia.org')
-      assert.equal(u.searchParams.get('iiurlwidth'),'1440')
+      assert.equal(u.searchParams.get('iiurlwidth'),'960')
       assert.equal(u.searchParams.get('titles'),titles.join('|'))
       assert.match(options.headers['Api-User-Agent'],/MeteoPulse/)
       return {ok:true,json:async()=>response}

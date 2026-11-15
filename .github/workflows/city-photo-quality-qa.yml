@@ -1,0 +1,53 @@
+name: City photo quality and speed QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/city-photo-featured.js'
+      - 'src/city-photo-auto.js'
+      - 'src/city-photo-core.js'
+      - 'src/CityPhotoLayer.tsx'
+      - 'index.html'
+      - 'tests/unit/city-photo-quality.test.mjs'
+      - 'tests/unit/city-photo-auto.test.mjs'
+      - 'tests/unit/city-photo.test.mjs'
+      - 'tests/city-photo-auto.spec.ts'
+      - '.github/workflows/city-photo-quality-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  image-quality:
+    if: github.head_ref == 'fix/city-photo-quality-speed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Photo relevance, license and cache tests
+        run: node --test tests/unit/city-photo.test.mjs tests/unit/city-photo-auto.test.mjs tests/unit/city-photo-quality.test.mjs
+      - name: Production build and TypeScript
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Chromium
+        run: npx playwright install --with-deps chromium
+      - name: City photo and weather visual regression
+        run: npx playwright test tests/city-photo-auto.spec.ts tests/city-photo.spec.ts tests/weather-vivid.spec.ts --reporter=line --workers=2
+      - name: Mobile forecast controls regression
+        run: npx playwright test tests/mobile-forecast-cards.spec.ts --grep "forecast cards 390 " --reporter=line --workers=2 --output=work/city-image-regression-results
+      - name: Screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: city-photo-quality-qa
+          path: work/browser-results/
+          retention-days: 3
+          if-no-files-found: ignore
