@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   CITY_PHOTO_CACHE_MS, cityPhotoGalleryKey, cityDayOrdinal, selectCityPhoto,
   reviewedPhotoTitles, cityPhotoApiUrl, parseCityPhotoResponse,
-  fetchCityPhotoGallery, readCityPhotoCache, saveCityPhotoCache,
+  fetchCityPhotoGallery, loadCityPhotoGallery, readCityPhotoCache, saveCityPhotoCache,
 } from '../../src/city-photo-core.js'
 
 const varna = {name:'Варна',lat:43.2141,lon:27.9147,countryCode:'BG',geonameId:726050}
@@ -108,4 +108,28 @@ test('cache is per-city, expires and rejects unsafe links',()=>{
   const hostile=photos.map(x=>({...x,licenseUrl:'javascript:alert(1)'}))
   saveCityPhotoCache('bg-varna',hostile,storage,day)
   assert.equal(readCityPhotoCache('bg-varna',storage,day+1000),null)
+})
+
+test('React StrictMode and simultaneous viewers coalesce to one Commons request',async()=>{
+  const titles=reviewedPhotoTitles('bg-sofia')
+  const payload={query:{pages:Object.fromEntries(titles.map((title,i)=>[i,photo(title.slice(5))]))}}
+  const storage=memoryStorage()
+  let calls=0
+  let release
+  const deferred=new Promise(resolve=>{release=resolve})
+  const fetcher=async()=>{
+    calls++
+    await deferred
+    return {ok:true,json:async()=>payload}
+  }
+  const first=loadCityPhotoGallery('bg-sofia',{storage,fetcher})
+  const second=loadCityPhotoGallery('bg-sofia',{storage,fetcher})
+  assert.equal(calls,1)
+  release()
+  const [one,two]=await Promise.all([first,second])
+  assert.equal(one.length,4)
+  assert.deepEqual(one,two)
+  const third=await loadCityPhotoGallery('bg-sofia',{storage,fetcher})
+  assert.deepEqual(third,one)
+  assert.equal(calls,1)
 })
