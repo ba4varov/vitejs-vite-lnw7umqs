@@ -1,0 +1,65 @@
+/* City imagery is decorative, never the source of weather conditions.
+   The existing WMO gradient remains visible whenever a photo is missing. */
+.weather-app .weather-forecast-view .weather-city-photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  object-fit: cover;
+  object-position: center;
+  opacity: .78;
+  pointer-events: none;
+}
+.weather-app .weather-forecast-view .weather-city-photo ~ .weather-atmosphere .atmosphere-orb {
+  opacity: .22;
+}
+.weather-app .weather-forecast-view .weather-city-photo ~ .weather-atmosphere .atmosphere-cloud {
+  opacity: .32;
+}
+/* Keep rain and snow effects tied to WMO code even with a photograph. */
+.weather-app .weather-forecast-view .weather-city-photo-credit {
+  position: absolute;
+  z-index: 4;
+  bottom: 8px;
+  right: 16px;
+  left: auto;
+  max-width: calc(100% - 32px);
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: rgba(9, 22, 42, .78);
+  color: #fff;
+  font-size: .7rem;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.weather-app .weather-forecast-view .weather-city-photo-credit a {
+  color: #fff;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.weather-app .weather-forecast-view .weather-city-photo-credit a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .weather-app .weather-forecast-view .weather-city-photo { opacity: .66; }
+  .weather-app .weather-forecast-view .weather-city-photo-credit {
+    right: 8px;
+    bottom: 6px;
+    max-width: calc(100% - 16px);
+    padding: 4px 8px;
+    font-size: .68rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-app .weather-forecast-view .weather-city-photo { animation: none !important; }
+}
