@@ -6,7 +6,8 @@ import { CITY_PHOTO_CACHE_MS, parseCityPhotoResponse } from './city-photo-core.j
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php'
 const GEOCODE_API = 'https://geocoding-api.open-meteo.com/v1/search'
 const APP_ID = 'MeteoPulse/1.0 (https://ba4varov-wheater.vercel.app)'
-const GALLERY_PREFIX = 'meteoPulseNearbyPhotosV1:'
+// Version 2 invalidates the old 30-day caches that could contain office photos.
+const GALLERY_PREFIX = 'meteoPulseNearbyPhotosV2:'
 const CENTRE_PREFIX = 'meteoPulseNearbyCentreV1:'
 const CENTRE_CACHE_MS = 7 * 86_400_000
 const API_RETRY_MS = 15 * 60_000
@@ -109,22 +110,36 @@ export function nearbyPhotoSearchUrl(center) {
 }
 
 const excludeTitle = /(?:\b(?:logo|map|flag|poster|selfie|portrait|signature|diagram|screenshot|menu|advertisement|passport|ticket|coat.of.arms|drawing|painting|scan|svg|watermark)\b|карта|портрет|плакат)/iu
-const preferTitle = /(?:panoram|skyline|cityscape|city.view|view.of|aerial|landscape|square|street|park|harbor|harbour|cathedral|monument|boulevard|old.town|город|панорам|площад|улица|парка)/iu
+const scenicTitle = /(?:panoram|skyline|cityscape|city.view|city.centre|city.center|aerial|landscape|square|street|park|harbor|harbour|cathedral|monument|boulevard|old.town|город|панорам|площад|улица|парка|centre.ville|stadtansicht|vista.de.la.ciudad)/iu
+const unsafeSceneTitle = /(?:office|meeting|portrait|selfie|person|people|man.at|woman.at|worker|employee|reception|interior|lobby|workspace|conference|workshop|conference.room|hotel.room|shop|store|mall|businessman|businesswoman|headshot|desk|cubicle|camera|phone|computer|graduation)/iu
+const cityNameAliases = {
+  'пловдив':'plovdiv', 'бургас':'burgas', 'лондон':'london',
+  'париж':'paris', 'нюйорк':'newyork', 'токио':'tokyo',
+  'дубай':'dubai', 'варна':'varna', 'софия':'sofia',
+}
+const citySlug = text => normalize(text).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]/gu,'')
+function matchesCity(title, name) {
+  if (!name) return true
+  const label = citySlug(name)
+  const alias = cityNameAliases[label] || label
+  return alias.length >= 3 && citySlug(title).includes(alias)
+}
 const photoExt = /\.(?:jpe?g|png|webp)$/iu
 
-export function nearbyPhotoTitles(results, center) {
+export function nearbyPhotoTitles(results, center, cityName = '') {
   if (!isPoint(center)) return []
   const seen = new Set()
   return (Array.isArray(results) ? results : [])
     .filter(file => file?.ns === 6 && typeof file.title === 'string' &&
       file.title.startsWith('File:') && photoExt.test(file.title) &&
-      !excludeTitle.test(file.title) &&
+      scenicTitle.test(file.title) && !unsafeSceneTitle.test(file.title) &&
+      matchesCity(file.title, cityName) && !excludeTitle.test(file.title) &&
       isPoint({ lat: file.lat, lon: file.lon }) &&
       distanceMetres(center, { lat: file.lat, lon: file.lon }) <= PHOTO_RADIUS_METRES)
     .map(file => ({
       title: file.title,
       distance: distanceMetres(center, { lat: file.lat, lon: file.lon }),
-      score: preferTitle.test(file.title) ? 2 : 0
+      score: scenicTitle.test(file.title) ? 2 : 0
     }))
     .sort((a, b) => b.score - a.score || a.distance - b.distance)
     .filter(file => {
@@ -143,7 +158,7 @@ export function nearbyPhotoMetadataUrl(titles) {
   const u = new URL(COMMONS_API)
   for (const [k, v] of Object.entries({
     action: 'query', format: 'json', origin: '*', prop: 'imageinfo',
-    iiprop: 'url|size|mime|user|extmetadata', iiurlwidth: '1440',
+    iiprop: 'url|size|mime|user|extmetadata', iiurlwidth: '960',
     titles: titles.join('|')
   })) u.searchParams.set(k, v)
   return u.toString()
@@ -155,22 +170,17 @@ async function readCommons(url, fetcher) {
   return response.json()
 }
 
-export async function fetchNearbyCityPhotos(center, { fetcher = fetch } = {}) {
+export async function fetchNearbyCityPhotos(center, { fetcher = fetch, cityName = '' } = {}) {
   const url = nearbyPhotoSearchUrl(center)
   if (!url) return []
   const discovered = await readCommons(url, fetcher)
-  const titles = nearbyPhotoTitles(discovered?.query?.geosearch, center)
-  const collected = [], ids = new Set()
-  for (let i = 0; i < titles.length && collected.length < 5; i += 12) {
-    const batch = titles.slice(i, i + 12)
-    const metadataUrl = nearbyPhotoMetadataUrl(batch)
-    const response = await readCommons(metadataUrl, fetcher)
-    const photos = parseCityPhotoResponse(response, batch)
-    for (const photo of photos) {
-      if (!ids.has(photo.id)) { collected.push(photo); ids.add(photo.id) }
-    }
-  }
-  return collected.slice(0, 8)
+  // One bounded metadata call rather than repeatedly fetching ever more files.
+  // If no genuine scenic city photos are found, retain the weather background.
+  const titles = nearbyPhotoTitles(discovered?.query?.geosearch, center, cityName).slice(0, 12)
+  if (!titles.length) return []
+  const metadataUrl = nearbyPhotoMetadataUrl(titles)
+  const response = await readCommons(metadataUrl, fetcher)
+  return parseCityPhotoResponse(response, titles).slice(0, 8)
 }
 
 // The cache contains no raw GPS coordinates and no third-party links apart
@@ -230,7 +240,7 @@ export function loadNearbyCityGallery(request, {
     const photoKey = canonicalKey(resolved)
     const fromCache = readNearbyCache(photoKey, storage, now)
     if (fromCache) return fromCache
-    const photos = await fetchNearbyCityPhotos(resolved, { fetcher })
+    const photos = await fetchNearbyCityPhotos(resolved, { fetcher, cityName: request.name })
     if (photos.length < 2) {
       retryAfter.set(request.key, Date.now() + EMPTY_RETRY_MS)
       return []
