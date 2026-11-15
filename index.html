@@ -6,6 +6,9 @@
       if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     </script>
+    <!-- Establish the Commons image connection before the city photo is chosen. -->
+    <link rel="preconnect" href="https://upload.wikimedia.org" crossorigin />
+    <link rel="dns-prefetch" href="https://commons.wikimedia.org" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="/pwa/apple-touch-icon.png" />
