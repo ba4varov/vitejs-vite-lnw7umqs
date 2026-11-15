@@ -165,3 +165,40 @@ export function saveCityPhotoCache(cityKey, photos, storage, now = Date.now()) {
     storage.setItem(CACHE_PREFIX + cityKey, JSON.stringify({ savedAt: now, photos: photos.slice(0, 8) }))
   } catch { /* localStorage quota/private mode: photos still work for this view */ }
 }
+
+
+/* Document-scoped request coalescing. React StrictMode rehearses effects; a
+ * browser refresh, remount, or two consumers must not issue duplicate calls.
+ * Do not abort the shared request when a component unmounts; the result is
+ * cached for the city but stale consumers discard their local state update. */
+const activePhotoRequests = new Map()
+const cityPhotoBackoffUntil = new Map()
+const PHOTO_RETRY_MS = 15 * 60 * 1000
+
+export async function loadCityPhotoGallery(cityKey, {
+  storage = null, fetcher = fetch, now = Date.now()
+} = {}) {
+  if (!reviewedPhotoTitles(cityKey).length) return []
+  const cached = readCityPhotoCache(cityKey, storage, now)
+  if (cached) return cached
+  if (now < (cityPhotoBackoffUntil.get(cityKey) || 0)) return []
+  if (activePhotoRequests.has(cityKey)) return activePhotoRequests.get(cityKey)
+
+  const task = fetchCityPhotoGallery(cityKey, { fetcher })
+    .then(photos => {
+      if (photos.length < 2) {
+        cityPhotoBackoffUntil.set(cityKey, Date.now() + PHOTO_RETRY_MS)
+        return []
+      }
+      saveCityPhotoCache(cityKey, photos, storage)
+      cityPhotoBackoffUntil.delete(cityKey)
+      return photos
+    })
+    .catch(() => {
+      cityPhotoBackoffUntil.set(cityKey, Date.now() + PHOTO_RETRY_MS)
+      return []
+    })
+    .finally(() => { activePhotoRequests.delete(cityKey) })
+  activePhotoRequests.set(cityKey, task)
+  return task
+}
