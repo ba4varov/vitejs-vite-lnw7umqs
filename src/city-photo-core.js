@@ -151,6 +151,8 @@ export function readCityPhotoCache(cityKey, storage, now = Date.now()) {
         now - item.savedAt >= CITY_PHOTO_CACHE_MS || !Array.isArray(item.photos)) return null
     const photos = item.photos.filter(photo => photo && imageUrlValid(photo.url) &&
       typeof photo.filePage === 'string' && photo.filePage.startsWith('https://commons.wikimedia.org/wiki/') &&
+      typeof photo.licenseUrl === 'string' &&
+      (!photo.licenseUrl || /^https:\/\/creativecommons\.org\//.test(photo.licenseUrl)) &&
       typeof photo.author === 'string' && typeof photo.license === 'string' &&
       photo.author.length <= 100 && photo.license.length <= 40)
     return photos.length >= 2 && photos.length === item.photos.length && photos.length <= 8 ? photos : null
