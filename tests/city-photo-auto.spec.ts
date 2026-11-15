@@ -18,10 +18,14 @@ const sampleCities = [
 async function boot(page:Page, language:'bg'|'en', withGeoFiles=true) {
   await page.addInitScript(lang=>{
     localStorage.setItem('meteoPulseLanguage',lang)
-    localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({
-      name:lang==='bg'?'Варна':'Varna', lat:43.2141,lon:27.9147,source:'manual',
-      countryCode:'BG',geonameId:726050
-    }))
+    // Seed only the first visit. React's accepted-location storage must own
+    // reloads and city changes after the user explicitly selects a new city.
+    if (!localStorage.getItem('meteoPulseConfirmedLocationV1')) {
+      localStorage.setItem('meteoPulseConfirmedLocationV1',JSON.stringify({
+        name:lang==='bg'?'Варна':'Varna', lat:43.2141,lon:27.9147,source:'manual',
+        countryCode:'BG',geonameId:726050
+      }))
+    }
   },language)
   const commonsCalls:string[]=[]
   await page.route('**/*',async route=>{
