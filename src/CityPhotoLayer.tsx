@@ -55,7 +55,7 @@ export function CityPhotoLayer({
       onError={() => setFailedUrl(photo.url)}
     />
     <div className="weather-city-photo-credit">
-      <span>{bg ? 'Снимка, не на живо:' : 'Photo, not live:'}</span>
+      <span>{bg ? 'Снимка (изрязана, не на живо):' : 'Photo (cropped, not live):'}</span>
       <a href={photo.filePage} target="_blank" rel="noopener noreferrer"
         title={bg ? 'Източник и автор · Wikimedia Commons. Визуално изрязана за оформление.' : 'Source and author · Wikimedia Commons. Cropped for layout.'}>
         {photo.author}
