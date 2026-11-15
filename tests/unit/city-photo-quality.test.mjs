@@ -53,4 +53,8 @@ test('automatic search never accepts office snapshots, portraits or irrelevant c
     {ns:6,lat:42.698,lon:23.322,title:'File:Varna skyline.jpg'}
   ]
   assert.deepEqual(nearbyPhotoTitles(bg,sofia,'София'),['File:Sofia panorama.jpg'])
+  const ny={lat:40.7128,lon:-74.006}
+  const skyline=[{ns:6,lat:40.713,lon:-74.005,title:'File:new-york skyline 2025.jpg'}]
+  assert.deepEqual(nearbyPhotoTitles(skyline,ny,'Ню Йорк'),['File:new-york skyline 2025.jpg'])
+  assert.deepEqual(nearbyPhotoTitles(skyline,ny,'New York'),['File:new-york skyline 2025.jpg'])
 })
