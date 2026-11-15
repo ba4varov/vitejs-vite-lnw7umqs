@@ -15,6 +15,8 @@ import './weather-vivid.css'
 import './forecast-vivid.css'
 import './nimbo-vivid.css'
 import './palette-vivid.css'
+import './city-photo.css'
+import { CityPhotoLayer } from './CityPhotoLayer'
 import { WeatherAdvice } from './WeatherAdvice'
 import { WindyMap } from './WindyMap'
 import { ForecastPeriodCard } from './ForecastPeriodCard'
@@ -1266,6 +1268,13 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
           )}
 
           <div className={`card main-card weather-forecast-view weather-scene-${weatherScene(weather.code)}${weather.isNight ? ' weather-scene-night' : ''}`} style={{ padding: 0, position: 'relative', overflow: 'hidden', border: 'none' }}>
+            <CityPhotoLayer
+              place={{ name: city, ...coords, geonameId: placeDetails.geonameId, countryCode: placeDetails.countryCode }}
+              accepted={hasAcceptedLocation}
+              now={clock}
+              timeZone={notificationForecast?.timeZone}
+              lang={lang}
+            />
             <div className="weather-atmosphere" aria-hidden="true">
               <span className="atmosphere-orb" />
               <span className="atmosphere-cloud atmosphere-cloud-one" />
