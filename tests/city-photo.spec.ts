@@ -23,9 +23,19 @@ async function setup(page: Page, location: 'varna' | 'sofia' = 'varna', failedIm
     const u = new URL(route.request().url())
     if (u.hostname === 'commons.wikimedia.org' && u.pathname === '/w/api.php') {
       apiCalls++
+      if (u.searchParams.get('list') === 'geosearch') {
+        const [lat, lon] = (u.searchParams.get('gscoord') || '').split('|').map(Number)
+        // A mocked, geotagged Commons collection for London's city centre.
+        const geosearch = Number.isFinite(lat) && Number.isFinite(lon) ?
+          Array.from({length:8},(_,i)=>({
+            ns:6, title:`File:London skyline ${i}.jpg`,
+            lat:lat + (i / 10000),lon
+          })) : []
+        return route.fulfill({json:{query:{geosearch}}})
+      }
       const titles = (u.searchParams.get('titles')||'').split('|')
       const isVarna = titles.some(t => t.includes('Varna'))
-      const prefix = isVarna ? 'varna' : 'sofia'
+      const prefix = isVarna ? 'varna' : titles.some(t => t.includes('London')) ? 'london' : 'sofia'
       const pages = Object.fromEntries(titles.map((title, i) => [String(i + 1), {
         title,
         imageinfo:[{
@@ -89,9 +99,9 @@ test('changing selected city never leaves old-city photo in the forecast',async(
   expect(records.calls()).toBe(2)
   await page.getByRole('button',{name:'Лондон',exact:true}).click()
   await expect(page.locator('.weather-forecast-view .big-temp')).toBeVisible()
-  await expect(image).toHaveCount(0)
-  await expect(page.locator('.weather-city-photo-credit')).toHaveCount(0)
-  expect(records.calls()).toBe(2)
+  await expect(image).toHaveAttribute('src',/london-/)
+  await expect(page.locator('.weather-city-photo-credit a')).toHaveCount(2)
+  expect(records.calls()).toBe(4) // One geo-search and one batched license/thumbnail lookup.
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 

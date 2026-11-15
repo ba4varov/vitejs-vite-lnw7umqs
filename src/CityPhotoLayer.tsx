@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { autoCityPhotoRequest, loadNearbyCityGallery } from './city-photo-auto.js'
 import {
   cityDayOrdinal, cityPhotoGalleryKey, loadCityPhotoGallery, selectCityPhoto
 } from './city-photo-core.js'
 
 type Place = {
   name: string; lat: number; lon: number;
-  geonameId?: number; countryCode?: string
+  geonameId?: number; countryCode?: string; country?: string
 }
 type Photo = {
   id: string; url: string; author: string; filePage: string;
@@ -13,11 +14,14 @@ type Photo = {
 }
 
 export function CityPhotoLayer({
-  place, accepted, now, timeZone, lang
+  place, accepted, now, timeZone, lang, source
 }: {
-  place: Place; accepted: boolean; now: number; timeZone?: string; lang: 'bg' | 'en'
+  place: Place; accepted: boolean; now: number; timeZone?: string; lang: 'bg' | 'en';
+  source?: 'default' | 'quick' | 'search' | 'place' | 'geolocation'
 }) {
-  const cityKey = accepted ? cityPhotoGalleryKey(place) : null
+  const curatedKey = accepted ? cityPhotoGalleryKey(place) : null
+  const automatic = accepted && !curatedKey ? autoCityPhotoRequest(place, source) : null
+  const cityKey = curatedKey || automatic?.key || null
   const [gallery, setGallery] = useState<{ key: string; photos: Photo[] } | null>(null)
   const [failedUrl, setFailedUrl] = useState('')
 
@@ -30,11 +34,16 @@ export function CityPhotoLayer({
     // localStorage may be disabled by browser privacy settings.
     let storage: Storage | null = null
     try { storage = window.localStorage } catch { /* in-memory view still works */ }
-    void loadCityPhotoGallery(cityKey, { storage }).then(photos => {
+    // Editorial picks take priority. Automatic candidates are not shown when
+    // there is insufficient licensed, geotag-verified variety for this city.
+    const request = curatedKey
+      ? loadCityPhotoGallery(curatedKey, { storage })
+      : automatic ? loadNearbyCityGallery(automatic, { storage, lang }) : Promise.resolve([])
+    void request.then(photos => {
       if (active && photos.length >= 2) setGallery({ key: cityKey, photos })
     })
     return () => { active = false }
-  }, [cityKey])
+  }, [cityKey, curatedKey, lang])
 
   const day = cityDayOrdinal(new Date(now), timeZone)
   const photo: Photo | null = useMemo(
