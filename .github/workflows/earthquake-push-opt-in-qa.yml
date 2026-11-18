@@ -72,8 +72,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Opt-in and existing nearby earthquake browser checks
         run: npx playwright test tests/earthquake-push-opt-in.spec.ts tests/earthquakes-nearby.spec.ts --reporter=line --workers=2
-      - name: Existing profile unsaved-state regressions
-        run: npx playwright test tests/profile-redesign.spec.ts --grep "coordinate city draft lifecycle" --reporter=line --workers=2 --output=work/earthquake-push-profile-results
+      - name: Existing disabled-registration and Push profile regressions
+        run: npx playwright test tests/push.spec.ts --grep "default registration off|push section visible without SQL migration" --reporter=line --workers=2 --output=work/earthquake-push-legacy-results
       - name: Browser screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4
