@@ -81,7 +81,7 @@ test('strict opted-in risk categories, saved cities, real owner, registered devi
   assert.deepEqual(found.map(x=>x.riskKind),['wind','wind'])
   assert.deepEqual(prepareWeatherSafetyPushPreview(snapshot(),
     {...onlyWind,enabled:false},{plan:'free'},'owner',deviceSet,new Set(),NOW),[])
-  assert.deepEqual(prepareWeatherSafetyPushPreview(snapshot(other),
+  assert.deepEqual(prepareWeatherSafetyPushPreview(snapshot(0,other),
     onlyWind,{plan:'free'},'owner',deviceSet,new Set(),NOW),[])
   assert.deepEqual(prepareWeatherSafetyPushPreview(snapshot(),
     onlyWind,{plan:'free'},'foreign',deviceSet,new Set(),NOW),[])
