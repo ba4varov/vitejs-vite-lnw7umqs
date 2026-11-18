@@ -12,7 +12,7 @@ async function loadEvents() {
   const now=Date.now()
   if (snapshot && now-snapshot.received<CLIENT_CACHE_MS && now>=snapshot.received) return snapshot.data
   if (pending) return pending
-  const request=fetch('/api/earthquakes',{
+  const request=fetch('/api/alerts?source=earthquakes',{
     signal:AbortSignal.timeout(9000),
     headers:{Accept:'application/json'},
   }).then(async response=>{
