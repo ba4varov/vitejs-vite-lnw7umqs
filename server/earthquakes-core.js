@@ -33,9 +33,15 @@ export function distanceKm(a,b) {
   return 6371.0088*2*Math.asin(Math.min(1,Math.sqrt(Math.max(0,h))))
 }
 
-export function normalizeUsgsEarthquakes(feed, now=Date.now()) {
+export function normalizeUsgsEarthquakes(feed, now=Date.now(), {
+  maxAgeMs=EARTHQUAKE_MAX_EVENT_AGE_MS, minMagnitude=3, maxItems=MAX_ITEMS
+}={}) {
   if (feed?.type !== 'FeatureCollection' || !Array.isArray(feed.features))
     throw Error('INVALID_USGS_FEED')
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs<=0 || maxAgeMs>31*86_400_000 ||
+    !Number.isFinite(minMagnitude) || minMagnitude<0 || minMagnitude>10 ||
+    !Number.isSafeInteger(maxItems) || maxItems<1 || maxItems>1000)
+    throw Error('INVALID_USGS_OPTIONS')
   if (feed.features.length > 6000) throw Error('OVERSIZE_USGS_FEED')
   const events=[]
   const seen=new Set()
@@ -45,8 +51,8 @@ export function normalizeUsgsEarthquakes(feed, now=Date.now()) {
     const lat=c?.[1],lon=c?.[0],depth=c?.[2],mag=p?.mag,time=p?.time
     if (!/^[a-zA-Z0-9_-]{2,90}$/.test(id) || seen.has(id) ||
       p?.type!=='earthquake' || g?.type!=='Point' ||
-      !point(lat,lon) || !Number.isFinite(mag) || mag < 3 ||
-      !Number.isFinite(time) || time > now+120_000 || time < now-EARTHQUAKE_MAX_EVENT_AGE_MS ||
+      !point(lat,lon) || !Number.isFinite(mag) || mag < minMagnitude ||
+      !Number.isFinite(time) || time > now+120_000 || time < now-maxAgeMs ||
       (depth!=null && (!Number.isFinite(depth)||depth < -10||depth > 800))) continue
     const updated=Number.isFinite(p?.updated)?p.updated:time
     const url=typeof p?.url==='string'&&
@@ -66,7 +72,7 @@ export function normalizeUsgsEarthquakes(feed, now=Date.now()) {
     seen.add(id)
     events.push(item)
   }
-  return events.sort((a,b)=>b.time-a.time).slice(0,MAX_ITEMS)
+  return events.sort((a,b)=>b.time-a.time).slice(0,maxItems)
 }
 
 export function nearbyEarthquakes(events,location,settings=EARTHQUAKE_DEFAULTS,now=Date.now()) {
