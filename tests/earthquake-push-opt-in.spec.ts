@@ -2,8 +2,6 @@ import {test,expect,type Page} from '@playwright/test'
 import {weather} from './forecast-order-fixture'
 import {clickHeaderControl} from './header-navigation'
 
-const city={name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'}
-
 async function boot(page:Page,lang:'bg'|'en',options:{migrationMissing?:boolean}={}){
   await page.addInitScript(lang=>{
     localStorage.setItem('meteoPulseLanguage',lang)
