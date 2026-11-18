@@ -1,0 +1,78 @@
+name: Unified safety Push B2b worker QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/push.ts'
+      - 'server/safety-push-worker.js'
+      - 'supabase/migrations/20261118130000_safety_push_worker_b2b.sql'
+      - 'tests/unit/safety-push-worker.test.mjs'
+      - 'tests/sql/safety-worker-b2b-fixture.sql'
+      - 'tests/sql/safety-worker-b2b.test.sql'
+      - 'docs/safety-push-worker-b2b.md'
+      - '.github/workflows/safety-push-worker-b2b-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  b2b-worker:
+    if: github.head_ref == 'feat/safety-push-worker-b2b'
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-worker-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Mocked safety worker + existing weather/USGS Push and Vercel unit tests
+        run: |
+          node --test \
+            tests/unit/safety-push-worker.test.mjs \
+            tests/unit/safety-push-preview.test.mjs \
+            tests/unit/earthquake-push-consent.test.mjs \
+            tests/unit/push.test.mjs \
+            tests/unit/vercel-endpoints.test.mjs
+      - name: Apply B1 then B2a then B2b to one disposable Postgres
+        run: |
+          set -euo pipefail
+          for file in \
+            tests/sql/push-migration-chain-fixture.sql \
+            tests/sql/safety-worker-b2b-fixture.sql \
+            supabase/migrations/20261118093000_earthquake_push_opt_in.sql \
+            supabase/migrations/20261118120000_safety_push_durable_gate.sql \
+            supabase/migrations/20261118130000_safety_push_worker_b2b.sql \
+            tests/sql/safety-worker-b2b.test.sql; do
+            docker run --rm --network host \
+              -e PGPASSWORD=synthetic-worker-only \
+              -v "$PWD:/repo:ro" \
+              postgres:17-alpine \
+              psql -X -h 127.0.0.1 -U postgres -d postgres \
+              -v ON_ERROR_STOP=1 -f "/repo/$file"
+          done
+      - name: Production TypeScript and build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Verify no scheduling was enabled
+        run: |
+          node --input-type=module -e "import {SAFETY_WORKER_CODE_ENABLED} from './server/safety-push-worker.js'; if(SAFETY_WORKER_CODE_ENABLED!==false)process.exit(1)"
+          node --input-type=module -e "import {readFileSync} from 'node:fs';const j=JSON.parse(readFileSync('vercel.json'));if(j.crons?.some(c=>String(c.path).includes('safety-dispatch')))process.exit(1)"
