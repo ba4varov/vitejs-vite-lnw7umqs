@@ -3,6 +3,15 @@
 -- Manual migration review; DO NOT apply to Production without approval.
 begin;
 
+-- Fail with an explicit prerequisite error rather than applying partial changes
+-- if the previously merged (but not yet deployed) Stage B1 schema is absent.
+do $
+begin
+ if to_regclass('public.earthquake_push_optins') is null
+   or to_regclass('public.push_deliveries') is null
+ then raise exception 'PUSH_SAFETY_PREREQUISITE_SCHEMA_MISSING';end if;
+end $;
+
 create table public.push_safety_controls (
  singleton boolean primary key default true check (singleton),
  delivery_enabled boolean not null default false,
