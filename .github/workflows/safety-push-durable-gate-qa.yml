@@ -1,0 +1,62 @@
+name: Unified safety Push durable gate QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20261118120000_safety_push_durable_gate.sql'
+      - 'tests/sql/safety-push-gate-fixture.sql'
+      - 'tests/sql/safety-push-gate.test.sql'
+      - 'docs/safety-push-durable-gate.md'
+      - '.github/workflows/safety-push-durable-gate-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  safety-gate:
+    if: github.head_ref == 'feat/safety-push-durable-gate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 19
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-gate-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify weather, earthquake and existing Push contracts
+        run: node --test tests/unit/safety-push-preview.test.mjs tests/unit/push.test.mjs tests/unit/earthquake-push-consent.test.mjs tests/unit/vercel-endpoints.test.mjs
+      - name: Isolated SQL gate (fake users, zero notification sends)
+        run: |
+          set -euo pipefail
+          for file in \
+            tests/sql/safety-push-gate-fixture.sql \
+            supabase/migrations/20261118120000_safety_push_durable_gate.sql \
+            tests/sql/safety-push-gate.test.sql; do
+            docker run --rm --network host \
+              -e PGPASSWORD=isolated-gate-only \
+              -v "${PWD}:/repo:ro" \
+              postgres:17-alpine \
+              psql -X -h 127.0.0.1 -U postgres -d postgres \
+              -v ON_ERROR_STOP=1 -f "/repo/${file}"
+          done
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
