@@ -59,7 +59,7 @@ test('archival normalization preserves older but valid events without changing 2
   const weekly=normalizeUsgsEarthquakes(example(),NOW,{maxAgeMs:7*DAY,minMagnitude:3,maxItems:500})
   assert.deepEqual(weekly.map(e=>e.id),['usgs:sof2','usgs:beyond','usgs:ath3'])
   const monthly=normalizeUsgsEarthquakes(example(),NOW,{maxAgeMs:30*DAY,minMagnitude:3,maxItems:500})
-  assert.deepEqual(monthly.map(e=>e.id),['usgs:sof2','usgs:ath3','usgs:beyond','usgs:sof12'])
+  assert.deepEqual(monthly.map(e=>e.id),['usgs:sof2','usgs:beyond','usgs:ath3','usgs:sof12'])
   assert.throws(()=>normalizeUsgsEarthquakes(example(),NOW,{maxAgeMs:32*DAY}),/INVALID_USGS_OPTIONS/)
 })
 
