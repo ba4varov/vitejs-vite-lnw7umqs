@@ -52,7 +52,8 @@ export function normalizeUsgsEarthquakes(feed, now=Date.now()) {
     const url=typeof p?.url==='string'&&
       /^https:\/\/earthquake\.usgs\.gov\/earthquakes\/eventpage\/[a-zA-Z0-9_-]+(?:\/)?$/.test(p.url) ?
       p.url : 'https://earthquake.usgs.gov/earthquakes/eventpage/'+encodeURIComponent(id)
-    const place=typeof p?.place==='string'?p.place.replace(/[<>\u0000-\u001f]/g,'').slice(0,140):''
+    const place=typeof p?.place==='string'?Array.from(p.place)
+      .filter(ch=>ch.codePointAt(0)>=32).join('').replace(/[<>]/g,'').slice(0,140):''
     const item={
       id:'usgs:'+id,
       source:'USGS',
