@@ -5,10 +5,11 @@ on:
     branches: [main]
     paths:
       - 'server/earthquakes-core.js'
-      - 'api/earthquakes.ts'
+      - 'api/alerts.ts'
       - 'src/NearbyEarthquakes.tsx'
       - 'src/nearby-earthquakes.css'
       - 'src/App.tsx'
+      - 'docs/earthquake-alerts-architecture.md'
       - 'src/PushSettings.tsx'
       - 'tests/unit/earthquakes-core.test.mjs'
       - 'tests/earthquakes-nearby.spec.ts'
@@ -30,6 +31,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: API function budget and earthquake safety tests
+        run: node --test tests/unit/vercel-endpoints.test.mjs tests/unit/earthquakes-core.test.mjs
       - name: Earthquake feed and safety unit tests
         run: node --test tests/unit/earthquakes-core.test.mjs
       - name: TypeScript and production build
