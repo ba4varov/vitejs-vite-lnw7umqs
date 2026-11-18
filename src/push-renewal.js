@@ -11,7 +11,7 @@ export async function renewPush({scope=window,device,key,load,confirm,persist,au
   if(!selected)throw Error('device-mismatch')
   const p=snapshot.preferences
   if(!p.enabled||!p.cities.length||!p.categories.length||(!snapshot.pro&&p.categories.some(c=>['walk','garden','sport'].includes(c))))throw Error('preferences-required')
-  if(snapshot.devices.length>=10)throw Error('device-limit')
+  // In-place renewal reuses the existing device row, even at the 10-device limit.
   if(!selected.label?.trim())throw Error('preflight-failed')
   const status=await checkPushRegistration({scope,device:selected,key})
   if(status!=='match')throw Error(status)
@@ -38,7 +38,14 @@ export async function renewPush({scope=window,device,key,load,confirm,persist,au
   let renewed
   try {renewed=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:vapidBytes(key)})}catch {throw Error('subscribe-failed')}
   try {
-   const data=await persist(renewed.toJSON(),selected.label)
+   const json=renewed.toJSON()
+   const data=await persist(json,selected.label)
+   // A successful HTTP response must contain the same device ID with the new
+   // endpoint fingerprint. Reject stale snapshots or an accidental extra row.
+   const digest=await scope.crypto.subtle.digest('SHA-256',new TextEncoder().encode(json.endpoint))
+   const fingerprint=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')
+   const same=data?.devices?.find(d=>d.id===selected.id)
+   if(!same||same.fingerprint!==fingerprint)return {status:'save-unconfirmed'}
    return {status:'success',data}
   }catch(error) {
    // Keep the new subscription even after a known rejection. No rollback,
@@ -52,11 +59,10 @@ export async function renewPush({scope=window,device,key,load,confirm,persist,au
 }
 export const pushRenewalMessages={
  bg:{...pushRegistrationMessages.bg,
-  warning:'Да подновя ли Push регистрацията на избраното устройство? Старият браузърен абонамент не може надеждно да се възстанови. При неуспех известията може да останат недостъпни. Старият запис в базата ще бъде запазен.',
-  checking:'Проверка на избраното устройство и ограниченията…',cancelled:'Подновяването е отказано. Няма промени.',success:'Push регистрацията е подновена. Старият запис е запазен. Това не доказва, че FCM ще приеме известие.',
+  warning:'Да подновя ли Push регистрацията на избраното устройство? Браузърът първо отписва стария абонамент. При успешен запис същият идентификатор на устройството ще получи новите данни. При отказ известията може да останат недостъпни, а старият запис в базата ще остане.',
+  checking:'Проверка на избраното устройство и ограниченията…',cancelled:'Подновяването е отказано. Няма промени.',success:'Push регистрацията е подновена за същото устройство, без нов запис. Това не доказва, че FCM ще приеме известие.',
   'registration-disabled':'Подновяването е недостъпно: новите регистрации са забранени.',
   'preferences-required':'Първо запази разрешени Push настройки с градове и категории.',
-  'device-limit':'Достигнат е лимитът от 10 устройства. Подновяването е спряно преди отписване.',
   'permission-required':'Нужно е вече дадено разрешение за известия. Провери настройките на браузъра.',
   'preflight-failed':'Проверката на сесията или настройките не е потвърдена. Подновяването е спряно.',
   'unsubscribe-unconfirmed':'Отписването не е потвърдено. Няма опит за ново абониране. Провери регистрацията.',
@@ -64,11 +70,10 @@ export const pushRenewalMessages={
   'save-rejected':'Записването е отказано. Новият браузърен абонамент и старият DB запис са запазени. Провери сесията и настройките. Няма автоматичен повторен опит.',
   'save-unconfirmed':'Резултатът от записването е неясен; записът може да е създаден. Новият браузърен абонамент и старият DB запис са запазени. Провери „Моите устройства“, преди друго действие. Няма автоматичен повторен опит.'},
  en:{...pushRegistrationMessages.en,
-  warning:'Renew Push registration for the selected device? The old browser subscription cannot reliably be restored. Notifications may remain unavailable if renewal fails. The old database record will be kept.',
-  checking:'Checking the selected device and registration restrictions…',cancelled:'Renewal cancelled. Nothing changed.',success:'Push registration renewed. The old record was kept. This does not prove that FCM will accept a notification.',
+  warning:'Renew Push registration for this device? The browser first unsubscribes the old subscription. On success the same device ID receives new credentials. On failure notifications may remain unavailable and the old database record remains.',
+  checking:'Checking the selected device and registration restrictions…',cancelled:'Renewal cancelled. Nothing changed.',success:'Push subscription renewed in place under the same device ID. This does not prove FCM will accept a notification.',
   'registration-disabled':'Renewal is unavailable: new registrations are disabled.',
   'preferences-required':'First save allowed Push preferences with cities and categories.',
-  'device-limit':'The 10-device limit has been reached. Renewal stopped before unsubscribing.',
   'permission-required':'Notification permission must already be granted. Check browser settings.',
   'preflight-failed':'Session or preferences checks could not be confirmed. Renewal stopped.',
   'unsubscribe-unconfirmed':'Unsubscribe was not confirmed. No new subscription was attempted. Check registration.',
