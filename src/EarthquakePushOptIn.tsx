@@ -32,6 +32,11 @@ export function EarthquakePushOptIn({session,lang,cities,onDirtyChange,onBusyCha
       })
     return()=>{live=false}
   },[session.user.id])
+  useEffect(()=>{
+    if(!snapshot?.enabled||!cities.length)return
+    const index=cities.findIndex(city=>sameCity(city,snapshot.city))
+    if(index>=0)setCityIndex(index)
+  },[snapshot?.city?.latitude,snapshot?.city?.longitude,snapshot?.city?.name,cities])
   const selected=cities[cityIndex]
   const changed=!!snapshot&&(enabled!==snapshot.enabled||
     (enabled&&!!selected&&!sameCity(selected,snapshot.city)))
