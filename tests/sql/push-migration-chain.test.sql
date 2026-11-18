@@ -63,6 +63,13 @@ begin
 end $$;
 reset role;
 
+-- Simulate an established consent from 10 minutes earlier, in this
+-- disposable fixture ONLY. An event before opt-in is correctly rejected.
+-- This is not an API path and is never run against real Supabase.
+update public.earthquake_push_optins
+  set opted_in_at=clock_timestamp()-interval '10 minutes'
+  where user_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
 -- ONLY inside an ephemeral CI database, temporarily turn gate on to test
 -- reserve/burn, but DO NOT invoke a provider or make any HTTP request.
 update public.push_safety_controls
