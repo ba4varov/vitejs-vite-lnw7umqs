@@ -128,7 +128,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
    const result=await renewPush({device,key:data.publicKey,load:()=>pushRequest(session),
     authorize:async()=>live.current&&epoch===diagnosticEpoch.current&&await pushKeySessionMatches(session)&&live.current&&epoch===diagnosticEpoch.current,
     confirm:()=>live.current&&epoch===diagnosticEpoch.current&&window.confirm(pushRenewalMessages[lang].warning),
-    persist:(subscription:object,deviceLabel:string)=>pushRequest(session,'POST',{subscription,label:deviceLabel})})
+    persist:(subscription:object,deviceLabel:string)=>pushRequest(session,'POST',{operation:'renew',deviceId:device.id,fingerprint:device.fingerprint,subscription,label:deviceLabel})})
    if(live.current&&epoch===diagnosticEpoch.current){if(result.data)apply(result.data);setMessage(pushRenewalMessages[lang][result.status])}
   }finally{renewalLock.current=false;if(live.current)setBusy(false)}
  }
