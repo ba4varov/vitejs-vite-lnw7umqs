@@ -1,0 +1,46 @@
+name: Unified safety Push candidate QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/safety-push-preview.js'
+      - 'src/PushSettings.tsx'
+      - 'tests/unit/safety-push-preview.test.mjs'
+      - 'docs/unified-safety-push-architecture.md'
+      - '.github/workflows/unified-safety-push-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unified-safety:
+    if: github.head_ref == 'feat/unified-safety-push-candidates'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Unified forecast + earthquake Push, prior registration and API budget tests
+        run: node --test tests/unit/safety-push-preview.test.mjs tests/unit/push.test.mjs tests/unit/earthquakes-core.test.mjs tests/unit/earthquake-push-consent.test.mjs tests/unit/vercel-endpoints.test.mjs
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Weather + earthquake Push preferences BG/EN browser regression
+        run: npx playwright test tests/push.spec.ts --grep "push section visible without SQL migration" --reporter=line --workers=2
+      - name: Browser traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-safety-push-qa
+          path: work/browser-results/
+          retention-days: 3
+          if-no-files-found: ignore
