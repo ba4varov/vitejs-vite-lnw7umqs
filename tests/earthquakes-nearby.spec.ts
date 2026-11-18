@@ -21,8 +21,10 @@ async function boot(page:Page,lang:'bg'|'en',geo:{lat:number;lon:number},data:ob
   let quakeCalls=0,pushCalls=0
   await page.route('**/*',route=>{
     const url=new URL(route.request().url())
-    if(url.pathname==='/api/earthquakes'){
+    if(url.pathname==='/api/alerts' && url.searchParams.get('source')==='earthquakes'){
       quakeCalls++
+      expect(url.searchParams.get('source')).toBe('earthquakes')
+      expect([...url.searchParams.keys()]).toEqual(['source'])
       return route.fulfill({json:data})
     }
     if(url.pathname.startsWith('/api/push')){
