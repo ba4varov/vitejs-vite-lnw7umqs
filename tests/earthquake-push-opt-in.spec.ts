@@ -90,6 +90,10 @@ for(const [width,lang] of [[390,'bg'],[1440,'en']] as const) {
       await optin.check()
       await expect(section.getByRole('combobox')).toHaveValue('0')
       await expect(page.locator('.profile-draft-note')).toBeVisible()
+      // Unsaved earthquake changes must prevent accidental profile closure.
+      page.once('dialog',async dialog=>{expect(dialog.type()).toBe('confirm');await dialog.dismiss()})
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('dialog')).toBeVisible()
       await section.getByRole('button',{name:lang==='bg'?'Запази съгласието':'Save consent'}).click()
       await expect(section).toContainText(lang==='bg'?'Съгласието е запазено':'Consent saved')
       await expect(page.locator('.profile-draft-note')).toHaveCount(0)
