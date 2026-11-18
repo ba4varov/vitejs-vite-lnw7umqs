@@ -136,9 +136,9 @@ begin
    then return null;end if;
  if (select count(*) from public.push_deliveries
      where device_id=target_device
-       and event_key like 'weather:open-meteo:%'
-         or device_id=target_device and event_key like 'earthquake:usgs:%'
-         and created_at>=clock_timestamp()-interval '24 hours')>30
+       and (event_key like 'weather:open-meteo:%'
+         or event_key like 'earthquake:usgs:%')
+       and created_at>=clock_timestamp()-interval '24 hours')>=30
    then return null;end if;
  key_value:=candidate->>'eventKey';
  insert into public.push_deliveries(
