@@ -1,0 +1,123 @@
+/* A quiet, always-available history browser — not an emergency warning. */
+.weather-app .earthquake-history {
+  margin: 14px 0 20px;
+  border: 1px solid #c8dce4;
+  border-radius: 18px;
+  padding: clamp(14px,2vw,21px);
+  background: linear-gradient(135deg,#f2fbfd,#fcfffe 66%,#f7f4ff);
+  box-shadow: 0 6px 21px rgba(21,73,104,.055);
+  color: #214157;
+}
+.weather-app .earthquake-history-header {
+  display: flex; justify-content: space-between; align-items:center;
+  flex-wrap:wrap; gap:12px;
+}
+.weather-app .earthquake-history h2 {
+  margin:0 0 4px;font-size:1.13rem;line-height:1.3;color:#215277;
+}
+.weather-app .earthquake-history-header p {
+  margin:0;color:#527187;font-size:.84rem;line-height:1.4;
+}
+.weather-app .earthquake-history button {
+  min-height:40px;
+  border:1px solid #acd0df;
+  border-radius:11px;
+  padding:7px 13px;
+  font:inherit;
+  font-size:.87rem;
+  font-weight:680;
+  background:#fff;
+  color:#1e5279;
+  cursor:pointer;
+}
+.weather-app .earthquake-history button:hover {background:#e3f4fb;border-color:#65a4c0}
+.weather-app .earthquake-history button:focus-visible {
+  outline:3px solid #2177b1;outline-offset:2px;
+}
+.weather-app .earthquake-history-toggle {white-space:nowrap}
+.weather-app .earthquake-history-toggle span {margin-left:6px;font-size:1.1em}
+.weather-app .earthquake-history-body {margin-top:17px;border-top:1px solid #d2e1e8;padding-top:16px}
+.weather-app .earthquake-history-controls {
+  display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap;
+}
+.weather-app .earthquake-history-controls > div {
+  display:flex;gap:6px;flex-wrap:wrap;
+}
+.weather-app .earthquake-history-controls button[aria-pressed="true"] {
+  background:#205d87;color:#fff;border-color:#205d87;
+}
+.weather-app .earthquake-history-scope {
+  margin:14px 0 13px;color:#55718a;font-size:.78rem;line-height:1.5;
+}
+.weather-app .earthquake-history-meta {
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:8px;margin-bottom:11px;font-size:.78rem;color:#516e84;
+}
+.weather-app .earthquake-history-meta button {min-height:34px;font-size:.78rem}
+.weather-app .earthquake-history-status {
+  margin:12px 0;border-radius:10px;padding:11px;
+  border:1px solid #c4dce6;background:#f6fbff;
+  color:#3d6580;font-size:.86rem;line-height:1.5;
+}
+.weather-app .earthquake-history-status button {margin-left:10px}
+.weather-app .earthquake-history-list {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;margin:0;padding:0;list-style:none;
+}
+.weather-app .earthquake-history-list li {
+  min-width:0;border:1px solid #d7e5e9;border-radius:12px;
+  padding:12px 13px;background:rgba(255,255,255,.86);
+}
+.weather-app .earthquake-history-summary {
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:9px;flex-wrap:wrap;
+}
+.weather-app .earthquake-history-summary strong {color:#246b84;font-size:1.13rem}
+.weather-app .earthquake-history-summary span {color:#4d6b7e;font-size:.78rem}
+.weather-app .earthquake-history-list p {margin:7px 0;color:#254658;line-height:1.45;overflow-wrap:anywhere}
+.weather-app .earthquake-history-list .earthquake-history-depth {
+  color:#586f7f;font-size:.78rem;
+}
+.weather-app .earthquake-history a {color:#155d88;font-weight:700;text-underline-offset:2px}
+.weather-app .earthquake-history-more {margin-top:13px}
+.weather-app .earthquake-history-disclaimer {
+  font-size:.75rem;line-height:1.55;color:#547183;margin:15px 0 0;
+}
+.weather-app.dark .earthquake-history {
+  border-color:#375b70;background:linear-gradient(130deg,#1a3948,#222f40 70%,#2b2949);
+  color:#ecf4fd;
+}
+.weather-app.dark .earthquake-history h2 {color:#d4f2ff}
+.weather-app.dark .earthquake-history-header p,
+.weather-app.dark .earthquake-history-scope,
+.weather-app.dark .earthquake-history-meta,
+.weather-app.dark .earthquake-history-disclaimer {color:#bad3e2}
+.weather-app.dark .earthquake-history-body {border-color:#426076}
+.weather-app.dark .earthquake-history button {background:#24455c;border-color:#50708b;color:#edf8ff}
+.weather-app.dark .earthquake-history button:hover {background:#315a70}
+.weather-app.dark .earthquake-history-controls button[aria-pressed="true"] {
+  background:#92d1f0;color:#19394d;border-color:#92d1f0;
+}
+.weather-app.dark .earthquake-history-status {
+  border-color:#42637d;background:#243d52;color:#e2f2ff;
+}
+.weather-app.dark .earthquake-history-list li {background:#213b4c;border-color:#426078}
+.weather-app.dark .earthquake-history-summary strong {color:#a6e7f7}
+.weather-app.dark .earthquake-history-summary span,
+.weather-app.dark .earthquake-history-list .earthquake-history-depth {color:#c1d5e2}
+.weather-app.dark .earthquake-history-list p {color:#e3f1ff}
+.weather-app.dark .earthquake-history a {color:#ade8ff}
+.weather-app.dark .earthquake-history :is(button,a):focus-visible {
+  outline-color:#b7e9ff;
+}
+@media(max-width:760px) {
+  .weather-app .earthquake-history-list {grid-template-columns:1fr}
+}
+@media(max-width:420px) {
+  .weather-app .earthquake-history {padding:13px}
+  .weather-app .earthquake-history-header {align-items:stretch}
+  .weather-app .earthquake-history-toggle {width:100%}
+  .weather-app .earthquake-history-controls {flex-direction:column;gap:10px}
+  .weather-app .earthquake-history-controls > div {display:grid;grid-template-columns:1fr 1fr}
+  .weather-app .earthquake-history-list li {padding:11px}
+}
