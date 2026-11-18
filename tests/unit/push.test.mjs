@@ -189,7 +189,7 @@ test('registration public key must agree with DB gate; caller cannot choose a di
  const on=await api('GET',null,settings,200,{contractVersion:1,registrationPublicKey:key})
  assert.equal(on.res.data.registrationEnabled,true)
  assert.equal((await api('POST',{subscription:sub,label:'Phone',vapidPublicKey:'caller-key'},settings)).res.code,400)
- const saved=await api('POST',{subscription:sub,label:'Phone'},settings)
+ const saved=await api('POST',{operation:'register',subscription:sub,label:'Phone'},settings)
  assert.equal(JSON.parse(saved.calls[1].opts.body).payload.vapidPublicKey,key)
 })
 const now=Date.parse('2026-10-09T00:00Z')
