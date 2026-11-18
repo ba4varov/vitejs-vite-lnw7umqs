@@ -7,6 +7,7 @@ import {subscribeSession,type AuthSession} from './auth-client'
 import {sessionPushTest,pushTestDiagnostic,pushRequest,pushKeyRequest,pushKeySessionMatches,type PushSnapshot,type PushPreferences,type PushCity,type PushDevice} from './push-client'
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages,pushEnrollmentMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
+import {EARTHQUAKE_DEFAULTS} from '../server/earthquakes-core.js'
 const personal=['walk','garden','sport']
 const presets:PushCity[]=[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'},{name:'Пловдив',latitude:42.1354,longitude:24.7453,zone:'Europe/Sofia'},{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'},{name:'Бургас',latitude:42.5048,longitude:27.4626,zone:'Europe/Sofia'}]
 export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:AuthSession;lang:'bg'|'en';onDirtyChange?:(dirty:boolean)=>void;onBusyChange?:(busy:boolean)=>void}) {
@@ -151,6 +152,11 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  return <section className="push-settings" aria-label={bg?'Push известия':'Push notifications'}>
   <h3>{bg?'Push известия при затворен сайт':'Push notifications when the site is closed'}</h3>
   <p>{bg?'Подготовка: автоматичната доставка е изключена. Тези настройки са независими от камбанката и съгласието за аналитика.':'Preparation: automatic delivery is disabled. These preferences are independent of the bell and analytics consent.'}</p>
+  <p className="earthquake-push-planned">
+    {bg
+      ? `Земетресения: начални прагове ${EARTHQUAKE_DEFAULTS.radiusKm} км и M ${EARTHQUAKE_DEFAULTS.minMagnitude.toFixed(1)}. Push е предвиден като включена възможност, но все още НЕ изпраща автоматични известия и ще изисква отделно разрешение от потребителя.`
+      : `Earthquakes: initial thresholds ${EARTHQUAKE_DEFAULTS.radiusKm} km and M ${EARTHQUAKE_DEFAULTS.minMagnitude.toFixed(1)}. Push is planned as an enabled option, but automatic delivery is NOT active and will require separate user permission.`}
+  </p>
   <p>{support==='ios-install'?(bg?'За iPhone/iPad: iOS 16.4 или по-нова версия → Добави към началния екран → отвори приложението от иконата.':'For iPhone/iPad: iOS 16.4 or later → Add to Home Screen → open from the icon.'):support==='unsupported'?(bg?'Този браузър не поддържа Web Push. Нужни са HTTPS и съвместим браузър.':'This browser does not support Web Push. HTTPS and a compatible browser are required.'):(bg?'Поддържан браузър. Разрешението се иска само с бутона за регистрация.':'Supported browser. Permission is requested only by the registration button.')}</p>
   {!data&&!message&&<p role="status">{bg?'Зареждане на Push настройките…':'Loading Push preferences…'}</p>}
   {message&&<p role="status">{message}</p>}
