@@ -12,12 +12,12 @@ function fixture(){
  const registration={scope:'https://meteo.invalid/',active:{scriptURL:'https://meteo.invalid/push-sw.js'},pushManager:{getSubscription:async()=>old,subscribe:async options=>{events.push('subscribe');assert.equal(options.userVisibleOnly,true);assert.deepEqual(options.applicationServerKey,new Uint8Array(Buffer.from(key,'base64url')));return renewed}}}
  const snapshot={registrationEnabled:true,publicKey:key,devices:[device],pro:false,preferences:{enabled:true,cities:[{}],categories:['danger']}}
  const scope={isSecureContext:true,location:{origin:'https://meteo.invalid'},crypto:webcrypto,navigator:{serviceWorker:{getRegistration:async()=>registration}},Notification:{permission:'granted',requestPermission:()=>{throw Error('no prompts')}}}
- const args={scope,device,key,load:async()=>{events.push('load');return snapshot},confirm:async()=>{events.push('confirm');return true},authorize:async()=>{events.push('authorize');return true},persist:async(value,label)=>{events.push('POST');assert.equal(value,payload);assert.equal(label,device.label);return {...snapshot,devices:[device,{id:'new'}]}}}
+ const args={scope,device,key,load:async()=>{events.push('load');return snapshot},confirm:async()=>{events.push('confirm');return true},authorize:async()=>{events.push('authorize');return true},persist:async(value,label)=>{events.push('POST');assert.equal(value,payload);assert.equal(label,device.label);return {...snapshot,devices:[{...device,fingerprint:createHash('sha256').update(payload.endpoint).digest('hex')}]}}}
  return {args,events,old,registration,snapshot}
 }
-test('successful renewal retains old DB record and uses same VAPID and authenticated persistence',async()=>{
+test('successful renewal preserves the original device ID with the new endpoint fingerprint',async()=>{
  const {args,events}=fixture();const result=await renewPush(args)
- assert.equal(result.status,'success');assert.equal(result.data.devices[0],args.device)
+ assert.equal(result.status,'success');assert.equal(result.data.devices[0].id,args.device.id);assert.notEqual(result.data.devices[0].fingerprint,args.device.fingerprint)
  assert.deepEqual(events,['load','confirm','load','authorize','unsubscribe','subscribe','POST'])
 })
 test('explicit cancellation never mutates',async()=>{
@@ -37,7 +37,6 @@ test('disabled registrations, preferences, Pro access, device limit, permission 
   ['registration-disabled',f=>f.snapshot.registrationEnabled=false],
   ['preferences-required',f=>f.snapshot.preferences.enabled=false],
   ['preferences-required',f=>f.snapshot.preferences.categories=['walk']],
-  ['device-limit',f=>f.snapshot.devices=Array(10).fill(f.args.device)],
   ['permission-required',f=>f.args.scope.Notification.permission='denied'],
   ['device-mismatch',f=>f.snapshot.devices=[]],
   ['preflight-failed',f=>f.args.load=async()=>{throw Error('private')}],
@@ -46,6 +45,17 @@ test('disabled registrations, preferences, Pro access, device limit, permission 
   assert.ok(!f.events.some(e=>['unsubscribe','subscribe','POST'].includes(e)))
  }
 })
+test('in-place renewal works at the 10-device limit and requires same-ID acknowledgement',async()=>{
+ const f=fixture();f.snapshot.devices=Array(10).fill(f.args.device)
+ assert.equal((await renewPush(f.args)).status,'success')
+ const wrong=fixture();wrong.args.persist=async()=>({...wrong.snapshot,devices:[{id:'new',fingerprint:createHash('sha256').update('https://fcm.googleapis.com/wp/synthetic-new').digest('hex')}]})
+ assert.equal((await renewPush(wrong.args)).status,'save-unconfirmed')
+ assert.equal(wrong.events.filter(e=>e==='POST').length,0,'fixture override does not log')
+ assert.equal(wrong.events.filter(e=>e==='unsubscribe').length,1)
+ const stale=fixture();stale.args.persist=async()=>stale.snapshot
+ assert.equal((await renewPush(stale.args)).status,'save-unconfirmed')
+})
+
 test('checks repeat after confirmation; changed permission, key or subscription cannot unsubscribe',async()=>{
  for(const change of [f=>f.snapshot.registrationEnabled=false,f=>f.old.endpoint+='other',f=>f.snapshot.publicKey='other']){
   const f=fixture();f.args.confirm=()=>{change(f);return true}
@@ -81,5 +91,5 @@ test('false or lost unsubscribe result never subscribes',async()=>{
 test('BG and EN cover every state with fixed messages and irreversible warning',()=>{
  assert.deepEqual(Object.keys(pushRenewalMessages.bg).sort(),Object.keys(pushRenewalMessages.en).sort())
  for(const messages of Object.values(pushRenewalMessages))for(const message of Object.values(messages))assert.ok(typeof message==='string'&&message.length>0&&!message.includes('synthetic'))
- assert.match(pushRenewalMessages.en.warning,/cannot reliably be restored/)
+ assert.match(pushRenewalMessages.en.warning,/first unsubscribes/)
 })
