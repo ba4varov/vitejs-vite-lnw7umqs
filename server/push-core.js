@@ -11,10 +11,25 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   if(Object.keys(req.query||{}).length)return res.status(400).json({error:'INVALID_QUERY'})
   if(JSON.stringify(req.body||{}).length>10000||Number(req.headers['content-length']||0)>10000)return res.status(413).json({error:'BODY_TOO_LARGE'})
   let payload={operation:'load'}
+  let renewal=false
   if(req.method==='POST') {
    if(env.PUSH_REGISTRATION_ENABLED!=='true'||!(/^[A-Za-z0-9_-]{87}$/.test(env.PUSH_VAPID_PUBLIC_KEY||''))||Buffer.from(env.PUSH_VAPID_PUBLIC_KEY,'base64url')[0]!==4)return res.status(503).json({error:'PUSH_REGISTRATION_DISABLED'})
-   if(!exactObject(req.body,['subscription','label'])||!validPushSubscription(req.body.subscription)||typeof req.body.label!=='string'||!req.body.label.trim()||req.body.label.length>80)return res.status(400).json({error:'INVALID_BODY'})
-   payload={operation:'register',...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
+   renewal=req.body?.operation==='renew'
+   if(renewal) {
+    // Renewal replaces only one owned, fingerprint-matched row. Never create an
+    // extra device or let HTTP input choose the server's VAPID public key.
+    if(!req.body||Object.keys(req.body).length!==5||!exactObject(req.body,['operation','deviceId','fingerprint','subscription','label'])||
+      typeof req.body.deviceId!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(req.body.deviceId)||
+      typeof req.body.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(req.body.fingerprint)||
+      !validPushSubscription(req.body.subscription)||typeof req.body.label!=='string'||!req.body.label.trim()||req.body.label.length>80)
+      return res.status(400).json({error:'INVALID_BODY'})
+    payload={...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
+   }else{
+    if(!req.body||Object.keys(req.body).length!==2||!exactObject(req.body,['subscription','label'])||
+      !validPushSubscription(req.body.subscription)||typeof req.body.label!=='string'||!req.body.label.trim()||req.body.label.length>80)
+      return res.status(400).json({error:'INVALID_BODY'})
+    payload={operation:'register',...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
+   }
   }
   if(req.method==='PATCH') {
    if(!validPushPreferences(req.body))return res.status(400).json({error:'INVALID_BODY'})
@@ -24,7 +39,7 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
    if(!exactObject(req.body,['id'])||typeof req.body.id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(req.body.id))return res.status(400).json({error:'INVALID_BODY'})
    payload={operation:'delete',id:req.body.id}
   }
-  const response=await limited(`${base}/rest/v1/rpc/my_push`,{method:'POST',headers:{apikey:key,Authorization:req.headers.authorization,'Content-Type':'application/json'},body:JSON.stringify({payload})})
+  const response=await limited(`${base}/rest/v1/rpc/${renewal?'my_push_renew':'my_push'}`,{method:'POST',headers:{apikey:key,Authorization:req.headers.authorization,'Content-Type':'application/json'},body:JSON.stringify({payload})})
   if(!response.ok) {
    const error=await response.json().catch(()=>({}))
    const status=error.message==='PUSH_RATE_LIMITED'?429:response.status===403?403:503
