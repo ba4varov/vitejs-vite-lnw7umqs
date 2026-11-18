@@ -37,6 +37,37 @@ test('API no sender, private caching, user JWT only; registration defaults off; 
  const anon={setHeader(){},status(c){this.code=c;return this},json(){return this}}
  await handlePush({method:'GET',headers:{},query:{}},anon,{SUPABASE_URL:'https://db.invalid',SUPABASE_ANON_KEY:'a'},()=>{throw Error('must not fetch')});assert.equal(anon.code,401)
 })
+test('renewal requires the existing registration gate and cannot create an arbitrary device',async()=>{
+ const env={PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key}
+ const deviceId='a0000000-0000-0000-0000-000000000001'
+ const fingerprint='a'.repeat(64)
+ const body={operation:'renew',deviceId,fingerprint,subscription:sub,label:'Note 13 Pro'}
+ const off=await api('POST',body)
+ assert.equal(off.res.code,503);assert.equal(off.calls.length,1)
+ for(const invalid of [
+  {...body,deviceId:'not-uuid'}, {...body,fingerprint:'invalid'},
+  {...body,subscription:{...sub,endpoint:'https://127.0.0.1/private'}},
+  {...body,userId:'foreign'}, {...body,vapidPublicKey:'caller-controlled'}
+ ]){
+  const failed=await api('POST',invalid,env)
+  assert.equal(failed.res.code,400)
+  assert.equal(failed.calls.length,1,'invalid renewal never reaches database')
+ }
+ const ok=await api('POST',body,env,200,{contractVersion:1,registrationPublicKey:key,pro:false,preferences:prefs,devices:[{id:deviceId,fingerprint}]})
+ assert.equal(ok.res.code,200)
+ assert.equal(ok.calls.length,2)
+ assert.match(ok.calls[1].url,/\/rest\/v1\/rpc\/my_push_renew$/)
+ const sent=JSON.parse(ok.calls[1].opts.body).payload
+ assert.deepEqual(sent,{...body,vapidPublicKey:key})
+ assert.equal(ok.res.data.devices[0].id,deviceId)
+ assert.equal(ok.res.data.registrationEnabled,true)
+ assert.equal(ok.res.data.deliveryEnabled,false)
+ assert.equal(ok.res.headers['Cache-Control'],'private, no-store')
+ assert.equal(ok.calls[1].opts.headers.Authorization,'Bearer isolated')
+ const old=await api('POST',{subscription:sub,label:'Phone'},env)
+ assert.match(old.calls[1].url,/\/rest\/v1\/rpc\/my_push$/)
+})
+
 const browser=(userAgent='Chrome',standalone=false)=>({isSecureContext:true,Notification:{},PushManager:{},navigator:{userAgent,maxTouchPoints:0,serviceWorker:{}},matchMedia:()=>({matches:standalone})})
 test('Android/Windows feature detection, iOS Home Screen and unsupported contexts',()=>{
  for(const ua of ['Android Chrome','Windows Chrome','Windows Edg'])assert.equal(pushSupport(browser(ua)),'supported')

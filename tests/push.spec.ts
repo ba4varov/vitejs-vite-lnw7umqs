@@ -306,11 +306,12 @@ for(const scenario of ['success','cancel','mismatch','lost-response','subscribe-
  },{publicKey,scenario})
  const hash=await import('node:crypto').then(c=>c.createHash('sha256').update('https://fcm.googleapis.com/wp/isolated').digest('hex'))
  const oldDevice={id:'00000000-0000-0000-0000-000000000003',label:'Note 13 Pro',fingerprint:hash,createdAt:'2026-10-14T00:00:00Z'}
+ const newHash=await import('node:crypto').then(c=>c.createHash('sha256').update('https://fcm.googleapis.com/wp/renewed').digest('hex'))
  const calls:any[]=[]
  await page.route('**/api/push',async r=>{
   const method=r.request().method();calls.push({method,body:r.request().postDataJSON()})
   if(method==='POST'&&scenario==='lost-response')return r.abort('failed')
-  return r.fulfill({json:{contractVersion:1,pro:false,preferences:state.preferences(),devices:method==='POST'?[oldDevice,{...oldDevice,id:'00000000-0000-0000-0000-000000000004',label:'Renewed device'}]:[oldDevice],registrationEnabled:scenario!=='disabled',publicKey,deliveryEnabled:false}})
+  return r.fulfill({json:{contractVersion:1,pro:false,preferences:state.preferences(),devices:method==='POST'?[{...oldDevice,fingerprint:newHash}]:[oldDevice],registrationEnabled:scenario!=='disabled',publicKey,deliveryEnabled:false}})
  })
  // Trigger a React render after setting the synthetic permission.
  await panel.getByLabel('Име на това устройство').fill('Test phone')
@@ -319,7 +320,7 @@ for(const scenario of ['success','cancel','mismatch','lost-response','subscribe-
   await expect(button).toBeDisabled()
  }else{
   let dialogs=0
-  page.on('dialog',async dialog=>{dialogs++;expect(dialog.message()).toContain('не може надеждно да се възстанови');if(scenario==='cancel')await dialog.dismiss();else await dialog.accept()})
+  page.on('dialog',async dialog=>{dialogs++;expect(dialog.message()).toContain('Браузърът първо отписва');if(scenario==='cancel')await dialog.dismiss();else await dialog.accept()})
   await button.click()
   const messages:any={success:'Push регистрацията е подновена',cancel:'Подновяването е отказано',mismatch:'не съвпада с избраното устройство','lost-response':'Резултатът от записването е неясен','subscribe-failed':'новото абониране не успя'}
   await expect(panel.getByRole('status').first()).toContainText(messages[scenario])
@@ -331,7 +332,14 @@ for(const scenario of ['success','cancel','mismatch','lost-response','subscribe-
  expect(calls.filter(c=>c.method==='DELETE')).toHaveLength(0)
  expect(calls.filter(c=>c.method==='POST')).toHaveLength(['success','lost-response'].includes(scenario)?1:0)
  expect(await page.evaluate(()=>(window as any).pushPrompts)).toBe(0)
- if(scenario==='success'){await expect(panel).toContainText('Note 13 Pro');await expect(panel).toContainText('Renewed device')}
+ if(scenario==='success'){
+  await expect(panel).toContainText('Note 13 Pro')
+  const posted=calls.filter(c=>c.method==='POST')
+  expect(posted[0].body.operation).toBe('renew')
+  expect(posted[0].body.deviceId).toBe(oldDevice.id)
+  expect(posted[0].body.fingerprint).toBe(oldDevice.fingerprint)
+  await expect(panel.getByRole('button',{name:'Поднови Push регистрацията',exact:true})).toHaveCount(1)
+ }
 })
 
 

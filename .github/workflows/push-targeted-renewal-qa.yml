@@ -1,0 +1,79 @@
+name: Targeted Push renewal QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/push-core.js'
+      - 'src/push-renewal.js'
+      - 'src/PushSettings.tsx'
+      - 'supabase/migrations/20261118150000_push_targeted_renewal.sql'
+      - 'tests/sql/push-targeted-renewal.sql'
+      - 'tests/unit/push.test.mjs'
+      - 'tests/unit/push-renewal.test.mjs'
+      - 'tests/push.spec.ts'
+      - 'docs/push-targeted-renewal-review.md'
+      - 'vercel.json'
+      - '.github/workflows/push-targeted-renewal-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-renewal:
+    if: github.head_ref == 'fix/push-targeted-renew-in-place'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-push-renew
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Unit regressions for exact owner-scoped renewal
+        run: node --test tests/unit/push.test.mjs tests/unit/push-renewal.test.mjs
+      - name: Apply all migrations and verify renewal on isolated PostgreSQL
+        run: |
+          set -euo pipefail
+          for file in tests/sql/admin-bootstrap.sql $(find supabase/migrations -maxdepth 1 -name '*.sql' | LC_ALL=C sort) tests/sql/push-targeted-renewal.sql; do
+            docker run --rm --network host \
+              -e PGPASSWORD=isolated-push-renew \
+              -v "${PWD}:/repo:ro" \
+              postgres:17-alpine \
+              psql -X -h 127.0.0.1 -U postgres -d postgres \
+                -v ON_ERROR_STOP=1 -f "/repo/${file}"
+          done
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Chromium setup
+        run: npx playwright install --with-deps chromium
+      - name: Local synthetic browser renewal tests only
+        run: npx playwright test tests/push.spec.ts --grep 'manual Push renewal' --workers=1
+      - name: Assert no Preview deployment or automatic safety sender
+        run: |
+          node --input-type=module -e "
+          import {readFileSync} from 'node:fs';
+          import {SAFETY_WORKER_CODE_ENABLED} from './server/safety-push-worker.js';
+          const j=JSON.parse(readFileSync('vercel.json','utf8'));
+          if(j.git.deploymentEnabled['fix/push-targeted-renew-in-place']!==false||SAFETY_WORKER_CODE_ENABLED!==false||j.crons?.length)process.exit(1);
+          "
