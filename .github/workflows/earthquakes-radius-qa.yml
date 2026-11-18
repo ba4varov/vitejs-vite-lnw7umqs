@@ -1,0 +1,48 @@
+name: Earthquake 300 km radius QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/earthquakes-core.js'
+      - 'tests/unit/earthquakes-core.test.mjs'
+      - 'tests/earthquakes-nearby.spec.ts'
+      - 'docs/earthquake-alerts-architecture.md'
+      - '.github/workflows/earthquakes-radius-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  radius-qa:
+    if: github.head_ref == 'fix/earthquake-radius-300km'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Unit tests for 300 km radius and API function budget
+        run: node --test tests/unit/earthquakes-core.test.mjs tests/unit/vercel-endpoints.test.mjs
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Earthquake nearby BG EN responsive browser tests
+        run: npx playwright test tests/earthquakes-nearby.spec.ts --reporter=line --workers=2
+      - name: Existing 390px weather forecast cards
+        run: npx playwright test tests/mobile-forecast-cards.spec.ts --grep "forecast cards 390 " --reporter=line --workers=2 --output=work/earthquake-radius-legacy
+      - name: Screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: earthquake-300km-qa
+          path: work/browser-results/
+          retention-days: 3
+          if-no-files-found: ignore
