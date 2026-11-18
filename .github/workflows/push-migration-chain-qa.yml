@@ -1,0 +1,62 @@
+name: Push migration chain readiness QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/sql/push-migration-chain-fixture.sql'
+      - 'tests/sql/push-migration-chain.test.sql'
+      - 'docs/push-production-migration-checklist.md'
+      - '.github/workflows/push-migration-chain-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  migration-chain:
+    if: github.head_ref == 'test/push-migration-chain-readiness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-push-chain
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply B1 then B2a on same ephemeral Postgres, verify gates and opt-outs
+        run: |
+          set -euo pipefail
+          for file in \
+            tests/sql/push-migration-chain-fixture.sql \
+            supabase/migrations/20261118093000_earthquake_push_opt_in.sql \
+            supabase/migrations/20261118120000_safety_push_durable_gate.sql \
+            tests/sql/push-migration-chain.test.sql; do
+            docker run --rm --network host \
+              -e PGPASSWORD=isolated-push-chain \
+              -v "${PWD}:/repo:ro" \
+              postgres:17-alpine \
+              psql -X -h 127.0.0.1 -U postgres -d postgres \
+              -v ON_ERROR_STOP=1 -f "/repo/${file}"
+          done
+      - name: Locked dependencies
+        run: npm ci
+      - name: Existing weather, earthquake consent and Push safety unit tests
+        run: node --test tests/unit/safety-push-preview.test.mjs tests/unit/earthquake-push-consent.test.mjs tests/unit/vercel-endpoints.test.mjs
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
