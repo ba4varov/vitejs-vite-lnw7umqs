@@ -39,7 +39,7 @@ async function boot(page:Page,lang:'bg'|'en',geo:{lat:number;lon:number},data:ob
   return {quakeCalls:()=>quakeCalls,pushCalls:()=>pushCalls}
 }
 for(const [width,lang] of [[360,'bg'],[390,'en'],[768,'bg'],[1440,'en']] as const) {
-  test(`earthquake panel ${width}px ${lang}: filters and attributes accurately`,async({page})=>{
+  test(`earthquake panel ${width}px ${lang}: filters and attributes accurately`,async({page},testInfo)=>{
     await page.setViewportSize({width,height:850})
     const now=Date.now()
     const record={
@@ -63,7 +63,7 @@ for(const [width,lang] of [[360,'bg'],[390,'en'],[768,'bg'],[1440,'en']] as cons
     expect(requests.quakeCalls()).toBe(1)
     expect(requests.pushCalls()).toBe(0)
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
-    await section.screenshot({path:`work/browser-results/earthquake-${width}-${lang}.png`})
+    await section.screenshot({path:testInfo.outputPath(`earthquake-${width}-${lang}.png`),animations:'disabled'})
   })
 }
 
