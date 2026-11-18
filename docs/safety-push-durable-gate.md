@@ -3,6 +3,22 @@
 **Delivery remains OFF, even after merging. No worker, scheduler, device transport,
 VAPID secret, Supabase production migration or cron job is activated by this PR.**
 
+## Production schema prerequisite checked (read-only)
+
+A read-only query against the live Meteo Puls Supabase schema confirmed the
+existing `push_controls`, `push_preferences`, `push_devices`,
+`push_deliveries` tables and `my_push` RPC. It also confirmed that
+`earthquake_push_optins` and `my_earthquake_push` (from the already merged
+PR #146) **are not yet installed** in the real database.
+
+**Required sequence, only after separate approval:** inspect the full SQL
+migrations and back up the schema; apply `20261118093000_earthquake_push_opt_in.sql`
+first; verify authenticated RPC, account isolation and explicit opt-in;
+then apply `20261118120000_safety_push_durable_gate.sql` with its default-OFF
+control; verify the gate is disabled, and only then prepare isolated test-device
+delivery. No automatic dispatch should be enabled during either migration.
+Merging a GitHub PR does not apply database migrations.
+
 ## Why this stage
 
 The already merged PR #147 has a pure dry-run candidate generator for two types
