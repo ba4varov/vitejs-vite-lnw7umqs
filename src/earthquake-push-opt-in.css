@@ -1,0 +1,50 @@
+/* Optional, account-bound earthquake consent. Never imply live delivery. */
+.push-settings .earthquake-optin {
+  border:1px solid #e5cda8;
+  border-left:4px solid #c38a42;
+  border-radius:13px;
+  padding:14px 16px;
+  margin:16px 0;
+  background:linear-gradient(125deg,#fff9ed,#f9fafc);
+  color:#433529;
+}
+.push-settings .earthquake-optin h4 {margin:0 0 8px;color:#68401c}
+.push-settings .earthquake-optin p {font-size:.87rem;line-height:1.5}
+.push-settings .earthquake-optin-disclosure {
+  background:#fff1d6;
+  border:1px solid #edd5a9;
+  border-radius:9px;
+  padding:10px;
+  font-weight:650;
+}
+.push-settings .earthquake-optin-toggle {
+  display:flex;gap:8px;align-items:flex-start;line-height:1.5;margin:12px 0;
+}
+.push-settings .earthquake-optin-toggle input {margin-top:4px;flex-shrink:0}
+.push-settings .earthquake-optin-select {display:block;margin:12px 0}
+.push-settings .earthquake-optin-select select {
+  display:block;max-width:100%;width:min(100%,440px);
+  border:1px solid #a99c88;border-radius:8px;
+  padding:10px;margin-top:6px;color:#263a45;background:white;
+}
+.push-settings .earthquake-optin button {min-height:40px}
+.push-settings .earthquake-optin :is(button,input,select):focus-visible {
+  outline:3px solid #9b650e;outline-offset:3px;
+}
+.push-settings .earthquake-optin-error {color:#8c2c24}
+.push-settings .earthquake-optin-date {font-size:.77rem;color:#735d4b}
+.weather-app.dark .push-settings .earthquake-optin {
+  background:linear-gradient(115deg,#35302b,#272d3a);
+  border-color:#987444;color:#f4e7d6;
+}
+.weather-app.dark .push-settings .earthquake-optin h4 {color:#ffe0ae}
+.weather-app.dark .push-settings .earthquake-optin-disclosure {
+  background:#4a3824;border-color:#9b784b;color:#ffe8c3;
+}
+.weather-app.dark .push-settings .earthquake-optin-date {color:#e2cdae}
+.weather-app.dark .push-settings .earthquake-optin-select select {
+  background:#303f50;color:#fff;border-color:#91a6b7;
+}
+@media(max-width:420px) {
+  .push-settings .earthquake-optin {padding:11px}
+}

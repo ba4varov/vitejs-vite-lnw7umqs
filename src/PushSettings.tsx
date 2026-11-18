@@ -8,6 +8,7 @@ import {sessionPushTest,pushTestDiagnostic,pushRequest,pushKeyRequest,pushKeySes
 import {pushSupport,preparePushWorker,enrollPush,removePushDevice,checkPushRegistration,pushRegistrationMessages,pushEnrollmentMessages} from './push-browser.js'
 import {alertNames} from './alerts-client'
 import {EARTHQUAKE_DEFAULTS} from '../server/earthquakes-core.js'
+import {EarthquakePushOptIn} from './EarthquakePushOptIn'
 const personal=['walk','garden','sport']
 const presets:PushCity[]=[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'},{name:'Пловдив',latitude:42.1354,longitude:24.7453,zone:'Europe/Sofia'},{name:'Варна',latitude:43.2141,longitude:27.9147,zone:'Europe/Sofia'},{name:'Бургас',latitude:42.5048,longitude:27.4626,zone:'Europe/Sofia'}]
 export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:AuthSession;lang:'bg'|'en';onDirtyChange?:(dirty:boolean)=>void;onBusyChange?:(busy:boolean)=>void}) {
@@ -15,6 +16,8 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  const [data,setData]=useState<PushSnapshot|null>(null),[draft,setDraft]=useState<PushPreferences>({enabled:false,cities:[],categories:[]}),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[worker,setWorker]=useState<ServiceWorkerRegistration|null>(null)
  const [label,setLabel]=useState(''),[city,setCity]=useState<PushCity>({name:'',latitude:0,longitude:0,zone:'Europe/Sofia'})
  const [checks,setChecks]=useState<Record<string,string>>({})
+ const [earthquakeDirty,setEarthquakeDirty]=useState(false)
+ const [earthquakeBusy,setEarthquakeBusy]=useState(false)
  const [keyChecks,setKeyChecks]=useState<Record<string,{p256dh:string;auth:string}>>({})
  const [keyStage,setKeyStage]=useState('')
  const [testTarget,setTestTarget]=useState<{deviceId:string;label:string}|null>(null)
@@ -34,7 +37,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  },[data,testTarget])
  const localTest=async()=>{setBusy(true);try{const code=await checkLocalNotification();if(live.current)setMessage(code+(code==='local:requested'?(bg?' — Браузърът прие локалното показване. Потвърди визуално известието; това не проверява FCM.':' — Browser accepted local display. Confirm visually; this does not test FCM.') : (bg?' — Провери разрешението и Service Worker на това устройство.':' — Check permission and Service Worker on this device.')))}finally{if(live.current)setBusy(false)}}
  const serverTest=async()=>{
-  if(testLock.current||busy||dirty){testMessage('attempt:blocked','Друга операция е активна или има незапазени настройки.','Another operation is active or preferences are unsaved.');return}
+  if(testLock.current||busy||earthquakeBusy||dirty||earthquakeDirty){testMessage('attempt:blocked','Друга операция е активна или има незапазени настройки.','Another operation is active or preferences are unsaved.');return}
   testLock.current=true;setBusy(true);testMessage('device:checking','Проверка на разрешението и регистрацията…','Checking permission and registration…')
   const epoch=diagnosticEpoch.current
   const current=()=>{const valid=live.current&&epoch===diagnosticEpoch.current;if(!valid)testMessage('session:changed','Акаунтът е сменен или изгледът е затворен. Тестът е прекъснат; резултатът не е потвърден.','Account changed or view closed. Test interrupted; outcome is unconfirmed.');return valid}
@@ -140,8 +143,8 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  }
  const dirty=!!data&&JSON.stringify(draft)!==JSON.stringify(data.preferences)
  const unsavedInputs=Boolean(city.name.trim() || (label.trim() && !data?.devices.some(device=>device.label===label.trim())))
- useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs)},[dirty,unsavedInputs,onDirtyChange])
- useEffect(()=>{onBusyChange?.(busy)},[busy,onBusyChange])
+ useEffect(()=>{onDirtyChange?.(dirty||unsavedInputs||earthquakeDirty)},[dirty,unsavedInputs,earthquakeDirty,onDirtyChange])
+ useEffect(()=>{onBusyChange?.(busy||earthquakeBusy)},[busy,earthquakeBusy,onBusyChange])
  const add=(c:PushCity)=>{
   if(!c.name.trim()||!Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||!Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||draft.cities.length>=5)return false
   try{new Intl.DateTimeFormat('en',{timeZone:c.zone}).format(0)}catch{return false}
@@ -171,7 +174,9 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
    <p>{bg?'Разрешено устройство: ':'Authorized device: '}{testTarget?`${testTarget.label} (${testTarget.deviceId})`:(bg?'няма':'none')}</p>
   </>}
   {data&&<>
-   <fieldset disabled={busy}><legend>{bg?'Градове и категории за бъдеща доставка':'Cities and categories for future delivery'}</legend>
+   <EarthquakePushOptIn session={session} lang={lang} cities={data.preferences.cities}
+     onDirtyChange={setEarthquakeDirty} onBusyChange={setEarthquakeBusy}/>
+   <fieldset disabled={busy||earthquakeBusy}><legend>{bg?'Градове и категории за бъдеща доставка':'Cities and categories for future delivery'}</legend>
     <p>{bg?'До 5 града. Предупрежденията за опасно време са безплатни и ориентировъчни по прогноза. Персоналните препоръки изискват текущ Pro достъп.':'Up to 5 cities. Dangerous weather forecast warnings are free and indicative. Personal recommendations require current Pro access.'}</p>
     <label><input type="checkbox" checked={draft.enabled} onChange={e=>setDraft({...draft,enabled:e.target.checked})}/>{bg?'Следи избраните градове и категории':'Monitor selected cities and categories'}</label>
     {Object.entries(alertNames[lang]).map(([kind,name])=><label key={kind}><input type="checkbox" disabled={personal.includes(kind)&&!data.pro} checked={draft.categories.includes(kind)} onChange={e=>setDraft({...draft,categories:e.target.checked?[...draft.categories,kind]:draft.categories.filter(k=>k!==kind)})}/>{String(name)}{personal.includes(kind)?' · Pro':''}</label>)}
