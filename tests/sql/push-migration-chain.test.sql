@@ -77,8 +77,11 @@ declare
  quake jsonb;
  qclaim uuid;
 begin
- c:=(select cities->0 from public.push_preferences
-       where user_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+ -- Candidate is constructed from an already validated fixed city. The
+ -- service_role itself has no direct grants to the private preferences table.
+ c:=jsonb_build_object(
+   'name','Varna','latitude',43.2141,'longitude',27.9147,
+   'zone','Europe/Sofia');
  k:='weather:open-meteo:'||repeat('0',32)||':wind:'
    ||to_char(clock_timestamp() at time zone 'Europe/Sofia','YYYY-MM-DD');
  claim:=public.reserve_safety_push(
