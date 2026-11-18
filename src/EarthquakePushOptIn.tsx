@@ -72,11 +72,11 @@ export function EarthquakePushOptIn({session,lang,cities,onDirtyChange,onBusyCha
         'Важно: дори при запазено съгласие автоматичната доставка е ИЗКЛЮЧЕНА, докато не приключат отделните проверки и одобрението. Не се иска ново разрешение от браузъра.':
         'Important: automatic delivery is DISABLED, even with saved consent, until separately reviewed and approved. No browser permission is requested here.'}
     </p>
-    {error&&<p role="status" className="earthquake-optin-error">
+    {error&&<p aria-live="polite" className="earthquake-optin-error">
       {message||(bg?'Настройките не могат да бъдат проверени.':'Cannot verify these settings.')}
     </p>}
-    {!error&&message&&<p role="status">{message}</p>}
-    {!snapshot&&!error&&<p role="status">{bg?'Проверка на съгласието…':'Checking consent…'}</p>}
+    {!error&&message&&<p aria-live="polite">{message}</p>}
+    {!snapshot&&!error&&<p aria-live="polite">{bg?'Проверка на съгласието…':'Checking consent…'}</p>}
     {snapshot&&<>
       <label className="earthquake-optin-toggle">
         <input type="checkbox" checked={enabled} disabled={busy||enabled===false&&cities.length===0}
