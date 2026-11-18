@@ -163,9 +163,27 @@ test('encrypted aes128gcm Web Push payload uses existing VAPID and supports serv
     [k.toLowerCase(),String(v)]))
   assert.equal(headers['content-encoding'],'aes128gcm')
   assert.equal(headers['content-type'],'application/octet-stream')
-  assert.equal(headers['urgency'],'very-low')
-  assert.equal(headers['ttl'],'60')
+  assert.equal(headers['urgency'],'high')
+  assert.equal(headers['ttl'],'3600')
   assert.equal(headers['content-length'],String(details.body.length))
+})
+
+test('recorded quake gets high urgency and expires after 15 minutes, never a diagnostic message',()=>{
+  const payload={title:'Метео Пулс — земетресение',
+    body:'Регистрирано земетресение M 3.8 близо до Варна. USGS.',
+    eventId:'earthquake:usgs:ci20261118'}
+  const details=prepareSafetyPush(device,config,device.deviceId,payload)
+  const headers=Object.fromEntries(Object.entries(details.headers).map(([k,v])=>
+    [k.toLowerCase(),String(v)]))
+  assert.equal(headers.ttl,'900')
+  assert.equal(headers.urgency,'high')
+  for(const key of ['synthetic-test','weather:open-meteo:invalid:wind:2026-11-18',
+    'earthquake:usgs:invalid id']){
+    assert.throws(()=>prepareSafetyPush(device,config,device.deviceId,{
+      ...payload,eventId:key
+    }),/INVALID_SAFETY_EVENT/)
+  }
+  assert.equal(SAFETY_WORKER_CODE_ENABLED,false)
 })
 
 function fixture({targets=[target],deny=false,transport,finishError=false}={}){

@@ -188,12 +188,20 @@ export function prepareSafetyPush(device,vapid,eventId,payload) {
     publicKey:device.publicKey}
   validateDevice(v,vapid,eventId)
   if(!payload||!/^.{2,80}$/.test(payload.title)||typeof payload.body!=='string'||
-    payload.body.length>240||payload.eventId!==undefined&&
-    (!/^.{1,180}$/.test(payload.eventId)))throw Error('INVALID_NOTIFICATION')
+    payload.body.length>240)throw Error('INVALID_NOTIFICATION')
+  // Never make diagnostic messages urgent. Only recognized server-side safety
+  // event keys may use this path; no browser-supplied urgency or TTL values.
+  const key=payload.eventId
+  const isEarthquake=typeof key==='string'&&
+    /^earthquake:usgs:[A-Za-z0-9_-]{2,90}$/.test(key)
+  const isWeather=typeof key==='string'&&
+    /^weather:open-meteo:[a-f0-9]{32}:(rain|storm|wind|cold|heat):[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(key)
+  if(!isEarthquake&&!isWeather)throw Error('INVALID_SAFETY_EVENT')
+  const ttl=isEarthquake?900:3600
   return webpush.generateRequestDetails({
     endpoint:v.endpoint,keys:{p256dh:v.p256dh,auth:v.auth}
   },JSON.stringify(payload),{
-    TTL:60,urgency:'very-low',contentEncoding:'aes128gcm',
+    TTL:ttl,urgency:'high',contentEncoding:'aes128gcm',
     vapidDetails:{subject:vapid.subject,publicKey:vapid.publicKey,
       privateKey:vapid.privateKey}
   })

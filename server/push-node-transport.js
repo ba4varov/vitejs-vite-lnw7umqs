@@ -20,6 +20,9 @@ export function isPublicAddress(address,family){
 const transportError=code=>Object.assign(Error('PUSH_TRANSPORT_UNCERTAIN'),{diagnosticCode:code})
 const badText=value=>['\r','\n','\0'].some(c=>String(value).includes(c))
 
+// The transport accepts only three exact time/urgency policies:
+// diagnostic=60/very-low, recorded quake=900/high, dangerous forecast=3600/high.
+// Reject arbitrary TTL/urgency combinations before DNS and socket creation.
 // Only allowlisted reasons escape this bounded (<=1024 bytes) parser.
 function classifyBody(bytes,contentType){
  const type=typeof contentType==='string'?contentType.split(';')[0].trim().toLowerCase():''
@@ -64,7 +67,7 @@ export function createNodeTransport({validEndpoint=isFcmEndpoint,allowedAddress=
   }
   if(size>4096||seen.size!==6)throw Error('INVALID_PUSH_HEADERS')
   const get=name=>Object.entries(headers).find(([k])=>k.toLowerCase()===name)?.[1]
-  if(get('content-length')!==String(body.length)||get('content-encoding')!=='aes128gcm'||get('content-type')!=='application/octet-stream'||get('ttl')!=='60'||get('urgency')!=='very-low'||!/^vapid t=[A-Za-z0-9_.-]+, k=[A-Za-z0-9_-]{87}$/.test(get('authorization')??''))throw Error('INVALID_PUSH_HEADERS')
+  if(get('content-length')!==String(body.length)||get('content-encoding')!=='aes128gcm'||get('content-type')!=='application/octet-stream'||!['60:very-low','900:high','3600:high'].includes(`${get('ttl')}:${get('urgency')}`)||!/^vapid t=[A-Za-z0-9_.-]+, k=[A-Za-z0-9_-]{87}$/.test(get('authorization')??''))throw Error('INVALID_PUSH_HEADERS')
   let timer
   let addresses
   try{
