@@ -240,7 +240,7 @@ test('revocation between reserve and final burn prevents network attempt',async(
   const f=fixture({targets:[{...target,earthquake:null,
     weather:{...preferences,categories:['wind']}}]})
   const overrides={
-    dbRpc:async(name,args)=>{
+    dbRpc:async(name,_args)=>{
       if(name==='safety_worker_targets')return [target]
       if(name==='reserve_safety_push')return uuid(12)
       if(name==='burn_safety_push')return false
