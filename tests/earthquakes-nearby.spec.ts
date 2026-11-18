@@ -49,7 +49,8 @@ for(const [width,lang] of [[360,'bg'],[390,'en'],[768,'bg'],[1440,'en']] as cons
       pushDeliveryEnabled:false,
       events:[
         event('near',43.2141,27.9147,3.1,now-60_000),
-        event('far',43.2141,30.5,6,now-70_000),
+        event('regional',43.2141,30.5,4.2,now-70_000),
+        event('far',43.2141,32.4,6,now-72_000),
         event('weak',43.2141,27.9147,2.9,now-80_000),
         event('old',43.2141,27.9147,5,now-25*60*60_000)
       ]
@@ -57,11 +58,13 @@ for(const [width,lang] of [[360,'bg'],[390,'en'],[768,'bg'],[1440,'en']] as cons
     const requests=await boot(page,lang,{lat:43.2141,lon:27.9147},record)
     const section=page.locator('.earthquake-nearby')
     await expect(section).toBeVisible()
-    await expect(section.locator('li')).toHaveCount(1)
+    await expect(section.locator('li')).toHaveCount(2)
     await expect(section.getByText(/M 3\.1/)).toBeVisible()
-    await expect(section.getByText(/100 (км|km)/)).toBeVisible()
+    await expect(section.getByText(/300 (км|km)/)).toBeVisible()
+    await expect(section.getByText(/M 4\.2/)).toBeVisible()
+    await expect(section.getByText(/M 6\.0/)).toHaveCount(0)
     await expect(section.getByText(lang==='bg'?/не е ранно предупреждение/i:/not an earthquake early-warning/i)).toBeVisible()
-    await expect(section.locator('a')).toHaveAttribute('href','https://earthquake.usgs.gov/earthquakes/eventpage/near')
+    await expect(section.locator('a').first()).toHaveAttribute('href','https://earthquake.usgs.gov/earthquakes/eventpage/near')
     expect(requests.quakeCalls()).toBe(1)
     expect(requests.pushCalls()).toBe(0)
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
