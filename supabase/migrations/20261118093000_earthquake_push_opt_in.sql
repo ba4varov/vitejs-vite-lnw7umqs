@@ -57,7 +57,7 @@ begin
   else
     if jsonb_typeof(payload->'enabled') is distinct from 'boolean'
        or (select count(*) from jsonb_object_keys(payload))
-          <> case when (payload->>'enabled')::boolean then 3 else 2 end
+          <> (case when (payload->>'enabled')::boolean then 3 else 2 end)
        or not (payload ? 'operation') then raise invalid_parameter_value; end if;
 
     if (payload->>'enabled')::boolean then
