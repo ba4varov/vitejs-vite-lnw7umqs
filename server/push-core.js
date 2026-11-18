@@ -25,10 +25,17 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
       return res.status(400).json({error:'INVALID_BODY'})
     payload={...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
    }else{
-    if(!req.body||Object.keys(req.body).length!==2||!exactObject(req.body,['subscription','label'])||
+    // Older open tabs used the same two-field POST envelope for *both* a
+    // brand-new registration and a destructive browser renewal. It can insert a
+    // duplicate device after unsubscribe. Fail closed before calling the RPC.
+    if(req.body?.operation===undefined && req.body && Object.keys(req.body).length===2 &&
+       exactObject(req.body,['subscription','label']))
+      return res.status(409).json({error:'PUSH_CLIENT_OUTDATED'})
+    if(!req.body||req.body.operation!=='register'||Object.keys(req.body).length!==3||
+      !exactObject(req.body,['operation','subscription','label'])||
       !validPushSubscription(req.body.subscription)||typeof req.body.label!=='string'||!req.body.label.trim()||req.body.label.length>80)
       return res.status(400).json({error:'INVALID_BODY'})
-    payload={operation:'register',...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
+    payload={...req.body,vapidPublicKey:env.PUSH_VAPID_PUBLIC_KEY}
    }
   }
   if(req.method==='PATCH') {
@@ -52,6 +59,6 @@ export async function handlePush(req,res,env=process.env,fetcher=fetch) {
   const validPublicKey=/^[A-Za-z0-9_-]{87}$/.test(publicKey) && Buffer.from(publicKey,'base64url')[0]===4
   const registrationEnabled=env.PUSH_REGISTRATION_ENABLED==='true' && data.registrationPublicKey===publicKey && validPublicKey
   // Authenticated diagnostics need only the public key; POST remains gated above.
-  return res.status(200).json({...data,registrationEnabled,publicKey:validPublicKey?publicKey:null,deliveryEnabled:false})
+  return res.status(200).json({...data,pushProtocolVersion:2,registrationEnabled,publicKey:validPublicKey?publicKey:null,deliveryEnabled:false})
  }catch{return res.status(503).json({error:'PUSH_UNAVAILABLE'})}
 }
