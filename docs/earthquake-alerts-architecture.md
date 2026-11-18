@@ -9,7 +9,7 @@
 - Attributing agency and status: USGS preliminary data; event parameters are subject to revision. Never claim that shaking was experienced merely from magnitude or distance.
 
 ## Stage A — implemented in this PR
-1. Public Vercel endpoint `GET /api/earthquakes` polls the fixed USGS `2.5_day.geojson` feed, checks shape, removes invalid/non-earthquake/old events, returns a bounded sanitized list. USGS recommends GeoJSON for real-time map displays.
+1. Public, existing Vercel endpoint `GET /api/alerts?source=earthquakes` polls the fixed USGS `2.5_day.geojson` feed, checks shape, removes invalid/non-earthquake/old events, returns a bounded sanitized list. USGS recommends GeoJSON for real-time map displays.
 2. CDN cache `s-maxage=60`, instance cache 60 s, and 90-second visible-tab polling. **No visitor coordinates are sent to USGS or to the API**; the browser uses its already accepted location to compute Haversine distance.
 3. Only M≥3.0 events inside 100 km and in the last 24 hours are displayed, max five rows. When there is no matching event, hide the section entirely. If the feed is unavailable, never claim "no earthquakes"; fresh previously confirmed data may be marked stale for up to 5 minutes.
 4. Each row shows source, event magnitude, distance, depth (if available), local time and direct link to the USGS event detail. Separate visually from NIMH official *weather* warnings.
@@ -40,3 +40,6 @@ USGS updates its GeoJSON summary feeds every minute; site display can lag due to
 - USGS Earthquake API: https://earthquake.usgs.gov/fdsnws/event/1/
 - EMSC FDSN-WS Event: https://www.seismicportal.eu/fdsn-wsevent.html
 - EMSC near-real-time notifications: https://www.seismicportal.eu/webservices.html
+
+### Vercel Hobby function count
+The existing eleven API functions are already at the project limit. This feature adds **no new Lambda**: it routes `/api/alerts?source=earthquakes` to the dedicated feed core while leaving the authenticated `/api/alerts` and `?source=nimh` untouched. The existing Node security workflow must remain successful.
