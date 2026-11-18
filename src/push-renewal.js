@@ -4,7 +4,7 @@ import {checkPushRegistration,vapidBytes,pushRegistrationMessages} from './push-
 export async function renewPush({scope=window,device,key,load,confirm,persist,authorize}) {
  const preflight=async()=>{
   let snapshot
-  try {snapshot=await load()}catch {throw Error('preflight-failed')}
+  try {snapshot=await load()}catch(error) {throw Error(error?.message==='PUSH_CLIENT_OUTDATED'?'client-outdated':'preflight-failed')}
   // Fail before browser unsubscribe when a cached tab talks to a different API contract.
   if(snapshot.pushProtocolVersion!==2)throw Error('client-outdated')
   if(!snapshot.registrationEnabled)throw Error('registration-disabled')
