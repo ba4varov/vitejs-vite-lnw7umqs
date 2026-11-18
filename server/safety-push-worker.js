@@ -96,14 +96,24 @@ export async function selectSafetyCandidates(targets,{
 }={}) {
   if(!Array.isArray(targets)||targets.length>MAX_TARGETS_PER_RUN)return []
   const found=[],seen=new Set(),forecasts=new Map()
-  let quakes=[]
-  if(targets.some(t=>t?.earthquake?.enabled)) {
-    try{
-      const response=await readEarthquakes({fetcher,now})
-      if(!response.stale&&response.checkedAt<=now&&now-response.checkedAt<120000&&
-        Array.isArray(response.events))quakes=response.events
-    }catch{/* Missing source is NOT proof of no earthquake. No candidate. */}
+  // Batch only ten distinct city forecasts per invocation to bound usage.
+  // Start the USGS request and all weather calls together, not serially.
+  const quakePromise=targets.some(t=>t?.earthquake?.enabled)?
+    Promise.resolve().then(()=>readEarthquakes({fetcher,now})).catch(()=>null):
+    Promise.resolve(null)
+  for(const t of targets){
+    if(!t?.weather?.enabled||!validPushPreferences(t.weather))continue
+    for(const city of t.weather.cities){
+      const id=cityId(city)
+      if(forecasts.has(id)||forecasts.size>=10)continue
+      forecasts.set(id,Promise.resolve().then(()=>readForecast(city,fetcher,now))
+        .catch(()=>null))
+    }
   }
+  const response=await quakePromise
+  const quakes=response&&!response.stale&&response.checkedAt<=now&&
+    now-response.checkedAt<120000&&Array.isArray(response.events)?
+    response.events:[]
   for(const t of targets){
     const userId=t?.userId
     if(typeof userId!=='string'||!UUID.test(t.deviceId||'')||!UUID.test(userId))continue
@@ -112,13 +122,7 @@ export async function selectSafetyCandidates(targets,{
     if(prefs?.enabled&&validPushPreferences(prefs)){
       for(const city of prefs.cities){
         const fingerprint=cityId(city)
-        if(!forecasts.has(fingerprint)){
-          // One server query per distinct saved city, not one per device.
-          let promise
-          try{promise=Promise.resolve(readForecast(city,fetcher,now)).catch(()=>null)}
-          catch{promise=Promise.resolve(null)}
-          forecasts.set(fingerprint,promise)
-        }
+        if(!forecasts.has(fingerprint))continue // hard API budget cap
         const snapshot=await forecasts.get(fingerprint)
         if(!snapshot)continue
         for(const item of prepareWeatherSafetyPushPreview(
