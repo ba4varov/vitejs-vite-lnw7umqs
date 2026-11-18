@@ -20,6 +20,7 @@ const sample=()=>({
     quake('eq001',43.2141,27.9147,3.0),
     quake('eq002',43.2141,28.6,4.1),
     quake('eq003',43.2141,29.5,5),
+    quake('eq008',43.2141,32.4,5.5),
     quake('eq004',43.2141,27.9147,2.8),
     quake('eq005',43.2141,27.9147,3.2,NOW-26*60*60_000),
     quake('eq006',43.2141,27.9147,3.3,NOW+20*60_000),
@@ -37,13 +38,13 @@ const fakeRes=()=>({
   json(body){this.body=body;return this},
 })
 
-test('initial defaults are 100 km, M3.0 and desired Push on, actual delivery fail-closed',()=>{
-  assert.deepEqual(EARTHQUAKE_DEFAULTS,{radiusKm:100,minMagnitude:3,pushRequested:true})
+test('initial defaults are 300 km, M3.0 and desired Push on, actual delivery fail-closed',()=>{
+  assert.deepEqual(EARTHQUAKE_DEFAULTS,{radiusKm:300,minMagnitude:3,pushRequested:true})
   assert.equal(EARTHQUAKE_PUSH_DELIVERY_ENABLED,false)
 })
 test('validates USGS event times, types, magnitudes, locations and URLs',()=>{
   const events=normalizeUsgsEarthquakes(sample(),NOW)
-  assert.deepEqual(events.map(e=>e.id),['usgs:eq007'].filter(()=>false).concat(['usgs:eq001','usgs:eq002','usgs:eq003']))
+  assert.deepEqual(events.map(e=>e.id),['usgs:eq001','usgs:eq002','usgs:eq003','usgs:eq008'])
   assert.ok(events.every(e=>e.source==='USGS' && e.preliminary===true))
   assert.equal(events[0].depthKm,12.5)
   const data=sample()
@@ -54,19 +55,23 @@ test('validates USGS event times, types, magnitudes, locations and URLs',()=>{
   assert.equal(cleaned.place.includes('<'),false)
   assert.throws(()=>normalizeUsgsEarthquakes({features:[]},NOW),/INVALID_USGS_FEED/)
 })
-test('haversine handles 100 km threshold, antimeridian and invalid coordinates',()=>{
+test('haversine handles 300 km threshold, antimeridian and invalid coordinates',()=>{
   const varna={lat:43.2141,lon:27.9147}
   assert.equal(distanceKm(varna,varna),0)
   assert.ok(distanceKm(varna,{lat:43.2141,lon:28.6})<100)
   assert.ok(distanceKm(varna,{lat:43.2141,lon:29.5})>100)
+  assert.ok(distanceKm(varna,{lat:43.2141,lon:31.5})<300)
+  assert.ok(distanceKm(varna,{lat:43.2141,lon:31.8})>300)
   assert.ok(distanceKm({lat:0,lon:179.8},{lat:0,lon:-179.8})<50)
   assert.equal(distanceKm({lat:Infinity,lon:1},varna),null)
 })
 test('only nearby, recent >=M3 events are shown in most-recent order',()=>{
   const matches=nearbyEarthquakes(normalizeUsgsEarthquakes(sample(),NOW),
     {lat:43.2141,lon:27.9147},EARTHQUAKE_DEFAULTS,NOW)
-  assert.deepEqual(matches.map(e=>e.id),['usgs:eq001','usgs:eq002'])
-  assert.ok(matches.every(e=>e.distanceKm<=100&&e.magnitude>=3))
+  assert.deepEqual(matches.map(e=>e.id),['usgs:eq001','usgs:eq002','usgs:eq003'])
+  assert.ok(matches.every(e=>e.distanceKm<=300&&e.magnitude>=3))
+  assert.ok(matches.some(e=>e.distanceKm>100&&e.distanceKm<=300))
+  assert.equal(matches.some(e=>e.id==='usgs:eq008'),false)
   assert.deepEqual(nearbyEarthquakes(matches,{lat:NaN,lon:27.9}),[])
   assert.deepEqual(nearbyEarthquakes(matches,{lat:43.2,lon:27.9},{radiusKm:900,minMagnitude:3}),[])
 })
@@ -74,7 +79,7 @@ test('push is never dispatched merely because configuration requests it',()=>{
   const events=normalizeUsgsEarthquakes(sample(),NOW)
   const subscriber={
     enabled:true,pushRequested:true,browserPermission:'granted',consentedAt:NOW-60*60_000,
-    lat:43.2141,lon:27.9147,radiusKm:100,minMagnitude:3
+    lat:43.2141,lon:27.9147,radiusKm:300,minMagnitude:3
   }
   assert.deepEqual(earthquakePushCandidates(events,subscriber,new Set(),NOW),[])
   assert.equal(earthquakeDedupKey(events[0]),'earthquake:usgs:eq001')
@@ -106,7 +111,7 @@ test('one fixed USGS feed, shared in memory and CDN, never accepts client GPS',a
   assert.equal(seen.options.redirect,'error')
   assert.equal(first.code,200);assert.equal(second.code,200)
   assert.equal(first.body.status,'ready')
-  assert.equal(first.body.events.length,3)
+  assert.equal(first.body.events.length,4)
   assert.equal(first.body.pushDeliveryEnabled,false)
   assert.match(first.headers['Cache-Control'],/s-maxage=60/)
 })
