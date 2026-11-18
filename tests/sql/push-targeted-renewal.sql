@@ -13,7 +13,7 @@ insert into public.push_preferences(user_id,enabled,cities,categories) values
 update public.push_controls set registration_enabled=false,
  registration_test_user_id='e0000000-0000-0000-0000-000000000001',
  vapid_public_key='B'||repeat('A',86),test_delivery_enabled=false,
- session_target_device_id='e1000000-0000-0000-0000-000000000001'
+ session_target_device_id=null
  where singleton;
 insert into public.push_devices(id,user_id,endpoint,fingerprint,p256dh,auth_key,label,vapid_public_key) values
  ('e1000000-0000-0000-0000-000000000001','e0000000-0000-0000-0000-000000000001',
@@ -24,6 +24,8 @@ insert into public.push_devices(id,user_id,endpoint,fingerprint,p256dh,auth_key,
  'https://fcm.googleapis.com/wp/another-owner',
  encode(sha256(convert_to('https://fcm.googleapis.com/wp/another-owner','UTF8')),'hex'),
  'B'||repeat('A',86),repeat('A',22),'Other synthetic','B'||repeat('A',86));
+-- FK target is assigned only after the referenced device row exists.
+update public.push_controls set session_target_device_id='e1000000-0000-0000-0000-000000000001' where singleton;
 
 do $$ begin
  if has_function_privilege('anon','public.my_push_renew(jsonb)','execute')
