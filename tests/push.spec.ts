@@ -39,12 +39,13 @@ async function setup(page:any,{permission='granted',registrationEnabled=true,pro
   if(missingMigration)return r.fulfill({status:503,json:{error:'PUSH_UNAVAILABLE'}})
   if(method==='PATCH')prefs=body
   if(method==='POST') {
+    expect(body.operation).toBe('register')
    if(failure)return r.fulfill({status:503,json:{error:'PUSH_UNAVAILABLE'}})
    const hash=await import('node:crypto').then(c=>c.createHash('sha256').update(body.subscription.endpoint).digest('hex'))
    devices=[{id:'00000000-0000-0000-0000-000000000003',label:body.label,fingerprint:hash,createdAt:new Date().toISOString()}]
   }
   if(method==='DELETE')devices=[]
-  return r.fulfill({json:{contractVersion:1,pro,preferences:prefs,devices,registrationEnabled,publicKey:publicKeyAvailable?publicKey:null,deliveryEnabled:false}})
+  return r.fulfill({json:{contractVersion:1,pushProtocolVersion:2,pro,preferences:prefs,devices,registrationEnabled,publicKey:publicKeyAvailable?publicKey:null,deliveryEnabled:false}})
  })
  await page.goto('/');await clickHeaderControl(page, page.locator('.auth-nav').getByRole('button',{name:'Моят профил',exact:true}))
  await page.getByRole('tab',{name:'Push известия',exact:true}).click()
@@ -157,13 +158,13 @@ for(const lang of ['bg','en'])for(const outcome of ['success','rejected','discon
  const requests:any[]=[],records=new Map();let attempts=0
  await page.route('**/api/push',async route=>{
   if(route.request().method()!=='POST')return route.fallback()
-  const body=route.request().postDataJSON();requests.push(body);attempts++
+  const body=route.request().postDataJSON();expect(body.operation).toBe('register');requests.push(body);attempts++
   if(attempts===1&&outcome==='rejected')return route.fulfill({status:403,json:{error:'PUSH_FORBIDDEN'}})
   if(attempts===1&&outcome==='disconnected')return route.abort('internetdisconnected')
   const fingerprint=await import('node:crypto').then(c=>c.createHash('sha256').update(body.subscription.endpoint).digest('hex'))
   records.set(fingerprint,{id:'00000000-0000-0000-0000-000000000003',label:body.label,fingerprint,createdAt:'2026-10-14T00:00:00Z'})
   if(attempts===1&&outcome==='lost-response')return route.abort('connectionclosed')
-  return route.fulfill({json:{contractVersion:1,pro:false,preferences:{enabled:true,cities:[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'}],categories:['wind']},devices:[...records.values()],registrationEnabled:true,publicKey,deliveryEnabled:false}})
+  return route.fulfill({json:{contractVersion:1,pushProtocolVersion:2,pro:false,preferences:{enabled:true,cities:[{name:'София',latitude:42.6977,longitude:23.3219,zone:'Europe/Sofia'}],categories:['wind']},devices:[...records.values()],registrationEnabled:true,publicKey,deliveryEnabled:false}})
  })
  const panel=page.locator('.push-settings'),button=panel.getByRole('button',{name:lang==='bg'?'Разреши и регистрирай това устройство':'Allow and register this device',exact:true})
  await button.click()
@@ -311,7 +312,7 @@ for(const scenario of ['success','cancel','mismatch','lost-response','subscribe-
  await page.route('**/api/push',async r=>{
   const method=r.request().method();calls.push({method,body:r.request().postDataJSON()})
   if(method==='POST'&&scenario==='lost-response')return r.abort('failed')
-  return r.fulfill({json:{contractVersion:1,pro:false,preferences:state.preferences(),devices:method==='POST'?[{...oldDevice,fingerprint:newHash}]:[oldDevice],registrationEnabled:scenario!=='disabled',publicKey,deliveryEnabled:false}})
+  return r.fulfill({json:{contractVersion:1,pushProtocolVersion:2,pro:false,preferences:state.preferences(),devices:method==='POST'?[{...oldDevice,fingerprint:newHash}]:[oldDevice],registrationEnabled:scenario!=='disabled',publicKey,deliveryEnabled:false}})
  })
  // Trigger a React render after setting the synthetic permission.
  await panel.getByLabel('Име на това устройство').fill('Test phone')
@@ -531,7 +532,7 @@ for(const refusal of ['rights','consent','registration'])test(`Push final revali
  if(refusal==='consent')await page.route('**/api/push',async r=>{
   if(r.request().method()!=='GET'||!await page.evaluate(()=>(window as any).pushConfirmed))return r.fallback()
   // Synthetic denied snapshot; never forward to a hosted account API.
-  return r.fulfill({json:{contractVersion:1,pro:false,preferences:{enabled:false,cities:[],categories:[]},devices:[],registrationEnabled:true,publicKey,deliveryEnabled:false}})
+  return r.fulfill({json:{contractVersion:1,pushProtocolVersion:2,pro:false,preferences:{enabled:false,cities:[],categories:[]},devices:[],registrationEnabled:true,publicKey,deliveryEnabled:false}})
  })
  if(refusal==='registration')await page.evaluate(()=>{const confirm=window.confirm;window.confirm=message=>{const answer=confirm(message);if(answer)(window as any).diagnosticSubscription('device');return answer}})
  let dialogs=0;page.on('dialog',async d=>{dialogs++;await d.accept()})

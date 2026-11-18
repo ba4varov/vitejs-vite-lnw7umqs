@@ -1,0 +1,51 @@
+name: Push stale-client contract guard QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/push-core.js'
+      - 'src/push-client.ts'
+      - 'src/push-renewal.js'
+      - 'src/push-browser.js'
+      - 'src/PushSettings.tsx'
+      - 'tests/unit/push.test.mjs'
+      - 'tests/unit/push-renewal.test.mjs'
+      - 'tests/push.spec.ts'
+      - '.github/workflows/push-stale-client-guard-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  stale-client:
+    if: github.head_ref == 'fix/push-stale-client-protocol-guard'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.19.0'
+          check-latest: false
+      - name: Install locked dependencies with no lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test stale legacy client, new register envelope and in-place renewal
+        run: node --test tests/unit/push.test.mjs tests/unit/push-renewal.test.mjs
+      - name: Type check, build and lint
+        run: |
+          npm run build
+          npm run lint
+      - name: Install local Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests (isolated fake account and fake push service)
+        run: npx playwright test tests/push.spec.ts --grep 'manual Push renewal|safe enrollment|explicit permission' --workers=1
+      - name: Ensure no preview deployment on this branch
+        run: |
+          node --input-type=module -e "
+          import {readFileSync} from 'node:fs'
+          const c=JSON.parse(readFileSync('vercel.json','utf8'))
+          if(c.git.deploymentEnabled['fix/push-stale-client-protocol-guard']!==false||c.crons?.length)process.exit(1)
+          "

@@ -116,7 +116,7 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
   setBusy(true);setMessage('')
   // Permission request occurs synchronously in enrollPush, directly from this click.
   void enrollPush({registration:worker,key:data.publicKey,persist:async(subscription:object)=>{
-   const result=await pushRequest(session,'POST',{subscription,label:label.trim()});apply(result);return result
+   const result=await pushRequest(session,'POST',{operation:'register',subscription,label:label.trim()});apply(result);return result
   }}).then(()=>{if(live.current)setMessage(bg?'Устройството е записано за подготовка. Автоматична доставка няма.':'Device prepared. Automatic delivery is disabled.')}).catch(error=>{if(live.current){const enrollmentMessage=pushEnrollmentMessages[lang][error.message];if(enrollmentMessage)setMessage(enrollmentMessage);else fail(error)}}).finally(()=>{if(live.current)setBusy(false)})
  }
  const remove=async(device:any)=>{setBusy(true);setMessage('');try{await removePushDevice({registration:worker,device,persist:async(id:string)=>{const result=await pushRequest(session,'DELETE',{id});apply(result);return result}})}catch(e){fail(e)}finally{if(live.current)setBusy(false)}}

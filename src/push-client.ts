@@ -3,7 +3,7 @@ import {accountSession,restoreSession,type AuthSession} from './auth-client'
 export type PushCity={name:string;latitude:number;longitude:number;zone:string}
 export type PushPreferences={enabled:boolean;cities:PushCity[];categories:string[]}
 export type PushDevice={id:string;label:string;fingerprint:string;createdAt:string}
-export type PushSnapshot={contractVersion:1;pro:boolean;preferences:PushPreferences;devices:PushDevice[];registrationEnabled:boolean;publicKey:string|null;deliveryEnabled:false}
+export type PushSnapshot={contractVersion:1;pushProtocolVersion:2;pro:boolean;preferences:PushPreferences;devices:PushDevice[];registrationEnabled:boolean;publicKey:string|null;deliveryEnabled:false}
 export async function pushRequest(session:AuthSession,method='GET',body?:object):Promise<PushSnapshot> {
  const active=await restoreSession()
  if(!active||active.user.id!==session.user.id)throw Error('SESSION_CHANGED')
@@ -11,6 +11,7 @@ export async function pushRequest(session:AuthSession,method='GET',body?:object)
  if(!response.ok)throw Object.assign(Error(String(response.status)),{status:response.status})
  const data=await response.json()
  if(data.contractVersion!==1||data.deliveryEnabled!==false||!Array.isArray(data.devices)||!Array.isArray(data.preferences?.cities)||!Array.isArray(data.preferences?.categories)||typeof data.pro!=='boolean')throw Error('INVALID_RESPONSE')
+ if(data.pushProtocolVersion!==2)throw Error('PUSH_CLIENT_OUTDATED')
  return data
 }
 

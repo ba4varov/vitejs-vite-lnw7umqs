@@ -4,7 +4,9 @@ import {checkPushRegistration,vapidBytes,pushRegistrationMessages} from './push-
 export async function renewPush({scope=window,device,key,load,confirm,persist,authorize}) {
  const preflight=async()=>{
   let snapshot
-  try {snapshot=await load()}catch {throw Error('preflight-failed')}
+  try {snapshot=await load()}catch(error) {throw Error(error?.message==='PUSH_CLIENT_OUTDATED'?'client-outdated':'preflight-failed')}
+  // Fail before browser unsubscribe when a cached tab talks to a different API contract.
+  if(snapshot.pushProtocolVersion!==2)throw Error('client-outdated')
   if(!snapshot.registrationEnabled)throw Error('registration-disabled')
   if(snapshot.publicKey!==key)throw Error('vapid-mismatch')
   const selected=snapshot.devices.find(d=>d.id===device.id&&d.fingerprint===device.fingerprint)
@@ -61,6 +63,7 @@ export const pushRenewalMessages={
  bg:{...pushRegistrationMessages.bg,
   warning:'Да подновя ли Push регистрацията на избраното устройство? Браузърът първо отписва стария абонамент. При успешен запис същият идентификатор на устройството ще получи новите данни. При отказ известията може да останат недостъпни, а старият запис в базата ще остане.',
   checking:'Проверка на избраното устройство и ограниченията…',cancelled:'Подновяването е отказано. Няма промени.',success:'Push регистрацията е подновена за същото устройство, без нов запис. Това не доказва, че FCM ще приеме известие.',
+  'client-outdated':'Страницата и сървърът са с различни версии. Презареди Метео Пулс и провери устройството. Няма промяна на абонамента.',
   'registration-disabled':'Подновяването е недостъпно: новите регистрации са забранени.',
   'preferences-required':'Първо запази разрешени Push настройки с градове и категории.',
   'permission-required':'Нужно е вече дадено разрешение за известия. Провери настройките на браузъра.',
@@ -72,6 +75,7 @@ export const pushRenewalMessages={
  en:{...pushRegistrationMessages.en,
   warning:'Renew Push registration for this device? The browser first unsubscribes the old subscription. On success the same device ID receives new credentials. On failure notifications may remain unavailable and the old database record remains.',
   checking:'Checking the selected device and registration restrictions…',cancelled:'Renewal cancelled. Nothing changed.',success:'Push subscription renewed in place under the same device ID. This does not prove FCM will accept a notification.',
+  'client-outdated':'The page and server versions differ. Reload Meteo Pulse and check the device. No subscription was changed.',
   'registration-disabled':'Renewal is unavailable: new registrations are disabled.',
   'preferences-required':'First save allowed Push preferences with cities and categories.',
   'permission-required':'Notification permission must already be granted. Check browser settings.',

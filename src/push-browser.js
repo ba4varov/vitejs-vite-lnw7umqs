@@ -32,7 +32,7 @@ export async function enrollPush({scope=window,registration,key,persist}) {
   // A failed response may follow a committed write. Keep the subscription so
   // another explicit click resubmits the same endpoint to the owner's upsert.
   // Only known API rejections/preflight session changes are definitive.
-  const rejected=[400,401,403,405,413,429].includes(error?.status)||error?.message==='SESSION_CHANGED'
+  const rejected=[400,401,403,405,409,413,429].includes(error?.status)||error?.message==='SESSION_CHANGED'
   throw Error(rejected?'PUSH_REGISTRATION_REJECTED':'PUSH_REGISTRATION_UNCONFIRMED')
  }
 }

@@ -27,9 +27,9 @@ async function api(method,body,extraEnv={},rpcStatus=200,rpcBody={contractVersio
 }
 test('API no sender, private caching, user JWT only; registration defaults off; mutation validation',async()=>{
  const off=await api('POST',{subscription:sub,label:'Phone'});assert.equal(off.res.code,503);assert.equal(off.calls.length,1)
- const on=await api('POST',{subscription:sub,label:'Phone'},{PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key});assert.equal(on.res.code,200);assert.equal(on.res.data.deliveryEnabled,false);assert.equal(on.calls.length,2)
+ const on=await api('POST',{operation:'register',subscription:sub,label:'Phone'},{PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key});assert.equal(on.res.code,200);assert.equal(on.res.data.deliveryEnabled,false);assert.equal(on.res.data.pushProtocolVersion,2);assert.equal(on.calls.length,2)
  assert.equal(on.calls[1].opts.headers.Authorization,'Bearer isolated');assert.equal(on.calls[1].opts.redirect,'error');assert.equal(on.res.headers['Cache-Control'],'private, no-store')
- const bad=await api('POST',{subscription:{...sub,endpoint:'http://127.0.0.1'},label:'Phone'},{PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key});assert.equal(bad.res.code,400);assert.equal(bad.calls.length,1)
+ const bad=await api('POST',{operation:'register',subscription:{...sub,endpoint:'http://127.0.0.1'},label:'Phone'},{PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key});assert.equal(bad.res.code,400);assert.equal(bad.calls.length,1)
  assert.equal((await api('PATCH',{...prefs,user_id:'other'})).res.code,400)
  assert.equal((await api('DELETE',{id:'x'})).res.code,400)
  assert.equal((await api('GET',null,{},400,{message:'PUSH_RATE_LIMITED'})).res.code,429)
@@ -64,10 +64,28 @@ test('renewal requires the existing registration gate and cannot create an arbit
  assert.equal(ok.res.data.deliveryEnabled,false)
  assert.equal(ok.res.headers['Cache-Control'],'private, no-store')
  assert.equal(ok.calls[1].opts.headers.Authorization,'Bearer isolated')
- const old=await api('POST',{subscription:sub,label:'Phone'},env)
+ const old=await api('POST',{operation:'register',subscription:sub,label:'Phone'},env)
  assert.match(old.calls[1].url,/\/rest\/v1\/rpc\/my_push$/)
 })
 
+test('stale two-field POST from an old renewal page is rejected without database insert',async()=>{
+ const env={PUSH_REGISTRATION_ENABLED:'true',PUSH_VAPID_PUBLIC_KEY:key}
+ for(const body of [{subscription:sub,label:'Note 13 Pro'},{operation:'unknown',subscription:sub,label:'Note 13 Pro'},{operation:'renew',subscription:sub,label:'Note 13 Pro'}]){
+  const r=await api('POST',body,env)
+  assert.equal(r.res.code,body.operation===undefined?409:400)
+  assert.equal(r.calls.length,1,'no registration/renewal RPC can run')
+  if(body.operation===undefined)assert.deepEqual(r.res.data,{error:'PUSH_CLIENT_OUTDATED'})
+ }
+ const off=await api('POST',{subscription:sub,label:'Note 13 Pro'})
+ assert.equal(off.res.code,503,'disabled gate still wins')
+ const fresh=await api('POST',{operation:'register',subscription:sub,label:'Fresh device'},env)
+ assert.equal(fresh.res.code,200)
+ assert.match(fresh.calls[1].url,/\/rest\/v1\/rpc\/my_push$/)
+ const sent=JSON.parse(fresh.calls[1].opts.body).payload
+ assert.equal(sent.operation,'register')
+ assert.equal(sent.vapidPublicKey,key)
+ assert.deepEqual(Object.keys(sent).sort(),['label','operation','subscription','vapidPublicKey'].sort())
+})
 const browser=(userAgent='Chrome',standalone=false)=>({isSecureContext:true,Notification:{},PushManager:{},navigator:{userAgent,maxTouchPoints:0,serviceWorker:{}},matchMedia:()=>({matches:standalone})})
 test('Android/Windows feature detection, iOS Home Screen and unsupported contexts',()=>{
  for(const ua of ['Android Chrome','Windows Chrome','Windows Edg'])assert.equal(pushSupport(browser(ua)),'supported')
@@ -171,7 +189,7 @@ test('registration public key must agree with DB gate; caller cannot choose a di
  const on=await api('GET',null,settings,200,{contractVersion:1,registrationPublicKey:key})
  assert.equal(on.res.data.registrationEnabled,true)
  assert.equal((await api('POST',{subscription:sub,label:'Phone',vapidPublicKey:'caller-key'},settings)).res.code,400)
- const saved=await api('POST',{subscription:sub,label:'Phone'},settings)
+ const saved=await api('POST',{operation:'register',subscription:sub,label:'Phone'},settings)
  assert.equal(JSON.parse(saved.calls[1].opts.body).payload.vapidPublicKey,key)
 })
 const now=Date.parse('2026-10-09T00:00Z')

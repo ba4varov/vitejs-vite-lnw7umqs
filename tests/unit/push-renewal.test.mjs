@@ -10,7 +10,7 @@ function fixture(){
  const payload={endpoint:'https://fcm.googleapis.com/wp/synthetic-new',keys:{p256dh:'synthetic',auth:'synthetic'}}
  const renewed={toJSON:()=>payload,unsubscribe:()=>{throw Error('must keep new subscription')}}
  const registration={scope:'https://meteo.invalid/',active:{scriptURL:'https://meteo.invalid/push-sw.js'},pushManager:{getSubscription:async()=>old,subscribe:async options=>{events.push('subscribe');assert.equal(options.userVisibleOnly,true);assert.deepEqual(options.applicationServerKey,new Uint8Array(Buffer.from(key,'base64url')));return renewed}}}
- const snapshot={registrationEnabled:true,publicKey:key,devices:[device],pro:false,preferences:{enabled:true,cities:[{}],categories:['danger']}}
+ const snapshot={pushProtocolVersion:2,registrationEnabled:true,publicKey:key,devices:[device],pro:false,preferences:{enabled:true,cities:[{}],categories:['danger']}}
  const scope={isSecureContext:true,location:{origin:'https://meteo.invalid'},crypto:webcrypto,navigator:{serviceWorker:{getRegistration:async()=>registration}},Notification:{permission:'granted',requestPermission:()=>{throw Error('no prompts')}}}
  const args={scope,device,key,load:async()=>{events.push('load');return snapshot},confirm:async()=>{events.push('confirm');return true},authorize:async()=>{events.push('authorize');return true},persist:async(value,label)=>{events.push('POST');assert.equal(value,payload);assert.equal(label,device.label);return {...snapshot,devices:[{...device,fingerprint:createHash('sha256').update(payload.endpoint).digest('hex')}]}}}
  return {args,events,old,registration,snapshot}
@@ -19,6 +19,14 @@ test('successful renewal preserves the original device ID with the new endpoint 
  const {args,events}=fixture();const result=await renewPush(args)
  assert.equal(result.status,'success');assert.equal(result.data.devices[0].id,args.device.id);assert.notEqual(result.data.devices[0].fingerprint,args.device.fingerprint)
  assert.deepEqual(events,['load','confirm','load','authorize','unsubscribe','subscribe','POST'])
+})
+test('old or missing API protocol blocks before browser unsubscribe and consent prompt',async()=>{
+ for(const v of [undefined,1,3]){
+  const f=fixture()
+  f.snapshot.pushProtocolVersion=v
+  assert.equal((await renewPush(f.args)).status,'client-outdated')
+  assert.deepEqual(f.events,['load'])
+ }
 })
 test('explicit cancellation never mutates',async()=>{
  const {args,events}=fixture();args.confirm=()=>false
