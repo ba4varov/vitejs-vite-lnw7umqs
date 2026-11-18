@@ -1,0 +1,50 @@
+name: Safety Push alert priority QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/push-node-transport.js'
+      - 'server/safety-push-worker.js'
+      - 'tests/unit/safety-push-worker.test.mjs'
+      - 'tests/unit/push-node-transport.test.mjs'
+      - 'docs/push-real-device-readiness.md'
+      - '.github/workflows/safety-push-alert-priority-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  alert-priority:
+    if: github.head_ref == 'fix/safety-push-alert-priority-readiness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Local TLS Web Push transport and urgent alert policy
+        run: |
+          node --test \
+            tests/unit/push-node-transport.test.mjs \
+            tests/unit/safety-push-worker.test.mjs
+      - name: Existing test sender and registered device/consent regressions
+        run: |
+          node --test \
+            tests/unit/push-node-operator.test.mjs \
+            tests/unit/push-session-test.test.mjs \
+            tests/unit/safety-push-preview.test.mjs \
+            tests/unit/earthquake-push-consent.test.mjs \
+            tests/unit/vercel-endpoints.test.mjs
+      - name: TypeScript and production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Assert worker remains OFF and no safety Cron exists
+        run: |
+          node --input-type=module -e "import {SAFETY_WORKER_CODE_ENABLED} from './server/safety-push-worker.js'; if(SAFETY_WORKER_CODE_ENABLED!==false)process.exit(1)"
+          node --input-type=module -e "import {readFileSync} from 'node:fs';const j=JSON.parse(readFileSync('vercel.json'));if(j.git.deploymentEnabled['fix/safety-push-alert-priority-readiness']!==false||j.crons?.some(c=>String(c.path).includes('safety-dispatch')))process.exit(1)"
