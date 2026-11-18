@@ -1,6 +1,7 @@
 import { gpsWarningArea, MAX_WARNING_REGION_ACCURACY } from './nimh-location.js'
 import { OfficialWarnings } from './OfficialWarnings'
 import { NearbyEarthquakes } from './NearbyEarthquakes'
+import { EarthquakeHistory } from './EarthquakeHistory'
 import { RainWarning } from './RainWarning'
 import StartupDiagnostics from './StartupDiagnostics'
 import type { ConversationContext, PendingClarification } from '../server/weather-chat-core.js'
@@ -1235,6 +1236,7 @@ const fetchAiAdvice = async (dataForAi: any, requestId: number) => {
         lang={lang}
         timeZone={notificationForecast?.timeZone}
       />}
+      <EarthquakeHistory lang={lang} />
 
       {snapshotTime !== null && weatherCoords?.lat === coords.lat && weatherCoords?.lon === coords.lon && !freshness.fresh && <p role="status" className="forecast-update-error">
         {lang === 'bg' ? 'Последна валидна прогноза: ' : 'Last valid forecast: '}{new Date(snapshotTime).toLocaleString(lang === 'bg' ? 'bg-BG' : 'en-GB')}.{' '}
