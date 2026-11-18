@@ -95,6 +95,31 @@ try{
  await check('headers/body/options cannot add arbitrary targets, proxy or framing',async()=>{
   for(const changed of [{...details,proxy:'https://evil.invalid'},{...details,agent:{}},{...details,method:'GET'},{...details,headers:{...details.headers,'Content-Length':1}},{...details,headers:{...details.headers,Authorization:'x\r\nHost: evil'}},{...details,headers:{...details.headers,Host:'evil.invalid'}},{...details,headers:{...details.headers,authorization:'duplicate'}},{...details,body:Buffer.alloc(2049)}])await assert.rejects(prepare(changed,resolver))
  })
+ await check('urgent safety alerts pass pinned TLS with strict TTL/urgency; diagnostic remains low urgency',async()=>{
+  for(const [ttl,urgency] of [[900,'high'],[3600,'high']]){
+   const alert=webpush.generateRequestDetails(subscription,payload,{...options,TTL:ttl,urgency})
+   expected=alert;reset('accepted')
+   const once=await prepare(alert,resolver)
+   assert.equal((await once()).status,201)
+   assert.equal(observed.selected,1)
+   assert.equal(observed.wire,true)
+   assert.equal(observed.sni,true)
+   await assert.rejects(once(),/ATTEMPT_ALREADY_CONSUMED/)
+  }
+  const unsafe=[
+   {...options,TTL:60,urgency:'high'},
+   {...options,TTL:3600,urgency:'very-low'},
+   {...options,TTL:900,urgency:'normal'},
+   {...options,TTL:86400,urgency:'high'}
+  ]
+  for(const x of unsafe){
+   const altered=webpush.generateRequestDetails(subscription,payload,x)
+   let dns=0
+   await assert.rejects(prepare(altered,async()=>{dns++;return []}),/INVALID_PUSH_HEADERS/)
+   assert.equal(dns,0)
+  }
+  expected=details
+ })
  await check('actual Node Agent pins one prechecked IP, preserves SNI/headers/body, never re-resolves',async()=>{
   reset('accepted');let resolutions=0
   const once=await prepare(details,async()=>{resolutions++;return [{address:resolutions===1?'127.0.0.1':'127.0.0.2',family:4}]})
