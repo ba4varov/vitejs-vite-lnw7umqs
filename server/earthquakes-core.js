@@ -4,7 +4,7 @@
 export const EARTHQUAKE_FEED_URL =
   'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson'
 export const EARTHQUAKE_DEFAULTS = Object.freeze({
-  radiusKm: 100,
+  radiusKm: 300,
   minMagnitude: 3.0,
   pushRequested: true,
 })
