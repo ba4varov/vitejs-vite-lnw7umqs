@@ -155,6 +155,9 @@ export function PushSettings({session,lang,onDirtyChange,onBusyChange}:{session:
  return <section className="push-settings" aria-label={bg?'Push известия':'Push notifications'}>
   <h3>{bg?'Push известия при затворен сайт':'Push notifications when the site is closed'}</h3>
   <p>{bg?'Подготовка: автоматичната доставка е изключена. Тези настройки са независими от камбанката и съгласието за аналитика.':'Preparation: automatic delivery is disabled. These preferences are independent of the bell and analytics consent.'}</p>
+  <p>{bg
+    ? 'Предвидени са две независими групи известия: предварително предупреждение за опасно време според прогнозата (силен дъжд, гръмотевици, вятър, жега и студ) и информация за вече регистрирани земетресения. Градовете и категориите по-долу се отнасят за опасното време; земетресенията имат отделно съгласие.'
+    : 'Two independent safety channels are planned: advance warnings for forecast dangerous weather (heavy rain, storms, wind, heat and cold), and reports of already recorded earthquakes. The cities and risk categories below apply to weather; earthquakes require separate consent.'}</p>
   <p className="earthquake-push-planned">
     {bg
       ? `Земетресения: начални прагове ${EARTHQUAKE_DEFAULTS.radiusKm} км и M ${EARTHQUAKE_DEFAULTS.minMagnitude.toFixed(1)}. Push е предвиден като включена възможност, но все още НЕ изпраща автоматични известия и ще изисква отделно разрешение от потребителя.`
